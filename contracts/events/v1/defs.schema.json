@@ -19,6 +19,11 @@
       "pattern": "^\\S(.*\\S)?$",
       "description": "엔진이 발급한 식별자(포털은 만들지 않는다). 1~64자, 앞뒤 공백 없음."
     },
+    "tenantId": {
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9_]{0,31}$",
+      "description": "플랫폼 TenantId 형식"
+    },
     "agentId": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",

@@ -37,6 +37,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>포털 Envelope ⊇ 핵심: 핵심이 거부하는 변형을 포털 Envelope도 거부하고, 포털 Envelope의 allOf 첫 항이 사본을 가리킨다.</li>
  *   <li>type ↔ payload, type ↔ aggregate.kind 짝(Q4·Q5), 열거 밖 type·version은 거부(else: false), 모르는 필드는 허용(§4.5).</li>
  *   <li>요율·배수는 소수 문자열(Q3) — JSON number는 거부. contracts/ 전 파일 format 0. OpenAPI 피드의 정수 커서 규약.</li>
+ *   <li>v1.1(Phase 1 지시문 §0): 엔진에 없는 데이터는 선택(K1~K4), PayoutCompleted 확정값 선택 필드(K5), 금액 정의 문장(K6·K7),
+ *       피드 응답 필수 tenantId·422 Problem·limit 기본 200(K8), PolicyEventObserved 열거 설명(K9).</li>
  * </ul>
  * 스키마 IRI는 저장소 파일로만 풀린다(원격 조회 없음): {@code https://ga.example/portal/contracts/} → {@code contracts/},
  * {@code https://ga.example/contracts/}(ga-disclosure의 IRI) → {@code contracts/shared/ga-disclosure/}.
@@ -309,10 +311,87 @@ class EventSchemaTest {
     @Test
     void amountIsDocumentedAsPaidAfterTheLimitCut() {
         JsonNode amount = payloadSchema("CommissionCalculated").path("properties").path("amount");
-        assertThat(amount.path("description").asString()).contains("한도 삭감 뒤 지급분").contains("amount + limitCutAmt");
+        // K6(v1.1): 삭감 뒤·분할 뒤 지급 예정액, 요청액 = amount + limitCutAmt, 이연분은 DeferralScheduled(CURVE·LIMIT_DEFER)
+        assertThat(amount.path("description").asString()).contains("한도 삭감 뒤·분급 분할 뒤 지급 예정액").contains("amount + limitCutAmt")
+                .contains("DeferralScheduled").contains("CURVE").contains("LIMIT_DEFER");
         ObjectNode calc = read(CONTRACTS.resolve("events/v1/samples/02-CommissionCalculated.json"));
         ((ObjectNode) calc.path("payload")).put("amount", 2_800_000.5);
         assertThat(schema(ENVELOPE).validate(calc)).as("non-integer amount").isNotEmpty();
+    }
+
+    // ------------------------------------------------------------------ v1.1 — 엔진에 없는 데이터는 선택(K1~K5), 정의 문장(K7·K9)
+
+    static Stream<Arguments> optionalInV11() {
+        return Stream.of(
+                Arguments.argumentSet("K1 policySummary.productName·insuredMasked", "02-CommissionCalculated.json", List.of("policySummary"),
+                        List.of("productName", "insuredMasked"), List.of("contractDate", "monthlyPremium")),
+                Arguments.argumentSet("K2 basis.rate·payoutRate·installmentNo", "02-CommissionCalculated.json", List.of("basis"),
+                        List.of("rate", "payoutRate", "installmentNo"), List.of("ruleVersionIds")),
+                Arguments.argumentSet("K3 AgentSnapshot.grade·role", "16-AgentSnapshot.json", List.<String>of(),
+                        List.of("grade", "role"), List.of("agentId", "name", "orgPath", "status", "validFrom")),
+                Arguments.argumentSet("K4 StatementConfirmed.clawbackOffset·withholdingTax·net", "08-StatementConfirmed.json", List.<String>of(),
+                        List.of("clawbackOffset", "withholdingTax", "net"), List.of("agentId", "closeYm", "gross", "adjustment", "closedAt")));
+    }
+
+    /** 선택이 된 필드를 전부 뺀 변형이 통과하고, 그 객체의 required는 정확히 남은 목록이다(다시 필수로 조여지면 여기서 보인다). */
+    @ParameterizedTest
+    @MethodSource("optionalInV11")
+    void fieldsTheEngineDoesNotHaveAreOptional(String sampleFile, List<String> objectPath, List<String> optional, List<String> required) {
+        ObjectNode doc = read(CONTRACTS.resolve("events/v1/samples/" + sampleFile));
+        ObjectNode target = (ObjectNode) doc.path("payload");
+        JsonNode schemaNode = payloadSchema(doc.path("type").asString());
+        for (String step : objectPath) {
+            target = (ObjectNode) target.path(step);
+            schemaNode = schemaNode.path("properties").path(step);
+        }
+        for (String field : optional) {
+            assertThat(target.has(field)).as("sample has %s", field).isTrue();
+            target.remove(field);
+        }
+        assertThat(schema(ENVELOPE).validate(doc)).isEmpty();
+        assertThat(schemaNode.path("required")).extracting(JsonNode::asString).containsExactlyInAnyOrderElementsOf(required);
+    }
+
+    @Test
+    void payoutCompletedCarriesTheRunsSettledAmountsAsOptionalIntegers() {
+        ObjectNode doc = read(CONTRACTS.resolve("events/v1/samples/09-PayoutCompleted.json"));
+        ObjectNode payload = (ObjectNode) doc.path("payload");
+        payload.put("runSeq", 1).put("gross", 3_600_000).put("clawbackOffset", 0).put("receivableOffset", 0).put("carriedReceivable", 0)
+                .put("adjustment", 0).put("payable", 3_600_000).put("withholdingTax", 118_800).put("net", 3_481_200);
+        assertThat(schema(ENVELOPE).validate(doc)).isEmpty();
+        assertThat(payload.path("net").asLong()).isEqualTo(payload.path("paidAmount").asLong());
+        for (String field : List.of("gross", "clawbackOffset", "receivableOffset", "carriedReceivable", "adjustment", "payable", "withholdingTax", "net")) {
+            ObjectNode bad = doc.deepCopy();
+            ((ObjectNode) bad.path("payload")).put(field, "1");
+            assertThat(schema(ENVELOPE).validate(bad)).as("%s as a string", field).isNotEmpty();
+        }
+        ObjectNode run0 = doc.deepCopy();
+        ((ObjectNode) run0.path("payload")).put("runSeq", 0);
+        assertThat(schema(ENVELOPE).validate(run0)).as("runSeq 0").isNotEmpty();
+        assertThat(payloadSchema("PayoutCompleted").path("required")).extracting(JsonNode::asString)
+                .containsExactlyInAnyOrder("agentId", "closeYm", "paidAt", "paidAmount");
+        JsonNode props = payloadSchema("PayoutCompleted").path("properties");
+        assertThat(props.path("receivableOffset").path("description").asString()).contains("clawbackOffset").contains("다른 것");
+        assertThat(props.path("paidAmount").path("description").asString()).contains("= net");
+    }
+
+    /** K7: 세 집계 이벤트의 gross·clawbackOffset·adjustment는 포털 earnings_month 합산과 같은 정의 문장을 갖는다. */
+    @Test
+    void statementAndPayoutTotalsShareTheEarningsMonthDefinitions() {
+        for (String type : List.of("StatementEstimated", "StatementConfirmed", "PayoutCompleted")) {
+            JsonNode props = payloadSchema(type).path("properties");
+            assertThat(props.path("gross").path("description").asString()).as(type).contains("commType ∉ {CLAWBACK, ADJUSTMENT}").contains("전 상태 합산");
+            assertThat(props.path("clawbackOffset").path("description").asString()).as(type).contains("commType = CLAWBACK").contains("≤ 0");
+            assertThat(props.path("adjustment").path("description").asString()).as(type).contains("AdjustmentPosted");
+        }
+    }
+
+    @Test
+    void policyEventTypesDocumentTheEngineMapping() {
+        JsonNode eventType = payloadSchema("PolicyEventObserved").path("properties").path("eventType");
+        assertThat(eventType.path("enum")).extracting(JsonNode::asString)
+                .containsExactly("CANCEL", "LAPSE", "WITHDRAW", "REDUCE", "REINSTATE", "PAYMENT_OVERDUE");
+        assertThat(eventType.path("description").asString()).contains("REINSTATE = 엔진 REVIVE").contains("PAYMENT_OVERDUE는 우리 엔진이 발행하지 않는다");
     }
 
     /** 포털 defs의 시각·UUID 형식은 공유 핵심의 것과 글자까지 같다(두 정본이 어긋나지 않게). */
@@ -373,7 +452,8 @@ class EventSchemaTest {
         JsonNode api = YAML.readTree(readString(CONTRACTS.resolve("api/v1/engine-internal.openapi.yaml")));
         assertThat(api.path("openapi").asString()).isEqualTo("3.1.0");
         JsonNode feed = api.path("components").path("schemas").path("FeedResponse");
-        assertThat(feed.path("required")).extracting(JsonNode::asString).containsExactlyInAnyOrder("events", "nextSeq", "headSeq", "schemaVersion");
+        assertThat(feed.path("required")).extracting(JsonNode::asString)
+                .containsExactlyInAnyOrder("tenantId", "events", "nextSeq", "headSeq", "schemaVersion");
         for (String f : List.of("nextSeq", "headSeq", "schemaVersion")) {
             assertThat(feed.path("properties").path(f).path("type").asString()).as(f).isEqualTo("integer");
         }
@@ -383,6 +463,10 @@ class EventSchemaTest {
         assertThat(params.get("afterSeq").path("minimum").asInt()).isZero();
         assertThat(params.get("limit").path("minimum").asInt()).isEqualTo(1);
         assertThat(params.get("limit").path("maximum").asInt()).isEqualTo(1000);
+        assertThat(params.get("limit").path("default").asInt()).isEqualTo(200);
+        JsonNode responses = api.path("paths").path("/internal/v1/events").path("get").path("responses");
+        assertThat(responses.properties()).extracting(Map.Entry::getKey).containsExactlyInAnyOrder("200", "401", "422");
+        assertThat(responses.path("422").path("description").asString()).contains("AFTER_BEYOND_HEAD");
         assertThat(api.path("paths").properties()).extracting(Map.Entry::getKey).containsExactlyInAnyOrder(
                 "/internal/v1/events", "/internal/v1/simulations/new-contract", "/internal/v1/simulations/policy-event",
                 "/internal/v1/agents/{agentId}/statements/{ym}");
@@ -391,9 +475,19 @@ class EventSchemaTest {
         ObjectNode response = JsonNodeFactory.instance.objectNode();
         ArrayNode events = response.putArray("events");
         samples().stream().limit(9).map(EventSchemaTest::read).forEach(events::add);
-        response.put("nextSeq", 9).put("headSeq", 13).put("schemaVersion", 1);
+        response.put("tenantId", "GA01").put("nextSeq", 9).put("headSeq", 13).put("schemaVersion", 1);
         assertThat(feedSchema.validate(response)).isEmpty();
+        ObjectNode noTenant = response.deepCopy();
+        noTenant.remove("tenantId");
+        assertThat(feedSchema.validate(noTenant)).as("without tenantId (K8)").isNotEmpty();
+        ObjectNode badTenant = response.deepCopy();
+        badTenant.put("tenantId", "ga01");
+        assertThat(feedSchema.validate(badTenant)).as("tenantId not in the TenantId format").isNotEmpty();
         response.put("nextSeq", "9");
         assertThat(feedSchema.validate(response)).as("string cursor").isNotEmpty();
+
+        Schema problem = schema(PORTAL + "api/v1/engine-internal.openapi.yaml#/components/schemas/Problem");
+        assertThat(problem.validate(JSON.readTree("{\"code\":\"AFTER_BEYOND_HEAD\",\"message\":\"afterSeq 20 > headSeq 13\"}"))).isEmpty();
+        assertThat(problem.validate(JSON.readTree("{\"message\":\"x\"}"))).as("Problem without code").isNotEmpty();
     }
 }

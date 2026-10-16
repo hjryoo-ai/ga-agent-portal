@@ -7,9 +7,7 @@
   "required": [
     "agentId",
     "name",
-    "grade",
     "orgPath",
-    "role",
     "status",
     "validFrom"
   ],
@@ -27,7 +25,8 @@
     },
     "grade": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "description": "선택(v1.1) — 등급 이력이 없는 설계사가 있을 수 있다"
     },
     "orgPath": {
       "type": "string",
@@ -36,7 +35,7 @@
     "role": {
       "type": "string",
       "minLength": 1,
-      "description": "열린 값(AGENT/TEAM_LEAD/BRANCH_HEAD/...)"
+      "description": "선택(v1.1), 열린 값(AGENT/TEAM_LEAD/BRANCH_HEAD/...). 엔진에는 역할 개념이 없다 — 포털의 역할·권한은 identity_link에서 정한다(설계서 §9, Phase 3)"
     },
     "status": {
       "type": "string",
