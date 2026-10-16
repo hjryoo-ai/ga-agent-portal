@@ -25,7 +25,8 @@
         "REDUCE",
         "REINSTATE",
         "PAYMENT_OVERDUE"
-      ]
+      ],
+      "description": "REINSTATE = 엔진 REVIVE(부활). PAYMENT_OVERDUE는 우리 엔진이 발행하지 않는다(다른 공급원용). 엔진 EventType의 NEW·PAYMENT·CORRECT는 발행되지 않는다"
     },
     "occurredOn": {
       "$ref": "../defs.schema.json#/$defs/date"

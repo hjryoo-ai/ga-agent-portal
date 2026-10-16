@@ -1,12 +1,13 @@
 openapi: 3.1.0
 info:
   title: ga-commission-engine 내부 API — 포털이 쓰는 것 (v1 골격)
-  version: 1.0.0
+  version: 1.1.0
   description: |
-    엔진(테넌트별 인스턴스)이 포털에 제공하는 내부 API(설계서 §4.1·§4.3). 포털 Phase 0의 골격이며 구현은 엔진 E1(피드)·E2(동기 API)에서 한다.
+    엔진(테넌트별 인스턴스)이 포털에 제공하는 내부 API(설계서 §4.1·§4.3). 포털 Phase 0의 골격이며 구현은 엔진 E1(피드)·E2(동기 API·명세)에서 한다.
     인증은 서비스 토큰(운영 mTLS 권장) — 설계사 토큰으로는 접근할 수 없다.
     금액은 정수 원(integer), 요율·배수 같은 소수는 불투명 문자열(표시 전용), 날짜·시각은 pattern(format을 쓰지 않는다).
     피드 커서는 정수 afterSeq·nextSeq·headSeq 규약이다(ga-disclosure 6A 계획 승인 Q5로 재확인).
+    1.1.0(포털 Phase 1 지시문 §0 K8): FeedResponse에 필수 tenantId, 401·422(AFTER_BEYOND_HEAD) 응답, limit 기본 200. 피드는 엔진 E1이 구현한다.
 servers:
   - url: https://engine.invalid
 security:
@@ -27,10 +28,12 @@ paths:
         - name: limit
           in: query
           required: false
+          description: 한 번에 돌려줄 최대 건수. 없으면 200.
           schema:
             type: integer
             minimum: 1
             maximum: 1000
+            default: 200
       responses:
         '200':
           description: 이벤트 묶음. headSeq − nextSeq가 포털의 지연 지표.
@@ -38,6 +41,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FeedResponse'
+        '401':
+          description: 서비스 토큰이 없거나 틀렸다.
+        '422':
+          description: |
+            afterSeq > headSeq — code AFTER_BEYOND_HEAD. 복원된 DB 등 다른 발행자를 읽고 있다는 뜻이다(ga-disclosure 피드와 같은 규약).
+            포털은 그 테넌트를 정지한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /internal/v1/simulations/new-contract:
     post:
       operationId: simulateNewContract
@@ -109,8 +122,11 @@ components:
   schemas:
     FeedResponse:
       type: object
-      required: [events, nextSeq, headSeq, schemaVersion]
+      required: [tenantId, events, nextSeq, headSeq, schemaVersion]
       properties:
+        tenantId:
+          $ref: '../../events/v1/defs.schema.json#/$defs/tenantId'
+          description: 응답한 엔진 인스턴스의 테넌트(엔진은 테넌트별 인스턴스). 포털은 요청한 테넌트와 다르면 아무것도 적용하지 않고 그 테넌트를 정지한다(v1.1).
         events:
           type: array
           items:
@@ -125,6 +141,16 @@ components:
         schemaVersion:
           type: integer
           minimum: 1
+    Problem:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          pattern: '^[A-Z][A-Z0-9_]*$'
+          description: 오류 코드(예 AFTER_BEYOND_HEAD)
+        message:
+          type: string
     NewContractRequest:
       type: object
       required: [agentId, productKey, monthlyPremium, contractDate]

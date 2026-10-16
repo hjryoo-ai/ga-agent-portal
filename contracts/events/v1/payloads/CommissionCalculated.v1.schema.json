@@ -36,7 +36,7 @@
     },
     "amount": {
       "$ref": "../defs.schema.json#/$defs/won",
-      "description": "한도 삭감 뒤 지급분(정수 원, 환수·취소는 음수). 요청액 = amount + limitCutAmt(설계서 v1.2 I1)"
+      "description": "한도 삭감 뒤·분급 분할 뒤 지급 예정액(정수 원, 환수·취소는 음수). 요청액 = amount + limitCutAmt(설계서 v1.2 I1·DD-2). 분급 이연분은 이 금액에 들어 있지 않고 DeferralScheduled(reason CURVE·LIMIT_DEFER)로 따로 오며, 도래하면 DEFERRED 라인으로 다시 온다"
     },
     "closeYm": {
       "$ref": "../defs.schema.json#/$defs/ym"
@@ -57,9 +57,6 @@
     "basis": {
       "type": "object",
       "required": [
-        "rate",
-        "payoutRate",
-        "installmentNo",
         "ruleVersionIds"
       ],
       "properties": {
@@ -79,15 +76,14 @@
             "$ref": "../defs.schema.json#/$defs/id"
           }
         }
-      }
+      },
+      "description": "라인 근거. ruleVersionIds만 필수 — 요율·지급률·회차는 엔진에 있을 때만 온다(정액·일시 지급은 없다, v1.1). 화면은 있을 때 보여 준다(§14.0)"
     },
     "policySummary": {
       "type": "object",
       "required": [
         "contractDate",
-        "monthlyPremium",
-        "productName",
-        "insuredMasked"
+        "monthlyPremium"
       ],
       "properties": {
         "contractDate": {
@@ -98,12 +94,13 @@
         },
         "productName": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "선택(v1.1) — 엔진에 계약 마스터가 없다. 없으면 화면은 productKey를 보여 준다(설계서 §8)"
         },
         "insuredMasked": {
           "type": "string",
           "minLength": 1,
-          "description": "엔진이 마스킹해 발행한 피보험자명(설계서 §9) — 원문 이름은 받지 않는다"
+          "description": "선택(v1.1) — 엔진에 고객 데이터가 없다. 엔진이 마스킹해 발행한 피보험자명(설계서 §9) — 원문 이름은 받지 않는다"
         }
       }
     }
