@@ -341,6 +341,53 @@ tasks.register("verifyUpstreamContract") {
 }
 
 // ---------------------------------------------------------------------------------------------
+// 평문 스캔 골격(지시문 v1.2 §7): 모든 모듈의 시험 결과 XML(표준 출력·오류·실패 메시지·시험 이름)과 빌드 디렉터리의 *.log에 센티널
+// (원문·UTF-8 16진)이 한 번도 나타나지 않아야 한다. 센티널은 portal-infra 시험 픽스처의 pii-sentinels.properties(허구 값). 모든 Test 태스크 뒤에
+// 돌고 check에 묶인다. 포털 Phase 3부터 설계사 식별 정보가 들어오면 센티널을 늘린다(ga-disclosure Phase 2 P4와 같은 방식).
+// ---------------------------------------------------------------------------------------------
+val sentinelsFile = layout.projectDirectory.file("portal-infra/src/testFixtures/resources/pii-sentinels.properties")
+
+val scanPlaintextLeaks = tasks.register("scanPlaintextLeaks") {
+    group = "verification"
+    description = "Fails when a plaintext sentinel appears in any test result XML or build log."
+    val sentinels = sentinelsFile.asFile
+    val root = layout.projectDirectory.asFile
+    inputs.file(sentinels)
+    outputs.upToDateWhen { false }
+    doLast {
+        val props = java.util.Properties()
+        sentinels.reader(Charsets.UTF_8).use { props.load(it) }
+        val plain = props.getProperty("names").split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (plain.isEmpty()) throw GradleException("scanPlaintextLeaks: no sentinels in ${sentinels.relativeTo(root)}")
+        val forbidden = plain + plain.map { v -> v.toByteArray(Charsets.UTF_8).joinToString("") { "%02x".format(it) } }
+        val files = root.listFiles().orEmpty()
+            .map { it.resolve("build") }
+            .filter { it.isDirectory }
+            .flatMap { dir ->
+                dir.walkTopDown().filter { f ->
+                    f.isFile && ((f.name.endsWith(".xml") && f.path.contains("${File.separator}test-results${File.separator}")) || f.name.endsWith(".log"))
+                }.toList()
+            }
+        if (files.none { it.name.endsWith(".xml") }) {
+            throw GradleException("scanPlaintextLeaks: no test result XML found — run the tests first")
+        }
+        val hits = files.flatMap { f ->
+            val text = f.readText(Charsets.UTF_8)
+            forbidden.filter { text.contains(it) }.map { "${f.relativeTo(root)}: ${it.take(1)}…" }
+        }
+        if (hits.isNotEmpty()) {
+            throw GradleException("평문 센티널이 시험 출력에 나타났다(값은 앞 1자만 표시):\n" + hits.joinToString("\n"))
+        }
+        logger.lifecycle("scanPlaintextLeaks: ${files.size} files, ${forbidden.size} forbidden strings, 0 hits")
+    }
+}
+subprojects {
+    tasks.withType<Test>().configureEach { finalizedBy(scanPlaintextLeaks) }
+}
+scanPlaintextLeaks.configure { mustRunAfter(subprojects.map { p -> p.tasks.withType<Test>() }) }
+tasks.named("check") { dependsOn(scanPlaintextLeaks) }
+
+// ---------------------------------------------------------------------------------------------
 // CLAUDE.md 코드 규약 — "소스셋 밖의 파일을 읽는 테스트는 그 파일을 Gradle 입력으로 선언한다"(ga-disclosure Phase 8 BUG-3, 지시문 v1.2 §7):
 // 테스트 태스크마다 그 원천(+ 클래스패스에 오른 testFixtures)의 문자열 리터럴에서 저장소 경로(첫 마디가 저장소 최상위 이름)를 모아,
 // 선언하지 않은 것이 있으면 실패한다. 덮였다고 보는 것: ① 매번 도는 태스크(outputs.upToDateWhen { false }) ② 선언 입력 — 슬래시가 있는 경로는
