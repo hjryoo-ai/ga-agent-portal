@@ -22,8 +22,36 @@ dependencies {
     runtimeOnly(libs.postgresql)
 }
 
+val portalModules = listOf(
+    ":portal-domain", ":portal-projection", ":portal-ingest", ":portal-query", ":portal-sim", ":portal-recon",
+    ":portal-infra", ":portal-demo",
+)
+
 testing {
     suites {
+        register<JvmTestSuite>("archTest") {
+            dependencies {
+                implementation(project())
+                portalModules.forEach { implementation(project(it)) }
+                implementation(libs.platform.core)
+                implementation(libs.platform.spring)
+                // archunit의 전이 의존(slf4j-api)까지 Boot BOM 버전으로 고정한다.
+                implementation(enforcedPlatform(libs.spring.boot.bom))
+                implementation(libs.archunit)
+                implementation(libs.junit.jupiter)
+                implementation(libs.assertj.core)
+                runtimeOnly(libs.junit.platform.launcher)
+            }
+            targets.all {
+                testTask.configure {
+                    // TenantPredicateScanTest가 모든 모듈의 main 소스(.java 문자열 SQL·마이그레이션 .sql)를 읽는다(verifyTestInputs)
+                    listOf("portal-domain", "portal-projection", "portal-ingest", "portal-query", "portal-sim", "portal-recon",
+                        "portal-infra", "portal-app", "portal-demo").forEach { m ->
+                        inputs.dir(rootProject.layout.projectDirectory.dir("$m/src/main")).withPathSensitivity(PathSensitivity.RELATIVE)
+                    }
+                }
+            }
+        }
         register<JvmTestSuite>("integrationTest") {
             dependencies {
                 implementation(project())
@@ -49,5 +77,5 @@ testing {
 }
 
 tasks.named("check") {
-    dependsOn(testing.suites.named("integrationTest"))
+    dependsOn(testing.suites.named("archTest"), testing.suites.named("integrationTest"))
 }
