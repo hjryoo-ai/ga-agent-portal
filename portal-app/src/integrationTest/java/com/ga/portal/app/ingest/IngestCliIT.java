@@ -10,6 +10,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
@@ -76,6 +79,37 @@ class IngestCliIT {
                 tuple(IngestCommands.PAUSE, "cursor:" + t.value() + "@2"),
                 tuple(IngestCommands.PAUSE_REJECTED, "cursor:" + t.value() + "@2"),
                 tuple(IngestCommands.STATUS, "cursor:" + t.value() + "@2"));
+    }
+
+    /** 워커가 테넌트 잠금을 쥔 동안 pause·resume은 거부되고 아무것도 바꾸지 않는다(커서는 잠금을 쥔 뒤에만 읽는다). */
+    @Test
+    void commandsAreRefusedWhileAWorkerHoldsTheTenant() throws Exception {
+        TenantId t = TenantId.of(SeedData.uniqueTenant("CLI_L"));
+        rig.worker(IngestRig.feed("dup.jsonl"), new RecordingProjector(), 200).runOnce(t);
+        CountDownLatch held = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CompletableFuture<Boolean> worker = CompletableFuture.supplyAsync(() -> rig.transactions.inTransaction(t, () -> {
+            boolean got = rig.lock.tryLock();
+            held.countDown();
+            try {
+                release.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return got;
+        }));
+        assertThat(held.await(10, TimeUnit.SECONDS)).isTrue();
+        try {
+            IngestCommands.Outcome paused = commands(t).pause(t, ACTOR);
+            assertThat(paused.exitCode()).isEqualTo(2);
+            assertThat(paused.lines().getFirst()).contains("being processed by a worker");
+        } finally {
+            release.countDown();
+        }
+        assertThat(worker.get(10, TimeUnit.SECONDS)).isTrue();
+        assertThat(rig.cursor(t).state()).isEqualTo(IngestState.RUNNING);
+        assertThat(audits(t)).extracting(AuditAccessRepository.AuditRow::action, AuditAccessRepository.AuditRow::target)
+                .containsExactly(tuple(IngestCommands.PAUSE_REJECTED, "cursor:" + t.value() + "@-"));
     }
 
     @Test

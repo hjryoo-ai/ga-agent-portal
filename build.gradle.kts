@@ -359,7 +359,9 @@ val scanPlaintextLeaks = tasks.register("scanPlaintextLeaks") {
     doLast {
         val props = java.util.Properties()
         sentinels.reader(Charsets.UTF_8).use { props.load(it) }
-        val plain = props.getProperty("names").split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        // names: 허구 개인정보(설계사 이름), secrets: 허구 서비스 토큰(포털 Phase 1 — J10). 둘 다 원문·UTF-8 16진으로 찾는다.
+        val plain = listOf("names", "secrets").flatMap { key -> (props.getProperty(key) ?: "").split(",") }
+            .map { it.trim() }.filter { it.isNotEmpty() }
         if (plain.isEmpty()) throw GradleException("scanPlaintextLeaks: no sentinels in ${sentinels.relativeTo(root)}")
         val forbidden = plain + plain.map { v -> v.toByteArray(Charsets.UTF_8).joinToString("") { "%02x".format(it) } }
         val files = root.listFiles().orEmpty()

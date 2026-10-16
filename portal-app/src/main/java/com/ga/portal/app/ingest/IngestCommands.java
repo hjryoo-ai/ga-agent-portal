@@ -114,11 +114,13 @@ public final class IngestCommands {
 
     public Outcome pause(TenantId tenant, String actorSubject) {
         return transactions.inTransaction(tenant, () -> {
+            // 잠금을 먼저 — 커서는 잠금을 쥔 뒤에 읽는다(그 사이 워커가 커밋한 전진을 낡은 last_seq로 되돌리지 않게)
+            if (!lock.tryLock()) {
+                return reject(PAUSE_REJECTED, actorSubject, target(tenant, Optional.empty()),
+                        tenant.value() + " is being processed by a worker — try again");
+            }
             Optional<CursorRecord> cursor = store.cursor();
             String target = target(tenant, cursor.map(CursorRecord::lastSeq));
-            if (!lock.tryLock()) {
-                return reject(PAUSE_REJECTED, actorSubject, target, tenant.value() + " is being processed by a worker — try again");
-            }
             if (cursor.isEmpty()) {
                 return reject(PAUSE_REJECTED, actorSubject, target, tenant.value() + " has no cursor");
             }
