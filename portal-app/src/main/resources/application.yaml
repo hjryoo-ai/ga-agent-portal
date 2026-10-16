@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: ga-agent-portal
+  # 애플리케이션 데이터소스: portal_app (NOBYPASSRLS, DML만). 테넌트는 트랜잭션마다 TenantSessionBinder가 설정한다.
+  # 기본값은 로컬 개발 전용 자격 증명(docker/postgres/init-roles.sql과 짝) — 운영은 환경으로 준다.
+  datasource:
+    url: ${PORTAL_DB_URL:jdbc:postgresql://localhost:5432/portal}
+    username: ${PORTAL_APP_USER:portal_app}
+    password: ${PORTAL_APP_PASSWORD:app_local_only}
+  # 마이그레이션: portal_migrator (스키마 소유자). 애플리케이션 데이터소스와 분리된 접속.
+  flyway:
+    url: ${PORTAL_DB_URL:jdbc:postgresql://localhost:5432/portal}
+    user: ${PORTAL_MIGRATOR_USER:portal_migrator}
+    password: ${PORTAL_MIGRATOR_PASSWORD:migrator_local_only}
+    locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  health:
+    # 트랜잭션 밖 DB 접근 금지(불변 규약 2) — DB 헬스 지표는 테넌트 없이 커넥션을 쓰므로 끈다.
+    # 포털 Phase 8에서 전용 롤(portal_health)로 복원한다(설계서 §9 롤 표).
+    db:
+      enabled: false

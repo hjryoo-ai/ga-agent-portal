@@ -49,3 +49,58 @@ jobs:
           path: |
             **/build/reports/tests/**
             **/build/test-results/**/*.xml
+
+  no-docker:
+    # CLAUDE.md: Docker가 없으면 통합 테스트는 스킵이 아니라 실패해야 한다. 이 잡은 "실패해야 성공"이다(지시문 v1.2 §7·C8).
+    # 컨테이너 잡(container:)은 쓰지 않는다 — GitHub Actions는 컨테이너 잡에 호스트의 /var/run/docker.sock을 마운트하므로 Docker가 사라지지 않는다
+    # (ga-disclosure Phase 1에서 확인). 호스트 러너에서 Docker 데몬을 멈추고 소켓을 지운다.
+    # 성공 조건: Gradle 종료 코드 ≠ 0, Testcontainers의 Docker 미발견 오류, 스킵 0건, 실패한 스위트 ≥ 1.
+    runs-on: ubuntu-latest
+    env:
+      CI: 'true'
+      GHP_USER: ${{ secrets.GHP_USER }}
+      GHP_READ_TOKEN: ${{ secrets.GHP_READ_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Stop Docker and remove its socket
+        run: |
+          sudo systemctl stop docker.socket docker.service containerd.service || true
+          sudo rm -f /var/run/docker.sock
+          if docker info > /dev/null 2>&1; then echo 'Docker is still reachable'; exit 1; fi
+          test ! -S /var/run/docker.sock
+          echo 'Docker is unavailable'
+
+      - name: portal-infra integrationTest must FAIL without Docker
+        shell: bash
+        run: |
+          set +e
+          ./gradlew :portal-infra:integrationTest --no-daemon --console=plain > it.log 2>&1
+          code=$?
+          set -e
+          echo "gradle exit code: $code"
+          tail -n 80 it.log
+          if [ "$code" -eq 0 ]; then echo 'FAIL: integrationTest passed without Docker'; exit 1; fi
+          if ! grep -q 'Could not find a valid Docker environment' it.log; then echo 'FAIL: no Testcontainers Docker-missing error in the log'; exit 1; fi
+          results=$(ls portal-infra/build/test-results/integrationTest/*.xml 2>/dev/null | wc -l)
+          if [ "$results" -eq 0 ]; then echo 'FAIL: no test results — the tests did not run'; exit 1; fi
+          if grep -h -o 'skipped="[0-9]*"' portal-infra/build/test-results/integrationTest/*.xml | grep -v -q 'skipped="0"'; then
+            echo 'FAIL: some integration tests were skipped'; exit 1
+          fi
+          failed=$(grep -l -E '(failures|errors)="[1-9]' portal-infra/build/test-results/integrationTest/*.xml | wc -l)
+          echo "result files: $results, with failures/errors: $failed, skipped: 0"
+          if [ "$failed" -eq 0 ]; then echo 'FAIL: no failing test suite'; exit 1; fi
+          echo 'OK: integration tests failed (not skipped) because Docker is missing'
+
+      - name: Logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: no-docker-log
+          path: |
+            it.log
+            portal-infra/build/test-results/integrationTest/*.xml
