@@ -24,6 +24,18 @@ Phase 0(골격) 수용(2026-10-16) — [계획](docs/phase-00-계획.md)·[승�
 
 어느 쪽이든 받은 파일의 SHA-256이 `gradle/verification-metadata.xml`과 다르면 빌드가 실패한다.
 
+## 인제스트 운영 (Phase 1)
+
+엔진 피드를 테넌트별로 읽는 폴링은 `PORTAL_INGEST_ENABLED=true`일 때만 돈다. 테넌트 목록은 전용 롤 `portal_directory`(`PORTAL_DIRECTORY_USER`·`PORTAL_DIRECTORY_PASSWORD`), 서비스 토큰은 테넌트별 파일 `$PORTAL_ENGINE_TOKEN_DIR/<TENANT_ID>`(소유자만 읽게 — 값은 저장소·로그에 쓰지 않는다). 멈춘 테넌트를 다루는 운영 명령:
+
+```bash
+java -jar portal-app.jar --spring.profiles.active=cli ingest status [--tenant=GA01] --actor=ops-kim
+java -jar portal-app.jar --spring.profiles.active=cli ingest resume --tenant=GA01 --from-seq=120 --actor=ops-kim
+java -jar portal-app.jar --spring.profiles.active=cli ingest pause --tenant=GA01 --actor=ops-kim
+```
+
+전 건 `audit_access`에 남는다(거부도). `--from-seq`는 마지막으로 적용한 seq 이하만 — 건너뛰기는 재구축으로만. **인가의 한계**: 조회 API·인증이 오는 Phase 3 전까지 CLI는 실행한 OS 사용자를 믿는다 — 운영 호스트 접근 통제가 곧 인가다.
+
 ## 모듈
 
 | 모듈 | 역할 | Phase |

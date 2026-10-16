@@ -39,6 +39,7 @@ class TenantContextGuardTest {
     private final IngestCursorRepository cursors = new IngestCursorRepository(new TenantJdbcGateway(recording));
     private final IngestEventRepository events = new IngestEventRepository(new TenantJdbcGateway(recording));
     private final IngestLockRepository locks = new IngestLockRepository(new TenantJdbcGateway(recording));
+    private final AuditAccessRepository audit = new AuditAccessRepository(new TenantJdbcGateway(recording));
     private static final Instant NOW = Instant.parse("2026-10-17T00:00:00Z");
     private static final IngestEventRecord ROW = new IngestEventRecord(TenantId.of("GA01"), "5eed0000-0000-4000-8000-000000000001", 1,
             "AgentSnapshot", NOW, IngestEventStatus.APPLIED, Optional.empty(), "d".repeat(64));
@@ -50,6 +51,7 @@ class TenantContextGuardTest {
         assertThat(publicMethods(IngestCursorRepository.class)).containsExactly("ensure", "find", "save");
         assertThat(publicMethods(IngestEventRepository.class)).containsExactly("find", "markApplied", "markFailed", "maxAppliedSeq");
         assertThat(publicMethods(IngestLockRepository.class)).containsExactly("tryLock");
+        assertThat(publicMethods(AuditAccessRepository.class)).containsExactly("recent", "record");
     }
 
     @Test
@@ -65,6 +67,8 @@ class TenantContextGuardTest {
                 IngestEventStatus.FAILED, Optional.of("SCHEMA_VIOLATION: x"), ROW.payloadHash()))).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(events::maxAppliedSeq).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(locks::tryLock).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> audit.record("cli:ops", "INGEST_STATUS", "cursor:GA01@0", NOW)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> audit.recent(5)).isInstanceOf(TenantNotBoundException.class);
         assertThat(recording.connectionsObtained()).isZero();
         assertThat(recording.statements()).isEmpty();
     }
