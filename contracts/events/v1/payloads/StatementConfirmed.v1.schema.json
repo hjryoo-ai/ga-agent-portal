@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ga.example/portal/contracts/events/v1/payloads/StatementConfirmed.v1.schema.json",
+  "title": "StatementConfirmed payload (v1)",
+  "description": "월마감 확정(설계서 §4.2). → status=CONFIRMED(이후 해당 월 라인 변경 금지). 모르는 필드는 허용한다(설계서 §4.5 — 소비자는 무시).",
+  "type": "object",
+  "required": [
+    "agentId",
+    "closeYm",
+    "gross",
+    "clawbackOffset",
+    "adjustment",
+    "withholdingTax",
+    "net",
+    "closedAt"
+  ],
+  "properties": {
+    "agentId": {
+      "$ref": "../defs.schema.json#/$defs/agentId"
+    },
+    "closeYm": {
+      "$ref": "../defs.schema.json#/$defs/ym"
+    },
+    "gross": {
+      "$ref": "../defs.schema.json#/$defs/won"
+    },
+    "clawbackOffset": {
+      "$ref": "../defs.schema.json#/$defs/won"
+    },
+    "adjustment": {
+      "$ref": "../defs.schema.json#/$defs/won"
+    },
+    "withholdingTax": {
+      "$ref": "../defs.schema.json#/$defs/won"
+    },
+    "net": {
+      "$ref": "../defs.schema.json#/$defs/won"
+    },
+    "closedAt": {
+      "$ref": "../defs.schema.json#/$defs/instant"
+    }
+  }
+}
