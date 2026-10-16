@@ -52,7 +52,8 @@
       "enum": [
         "CUT",
         "DEFER_AFTER_FY"
-      ]
+      ],
+      "description": "룰의 over_limit_action 그대로. 현재 엔진은 DEFER_AFTER_FY도 삭감과 같게 동작하며 이연 스케줄을 만들지 않는다(엔진 §14) — 포털은 LIMIT_DEFER 스케줄이 없어도 오류로 보지 않는다(v1.1.1)"
     },
     "basis": {
       "type": "object",
