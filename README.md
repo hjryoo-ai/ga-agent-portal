@@ -6,7 +6,7 @@ GA 소속 설계사가 **"이번 달 얼마 받나 · 이 계약 한도가 얼�
 
 ## 상태
 
-Phase 0(골격) 진행 중 — [계획](docs/phase-00-계획.md)·[승인](docs/phase-00-계획승인.md). 정본 설계서 [`docs/설계서.md`](docs/설계서.md).
+Phase 0(골격) 보고 — 수용 심사 대기. [계획](docs/phase-00-계획.md)·[승인](docs/phase-00-계획승인.md)·[보고서](docs/phase-00-보고서.md). 정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.2), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## 실행
 
