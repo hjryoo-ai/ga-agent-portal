@@ -11,6 +11,39 @@
 > 표시: **[설계서 반영]** 지시문대로 설계서를 고칠 곳 · **[빈칸]** 설계서·지시문이 정하지 않아 정해야 하는 것 · **[계약 추가]** 엔진 E1이 따라야 할 계약 결정 ·
 > **[넓힘]** 불변식·허용 범위를 넓히는 것(이 계획에는 없다) · **[좁힘]** 지시문보다 엄격하게 하는 것.
 
+## 승인 반영 (2026-10-16, `docs/phase-00-계획승인.md`) — 아래 본문보다 우선한다
+
+Q1~Q10 전부 권장안(조건 포함), I1~I3·S1~S13 승인. 재승인 불요.
+
+| # | 결정·조건 | 이 계획에서 바뀌는 것 |
+|---|---|---|
+| Q1 | `UNIQUE (tenant_id, agent_id, dedup_key)` | 설계서 §5 DDL과 §6.5 머리말("`dedup_key`는 설계사 안에서 유일")을 같은 커밋에. `dedup_key` 문자열은 그대로 |
+| Q2 | `BigDecimal` 전 모듈 금지 | 변환 `round(x * 100)::bigint`는 `TenantRepository`의 SQL 한 곳에만. 시험: `80.00` → `Ratio(8000, 10000)` → `"80.0%"`, `95.50` → `"95.5%"`. `limit_multiple`은 설계서 §5 주석에 같은 규약만 |
+| Q3 | 소수 문자열 `^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$`, `description` "표시 전용 — 소비자는 산술에 쓰지 않는다" | `basis.rate`·`basis.payoutRate`·`limitMultiple` 세 곳. E1 전제 |
+| Q4 | 9종 + 짝 강제 | `STATEMENT`·`PAYOUT`의 `aggregate.id`를 `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[0-9]{4}(0[1-9]|1[0-2])$`로 좁힌다(포털 Envelope `if/then` 안 — 사본은 손대지 않음) |
+| Q5 | `type`(+`version`)별 `if/then` | 마지막에 `else: false` 구실을 하는 가드 — 열거 밖 `type`은 payload 검사 없이 통과하지 못한다(열거와 이중) |
+| Q6 | A-1 seq 1~13 + 4종 | `LimitLedgerRebased` 샘플은 A-3(`newLimit < accum`) |
+| Q7 | v1.0 §6 원문 = 승인 문서 §4. ⑤ 추정대로 + 차이 3건 | **D1** SQL 스캔 대상 = `main` 문자열 SQL **+ 마이그레이션 `.sql`의 DML**(DDL 제외). **D2** `tenant` 제외하지 않음 — 제외는 `flyway_schema_history`뿐. **D3** INSERT는 컬럼 목록에 `tenant_id` + 그 값이 `:tenantId`, 나머지는 `tenant_id = :tenantId` 술어 — 주입 S1(술어 없는 UPDATE)·**S4**(`tenant_id` 없는 INSERT) |
+| Q8 | 전 의존성 SHA-256, 신뢰 예외 0(플러그인·BOM 포함) | 메타데이터의 `com.ga.platform` 13개 항목을 인계 §6 표와 **스크립트로** 대조, 결과를 1단계 커밋 본문에 |
+| Q9 | `CHECK (… IN …)`(`comm_type` 제외) | 시험 `StatusEnumDdlTest`: Java 열거 값 집합 = V1 `CHECK` 목록. 열거가 없는 컬럼은 DDL이 정본이고 설계서 §5 주석과 대조. 주입 **Q9-1**(열거 값 하나를 `CHECK`에서 뺌 → 실패) |
+| Q10 | 각 단계 코드와 같은 커밋 | 1단계 커밋에서 설계서 제목·변경 이력(v1.2, 2026-10-16, "지시문 v1.2 반영 — S1~S13, Q1·Q9")만 먼저, 본문은 단계마다. 변경 이력에 Q1 = "설계서 v1.0·v1.1 결함(모순)", I1 = "표에 뜻이 없었음"(B4) |
+| I1 | `amount` = 한도 삭감 뒤 지급분, 요청액 = `amount + limitCutAmt` | 스키마 `description`과 설계서 §4.2 표에 같은 문장 |
+| S7 | DB 헬스 비활성 | 설계서 §9 롤 표에 "`portal_health` — Phase 8, 전용 롤" 자리 예약 |
+| S11 | JUnit 6 | Boot 4.1.1 BOM 관리판, 카탈로그에 버전 없음 |
+| B3 | `WITH CHECK` | `RlsIsolationIT`에 다른 테넌트 행 insert가 정책 위반으로 실패하는 시험 1건(주입 아님) |
+| B2 | C9 1차 증거 | CI 해석 경로(Gradle 캐시) + `printPlatformArtifacts` 해시 13개 = 인계 §6 표 — 보고서에 표로. 2차는 검증 메타데이터 |
+
+**C9 자격 증명 정정(승인 §3)** — 계획 ⑥의 "`GITHUB_ACTOR`·`GITHUB_TOKEN` + `permissions: packages: read`"와 표지의 "Manage Actions access"는 Maven 레지스트리에 맞지 않는다
+(Maven 레지스트리는 저장소 스코프 — 다른 저장소의 `GITHUB_TOKEN`은 읽지 못하고, 세분 권한 화면은 컨테이너·npm용). 사용자가 PAT(classic, `read:packages`)를
+`ga-agent-portal` 저장소 비밀 **`GHP_USER`·`GHP_READ_TOKEN`**으로 등록했다(2026-10-16 10:02Z, `gh secret list`로 이름 확인).
+- CI 저장소 자격은 환경변수 `GHP_USER`·`GHP_READ_TOKEN`(워크플로 `env:`에 비밀을 연결). 둘 중 하나라도 없거나 비면 **설정 단계에서 즉시 실패**("자격 증명 없음" — 401까지 가지 않음). 로컬은 `mavenLocal()`만이라 PAT 불요.
+- 저장소 어느 파일에도 토큰·사용자명 값을 쓰지 않는다(README에는 비밀 이름만). `printPlatformArtifacts`는 경로·해시만. 포크 PR에는 비밀이 전달되지 않아 C9가 실패하는 것이 정상 — CLAUDE.md 한 줄.
+- 첫 CI가 실패하면 보고할 사용자 조치는 PAT 범위(`read:packages`; `ga-disclosure`가 비공개면 `repo` — 2026-10-16 현재 공개)와 비밀 이름 철자.
+
+**주입 수**: 25 + S4 + Q9-1 = **27건 예상**(ID 단위).
+
+**지시문 오류**(`docs/DECISIONS.md`에, 승인 §6): v1.2 §5 "payload oneOf 13"(Q5), v1.2 §5 "부록 A-1 seq 1~9"(Q6), 0.2 정비 지시문·v1.2 C9의 "패키지 접근 설정"(§3), v1.0 §6 원문 미수록(Q7).
+
 ## 0. 먼저 결정이 필요한 것 (요약)
 
 | # | 무엇 | 권장 | 표시 |
@@ -162,7 +195,7 @@ contracts/
 - Gradle(Kotlin DSL) **9.8.1**(2026-10-16 현재 최신 — ga-disclosure는 9.8.0), Java 25 툴체인, Spring Boot **4.1.1**(4.1.x 최신, BOM). BOM 밖: ArchUnit 1.5.1,
   json-schema-validator(3.0.8이 최신 — Boot BOM의 Jackson을 끌어올리면 ga-disclosure처럼 BOM 호환 최신판으로, 사유를 카탈로그 주석에). 버전 카탈로그 + 의존성 락.
 - **플랫폼 해석(C9)**: `settings.gradle.kts`에서 `com.ga.platform` 그룹을 `exclusiveContent`로 **환경마다 정확히 한 저장소**에 묶는다 —
-  CI(`CI=true`)는 GitHub Packages(`maven.pkg.github.com/hjryoo-ai/ga-disclosure`, 자격 `GITHUB_ACTOR`·`GITHUB_TOKEN`, 워크플로 `permissions: packages: read`)만,
+  CI(`CI=true`)는 GitHub Packages(`maven.pkg.github.com/hjryoo-ai/ga-disclosure`, 자격 ~~`GITHUB_ACTOR`·`GITHUB_TOKEN`~~ → 비밀 `GHP_USER`·`GHP_READ_TOKEN` — 승인 §3)만,
   로컬은 `mavenLocal()`만. 둘 다 `gradle/verification-metadata.xml`의 SHA-256(Q8 — 전 의존성)으로 검증되므로 바이트가 다르면 출처와 무관하게 실패한다.
   메타데이터는 `--write-verification-metadata sha256`로 만들고 `com.ga.platform` 13개 항목을 인계 §6 표와 대조한다(다르면 멈추고 보고).
 - `printPlatformArtifacts`: 해석된 플랫폼 jar의 파일 경로와 SHA-256을 출력 — CI 로그에서 경로가 Gradle 캐시(원격에서 받음)이고 `~/.m2`가 아님을 1차 증거로.
@@ -195,13 +228,13 @@ contracts/
 | C10 | `RlsSettingNameTest`: `V2__rls.sql`이 읽는 설정 이름이 `TenantSession.SETTING_NAME`뿐 | R4 정책의 이름을 `app.tenantid`로 → 실패 |
 | — | 평문 스캔 | P1 시험이 센티널 출력 → 실패 |
 
-주입은 ID 하나 단위로 세고 각 단계 커밋 본문에 주입 → 실패 → 제거를 적는다(예상 25건).
+주입은 ID 하나 단위로 세고 각 단계 커밋 본문에 주입 → 실패 → 제거를 적는다(예상 25건 → 승인 뒤 27건: S4·Q9-1 추가).
 
 ## ⑧ 단계 — 단계마다 시험·주입·설계서 같은 커밋
 
 1. **빌드 골격**: 래퍼·카탈로그·락·검증 메타데이터·플랫폼 해석·jqwik 차단·`verifyNoSnapshots`·`printPlatformArtifacts`·모듈 9개·README·LICENSE·CLAUDE.md·CI.
-   설계서 S3·S11·S13. 주입 J1·V1·V2. **push해서 첫 CI로 C9(GitHub Packages 읽기)를 먼저 확인**한다 — 실패하면 사용자 조치(패키지 → Manage Actions access →
-   `ga-agent-portal` Read)로 보고하고 기다린다.
+   설계서 S3·S11·S13. 주입 J1·V1·V2. **push해서 첫 CI로 C9(GitHub Packages 읽기)를 먼저 확인**한다 — 실패하면 사용자 조치(PAT 범위·비밀 이름 철자 — 승인 §3)로
+   보고하고 기다린다.
 2. **도메인**: 포털 값객체·열거형 + 속성 시험(`Won`·`Ym` 재증명, 포털 식별자 검증). 설계서 S1.
 3. **스키마·롤·저장소**: V1·V2·`init-roles.sql`·하네스·두 저장소·C1~C4·C10. 설계서 S2·S4~S7. 주입 R1~R4.
 4. **계약**: 사본·`CHECKSUMS`·`UPSTREAM`·두 검증 태스크·포털 Envelope·payload 13·샘플 13·OpenAPI·`EventSchemaTest`·`verifyTestInputs`. 설계서 S8~S10·S12. 주입 K1~K6.
