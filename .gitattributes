@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+*.jar binary
+# 공유 계약 사본은 업스트림과 바이트 대조한다(verifyUpstreamContract) — 줄끝 변환을 하지 않는다.
+contracts/shared/** -text

@@ -1,0 +1,45 @@
+# ga-agent-portal
+
+GA 소속 설계사가 **"이번 달 얼마 받나 · 이 계약 한도가 얼마 남았나 · 앞으로 매달 얼마 나오나 · 해약되면 얼마 물어내나"**를 스스로 확인하는 읽기 전용 멀티테넌트 포털이다. 수수료의 계산·지급·환수·정산은 별도 저장소 `ga-commission-engine`이 하고, 포털은 엔진 이벤트 스트림을 설계사 관점으로 투영해 **보여주기만** 한다 — 금액을 다시 계산하지 않고(정수 합산·표시용 비율만), 모든 금액에 예상·확정·지급완료 상태를 붙이며, 읽기 모델은 이벤트 seq 0부터 언제든 다시 만들 수 있다. 공용 값객체·테넌트 격리 기반·이벤트 Envelope 핵심은 `ga-disclosure`가 발행하는 플랫폼 아티팩트(`com.ga.platform` 0.2.0)를 쓴다.
+
+> **면책** — 학습·포트폴리오 목적 저장소다. 규제 내용(1200%룰, 분급제 등)은 공개 자료 기반의 예시적 정리이고, 실제 기준은 금융위원회·금융감독원 원문과 유권해석을 따른다. 요율·금액·임계치는 전부 가상의 예시값이다. 이 시스템은 "법령 요건 충족"을 단언하지 않는다.
+
+## 상태
+
+Phase 0(골격) 진행 중 — [계획](docs/phase-00-계획.md)·[승인](docs/phase-00-계획승인.md). 정본 설계서 [`docs/설계서.md`](docs/설계서.md).
+
+## 실행
+
+필요한 것: JDK(툴체인 25는 Gradle이 받는다), Docker(통합 테스트 — 없으면 통합 테스트가 **실패**한다).
+
+```bash
+./gradlew build                      # 단위·아키텍처·통합 테스트 + 빌드 검사(SNAPSHOT 0, 플랫폼 SHA 고정, 테스트 입력 선언)
+./gradlew printPlatformArtifacts     # 해석된 플랫폼 0.2.0 파일 13개의 경로·SHA-256(인계 §6 표와 대조)
+```
+
+플랫폼 아티팩트(`com.ga.platform:*:0.2.0`)는
+
+- **로컬**: `mavenLocal()`에서만 찾는다 — ga-disclosure에서 `./gradlew publishToMavenLocal`(태그 `platform-v0.2.0`)로 넣는다.
+- **CI**: GitHub Packages(`hjryoo-ai/ga-disclosure`)에서만 찾는다. 자격 증명은 저장소 비밀 `GHP_USER`·`GHP_READ_TOKEN`(PAT classic, `read:packages`).
+
+어느 쪽이든 받은 파일의 SHA-256이 `gradle/verification-metadata.xml`과 다르면 빌드가 실패한다.
+
+## 모듈
+
+| 모듈 | 역할 | Phase |
+|---|---|---|
+| `portal-domain` | 포털 고유 값객체(`CalcId`·`PolicyNo`·`LedgerId`·`ScheduleId`·`CommType`)·상태 열거형. Spring·DB 무의존 | 0 |
+| `portal-projection` | 프로젝터(이벤트 → 뷰)·알림 파생 규칙. Spring·DB 무의존 | 2·6 |
+| `portal-ingest` | 이벤트 피드 클라이언트·커서·멱등 적용·재구축 | 1 |
+| `portal-query` | 조회 API(`/api/v1/me/**`)·인가 | 3 |
+| `portal-sim` | 엔진 시뮬레이션 프록시·`simulation_log` | 5 |
+| `portal-recon` | 대사·DRIFT·관측 지표 | 7 |
+| `portal-infra` | PostgreSQL 어댑터·Flyway·RLS | 0 |
+| `portal-app` | Spring Boot 조립·아키텍처 테스트 | 0 |
+| `portal-demo` | 데모 테넌트 데이터 생성기 | 8 |
+| `web/` | React PWA | 4 |
+| `contracts/` | 엔진↔포털 계약(JSON Schema·OpenAPI), `shared/ga-disclosure/` 공유 핵심 사본 | 0 |
+
+## 라이선스
+
+MIT — [`LICENSE`](LICENSE).
