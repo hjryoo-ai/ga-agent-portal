@@ -2,6 +2,25 @@
 
 > 브랜치 `work/phase-1`(`f30d026`에서). **승인 뒤 착수.** 승인 전에는 이 계획 커밋만 있다.
 
+## 승인 반영 (2026-10-17, `docs/phase-01-계획승인.md`) — 아래 본문보다 우선한다
+
+Q1~Q7 전부 권장안. 선행 계약 v1.1.1(PR #3) 병합 **`f54d008dd220b529804689aa1e89f8fc6bbc6d4a`**(CI run 38958845185, 2,276건) — 엔진 E1 `UPSTREAM`. `work/phase-1`은 그 `main`을 merge했다.
+
+| # | 반영 |
+|---|---|
+| CI-1 | 확인 — 지시문 K7 문구 오류(DE-7) |
+| Q2 | `SKIPPED` 행 없음. 설계서 §5 `ingest_event.status` 주석에 "(SKIPPED 미사용 — Phase 1 Q2)", 지표 `ingest_events_total{result=skipped}`만 |
+| Q3 | `portal_directory`: `tenant`의 **`tenant_id` 컬럼 SELECT**와 이 롤 전용 정책만. `status`·`params`는 tx₀에서 테넌트 컨텍스트로. 아키텍처 허용 목록에 항목(FQN·사유) — `TenantDirectoryReader`는 이미 플랫폼 DB 클래스 목록에 있으므로 사유에 롤을 적는다. `TenantDirectoryIT`(다른 컬럼·다른 표 권한 오류). 설계서 §9 롤 표 한 행. V2의 롤 단언(`portal_%` NOBYPASSRLS·NOSUPERUSER)이 새 롤도 잡는지 확인. 주입 **J12**: 롤에 다른 컬럼 GRANT → `TenantDirectoryIT` 실패 |
+| Q4 | 상태 표에 한 행: 토큰 파일이 없거나 비면 **폴링 전에 `PAUSED(TOKEN_MISSING)`** |
+| Q6 | `IngestLockRepository`의 SQL(`pg_try_advisory_xact_lock` 호출뿐)은 표가 없어 `TenantPredicateScanTest` 대상이 아니다 — 허용 목록이 아니라 "표 없음"으로 통과해야 하며, 그 사실을 스캐너 시험(함수 호출만 있는 문장 → 위반 0)에 한 건 더한다 |
+| Q7 | 토큰 파일이 소유자 외 읽기 가능하면 기동 시 경고(차단하지 않는다) |
+| ③ | 네트워크 오류·5xx는 `RUNNING` 불변, `ingest_feed_errors_total` |
+| ⑥ | 클래스패스 사본 = 저장소 바이트 시험 + 그 시험의 입력 선언 |
+| ⑨ | CLI 인가 한계를 README·보고서에 |
+| O-1 | Phase 2에서 새 V로 `agent_profile.role` NULL 허용 — Phase 2 계획에 |
+| §4 | 엔진 사실(설계서 반영은 Phase 2): `DeferralScheduled`는 `CURVE`만, 정정은 지급되지 않음(`StatementConfirmed.adjustment`에만), `StatementConfirmed.clawbackOffset`은 온다, A-1 금액은 엔진 시드로 재현되지 않음. **DD-5 후보**(Phase 2): §5 `policy_limit_history` PK `(tenant_id, ledger_id, posting_seq)`는 REBASE가 직전 POST와 같은 `posting_seq`를 가지면 충돌 — 이벤트 `seq`로 |
+| 주입 | J1~J11 + J12 = **12건** |
+
 ## 0. 먼저 결정이 필요한 것 (요약)
 
 | # | 질문 | 권장 | 대안 |
