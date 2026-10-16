@@ -56,7 +56,8 @@ class ArchitectureRulesTest {
             new Allowed("com.ga.platform.spring.jdbc.PlatformJdbcAutoConfiguration",
                     "애플리케이션 DataSource로 위 두 빈을 조립하는 자동 구성"),
             new Allowed("com.ga.platform.spring.jdbc.TenantDirectoryReader",
-                    "테넌트 ID 목록 전용 롤용 리더 — 포털 Phase 0은 쓰지 않는다(플랫폼 jar에 있어 규칙이 본다)"));
+                    "테넌트 ID 목록 전용 리더 — 포털 Phase 1 인제스트 스케줄러가 쓴다. 전용 롤 portal_directory(V3: tenant.tenant_id 컬럼 SELECT와 "
+                            + "전용 정책만, 테넌트 데이터 권한 0 — TenantDirectoryIT)"));
 
     /** 포털의 직접 DB 접근 허용 목록 — Phase 0은 비어 있다(지시문 v1.2 불변 규약 2). */
     static final List<Allowed> PORTAL_DB_ALLOWLIST = List.of();

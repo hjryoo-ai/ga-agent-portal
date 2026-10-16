@@ -3,6 +3,9 @@ package com.ga.portal.infra.persistence;
 import com.ga.platform.core.tenant.TenantNotBoundException;
 import com.ga.platform.spring.jdbc.TenantJdbcGateway;
 import com.ga.platform.spring.jdbc.TenantSessionBinder;
+import com.ga.platform.core.tenant.TenantId;
+import com.ga.portal.domain.IngestEventRecord;
+import com.ga.portal.domain.IngestEventStatus;
 import com.ga.portal.domain.IngestState;
 import com.ga.portal.infra.testing.RecordingDataSource;
 import org.junit.jupiter.api.Test;
@@ -11,7 +14,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
-import java.time.Clock;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -33,21 +36,35 @@ class TenantContextGuardTest {
 
     private final RecordingDataSource recording = new RecordingDataSource(UNREACHABLE);
     private final TenantRepository tenants = new TenantRepository(new TenantJdbcGateway(recording));
-    private final IngestCursorRepository cursors = new IngestCursorRepository(new TenantJdbcGateway(recording), Clock.systemUTC());
+    private final IngestCursorRepository cursors = new IngestCursorRepository(new TenantJdbcGateway(recording));
+    private final IngestEventRepository events = new IngestEventRepository(new TenantJdbcGateway(recording));
+    private final IngestLockRepository locks = new IngestLockRepository(new TenantJdbcGateway(recording));
+    private static final Instant NOW = Instant.parse("2026-10-17T00:00:00Z");
+    private static final IngestEventRecord ROW = new IngestEventRecord(TenantId.of("GA01"), "5eed0000-0000-4000-8000-000000000001", 1,
+            "AgentSnapshot", NOW, IngestEventStatus.APPLIED, Optional.empty(), "d".repeat(64));
 
     /** 저장소에 공개 메서드가 늘면 이 목록과 아래 호출을 함께 늘린다(새 메서드가 시험 밖에 남지 않게). */
     @Test
-    void theGuardedMethodsAreAllPublicMethodsOfBothRepositories() {
+    void theGuardedMethodsAreAllPublicMethodsOfTheRepositories() {
         assertThat(publicMethods(TenantRepository.class)).containsExactly("current");
-        assertThat(publicMethods(IngestCursorRepository.class)).containsExactly("find", "save");
+        assertThat(publicMethods(IngestCursorRepository.class)).containsExactly("ensure", "find", "save");
+        assertThat(publicMethods(IngestEventRepository.class)).containsExactly("find", "markApplied", "markFailed", "maxAppliedSeq");
+        assertThat(publicMethods(IngestLockRepository.class)).containsExactly("tryLock");
     }
 
     @Test
     void everyRepositoryMethodFailsBeforeReachingTheDatabaseWhenUnbound() {
         assertThatThrownBy(tenants::current).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(cursors::find).isInstanceOf(TenantNotBoundException.class);
-        assertThatThrownBy(() -> cursors.save(1, Optional.empty(), IngestState.RUNNING, Optional.empty()))
+        assertThatThrownBy(() -> cursors.save(1, Optional.empty(), IngestState.RUNNING, Optional.empty(), NOW))
                 .isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> cursors.ensure(NOW)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> events.find(ROW.eventId())).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> events.markApplied(ROW)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> events.markFailed(new IngestEventRecord(ROW.tenantId(), ROW.eventId(), 1, "AgentSnapshot", NOW,
+                IngestEventStatus.FAILED, Optional.of("SCHEMA_VIOLATION: x"), ROW.payloadHash()))).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(events::maxAppliedSeq).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(locks::tryLock).isInstanceOf(TenantNotBoundException.class);
         assertThat(recording.connectionsObtained()).isZero();
         assertThat(recording.statements()).isEmpty();
     }

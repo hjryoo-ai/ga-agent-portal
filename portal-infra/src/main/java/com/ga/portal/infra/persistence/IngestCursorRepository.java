@@ -7,7 +7,7 @@ import com.ga.platform.spring.jdbc.TenantScopedRepository;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
-import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
@@ -15,8 +15,8 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * 바인딩된 테넌트의 인제스트 커서(지시문 v1.2 §4 — 저장소 패턴 확정용 두 구체 저장소 중 하나). 갱신 시각은 주입된 {@link Clock}에서 온다.
- * 커서 전진 규칙(seq 갭·역순·중복)은 Phase 1 인제스트가 정한다 — 이 저장소는 저장만 한다.
+ * 바인딩된 테넌트의 인제스트 커서(설계서 §5·§6.1). 갱신 시각은 호출자가 주입된 시계에서 넘긴다. 전진 규칙(seq 갭·역순·중복)과 상태 전이는
+ * 인제스트 적용기가 정한다 — 이 저장소는 저장만 한다.
  */
 @Repository
 public class IngestCursorRepository extends TenantScopedRepository {
@@ -28,11 +28,8 @@ public class IngestCursorRepository extends TenantScopedRepository {
             rs.getObject("updated_at", OffsetDateTime.class).toInstant(),
             Optional.ofNullable(rs.getString("error")));
 
-    private final Clock clock;
-
-    public IngestCursorRepository(TenantJdbcGateway gateway, Clock clock) {
+    public IngestCursorRepository(TenantJdbcGateway gateway) {
         super(gateway);
-        this.clock = clock;
     }
 
     public Optional<CursorRecord> find() {
@@ -43,13 +40,23 @@ public class IngestCursorRepository extends TenantScopedRepository {
                 """, Map.of(), MAPPER);
     }
 
-    /** 커서를 쓰고(없으면 만든다) 시각을 지금으로 한다. {@code lastEventId}·{@code error}는 없을 수 있다. */
-    public void save(long lastSeq, Optional<String> lastEventId, IngestState state, Optional<String> error) {
+    /** 없으면 {@code RUNNING}·{@code last_seq 0}으로 만든다(두 워커가 동시에 불러도 하나 — {@code ON CONFLICT DO NOTHING}). */
+    public CursorRecord ensure(Instant now) {
+        update("""
+                INSERT INTO ingest_cursor (tenant_id, last_seq, last_event_id, state, updated_at, error)
+                VALUES (:tenantId, 0, NULL, 'RUNNING', :updatedAt, NULL)
+                ON CONFLICT (tenant_id) DO NOTHING
+                """, Map.of("updatedAt", OffsetDateTime.ofInstant(now, ZoneOffset.UTC)));
+        return find().orElseThrow();
+    }
+
+    /** 커서를 쓴다(없으면 만든다). {@code lastEventId}·{@code error}는 없을 수 있다. */
+    public void save(long lastSeq, Optional<String> lastEventId, IngestState state, Optional<String> error, Instant now) {
         Map<String, Object> params = new HashMap<>();
         params.put("lastSeq", lastSeq);
         params.put("lastEventId", lastEventId.orElse(null));
         params.put("state", state.name());
-        params.put("updatedAt", OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC));
+        params.put("updatedAt", OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
         params.put("error", error.orElse(null));
         update("""
                 INSERT INTO ingest_cursor (tenant_id, last_seq, last_event_id, state, updated_at, error)

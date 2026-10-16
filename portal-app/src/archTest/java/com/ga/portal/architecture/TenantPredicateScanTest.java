@@ -86,7 +86,8 @@ class TenantPredicateScanTest {
         assertThat(sqlFiles).extracting(p -> p.getFileName().toString()).containsExactly("V1__init.sql", "V2__rls.sql", "V3__ingest_payload_hash.sql");
         assertThat(knownTables).hasSize(17).contains("tenant", "earnings_line", "ingest_cursor", "audit_access");
         long javaSqlCount = javaFiles.stream().mapToLong(p -> SqlTenantScanner.sqlLiteralsInJava(read(p)).size()).sum();
-        assertThat(javaSqlCount).as("repository SQL literals found (TenantRepository 1, IngestCursorRepository 2)").isEqualTo(3);
+        assertThat(javaSqlCount).as("repository SQL literals found (TenantRepository 1, IngestCursorRepository 3, IngestEventRepository 4, "
+                + "IngestLockRepository 1)").isEqualTo(9);
     }
 
     @Test
@@ -137,6 +138,8 @@ class TenantPredicateScanTest {
             "INSERT INTO ingest_cursor (last_seq, tenant_id, state) VALUES (0, :tenantId, coalesce(:s, 'RUNNING'))",
             "INSERT INTO ingest_cursor (tenant_id, last_seq) VALUES (:tenantId, 0) ON CONFLICT (tenant_id) DO UPDATE SET last_seq = EXCLUDED.last_seq WHERE ingest_cursor.tenant_id = :tenantId",
             "SELECT count(*) FROM flyway_schema_history",
+            // 계획 승인 Q6: 표에 닿지 않는 문장(함수 호출뿐)은 대상이 아니다 — 허용 목록 없이 통과한다(IngestLockRepository)
+            "SELECT pg_try_advisory_xact_lock(hashtext('portal.ingest'), hashtext(:tenantId)) AS locked",
             "-- SELECT * FROM earnings_line\nSELECT 1",
             "SELECT 'FROM earnings_line' AS text",
     })
