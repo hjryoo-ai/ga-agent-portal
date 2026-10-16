@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ga.example/portal/contracts/events/v1/payloads/PayoutCompleted.v1.schema.json",
+  "title": "PayoutCompleted payload (v1)",
+  "description": "지급 런 완료(설계서 §4.2). → status=PAID. 모르는 필드는 허용한다(설계서 §4.5 — 소비자는 무시).",
+  "type": "object",
+  "required": [
+    "agentId",
+    "closeYm",
+    "paidAt",
+    "paidAmount"
+  ],
+  "properties": {
+    "agentId": {
+      "$ref": "../defs.schema.json#/$defs/agentId"
+    },
+    "closeYm": {
+      "$ref": "../defs.schema.json#/$defs/ym"
+    },
+    "paidAt": {
+      "$ref": "../defs.schema.json#/$defs/instant"
+    },
+    "paidAmount": {
+      "$ref": "../defs.schema.json#/$defs/won"
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ga.example/portal/contracts/events/v1/payloads/AgentSnapshot.v1.schema.json",
+  "title": "AgentSnapshot payload (v1)",
+  "description": "설계사 마스터·소속·등급 변경 시, 재구축 부트스트랩 시(설계서 §4.2). → agent_profile upsert. 모르는 필드는 허용한다(설계서 §4.5 — 소비자는 무시).",
+  "type": "object",
+  "required": [
+    "agentId",
+    "name",
+    "grade",
+    "orgPath",
+    "role",
+    "status",
+    "validFrom"
+  ],
+  "properties": {
+    "agentId": {
+      "$ref": "../defs.schema.json#/$defs/agentId"
+    },
+    "nameMasked": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "grade": {
+      "type": "string",
+      "minLength": 1
+    },
+    "orgPath": {
+      "type": "string",
+      "pattern": "^(/[A-Za-z0-9_-]+)+$"
+    },
+    "role": {
+      "type": "string",
+      "minLength": 1,
+      "description": "열린 값(AGENT/TEAM_LEAD/BRANCH_HEAD/...)"
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "validFrom": {
+      "$ref": "../defs.schema.json#/$defs/date"
+    }
+  }
+}

@@ -41,6 +41,9 @@ jobs:
       - name: Build (unit + archTest + integrationTest + build checks)
         run: ./gradlew build --console=plain
 
+      - name: C7 — shared contract copy equals ga-disclosure at the UPSTREAM merge commit (network)
+        run: ./gradlew verifyUpstreamContract --console=plain
+
       - name: Test reports
         if: always()
         uses: actions/upload-artifact@v7
