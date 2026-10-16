@@ -330,7 +330,9 @@ class EventSchemaTest {
                 Arguments.argumentSet("K3 AgentSnapshot.grade·role", "16-AgentSnapshot.json", List.<String>of(),
                         List.of("grade", "role"), List.of("agentId", "name", "orgPath", "status", "validFrom")),
                 Arguments.argumentSet("K4 StatementConfirmed.clawbackOffset·withholdingTax·net", "08-StatementConfirmed.json", List.<String>of(),
-                        List.of("clawbackOffset", "withholdingTax", "net"), List.of("agentId", "closeYm", "gross", "adjustment", "closedAt")));
+                        List.of("clawbackOffset", "withholdingTax", "net"), List.of("agentId", "closeYm", "gross", "adjustment", "closedAt")),
+                Arguments.argumentSet("L1 LimitLedgerRebased.postingSeq (v1.1.1)", "17-LimitLedgerRebased.json", List.<String>of(),
+                        List.of("postingSeq"), List.of("ledgerId", "oldLimit", "newLimit", "monthlyPremium", "reason")));
     }
 
     /** 선택이 된 필드를 전부 뺀 변형이 통과하고, 그 객체의 required는 정확히 남은 목록이다(다시 필수로 조여지면 여기서 보인다). */
@@ -392,6 +394,20 @@ class EventSchemaTest {
         assertThat(eventType.path("enum")).extracting(JsonNode::asString)
                 .containsExactly("CANCEL", "LAPSE", "WITHDRAW", "REDUCE", "REINSTATE", "PAYMENT_OVERDUE");
         assertThat(eventType.path("description").asString()).contains("REINSTATE = 엔진 REVIVE").contains("PAYMENT_OVERDUE는 우리 엔진이 발행하지 않는다");
+    }
+
+    /** v1.1.1 L1~L3: postingSeq는 있으면 여전히 ≥ 1, paidAt·limitCutPolicy의 뜻이 설명문에 있다. */
+    @Test
+    void v111DescriptionsAndTheRemainingPostingSeqBound() {
+        ObjectNode rebased = read(CONTRACTS.resolve("events/v1/samples/17-LimitLedgerRebased.json"));
+        ((ObjectNode) rebased.path("payload")).put("postingSeq", 0);
+        assertThat(schema(ENVELOPE).validate(rebased)).as("postingSeq 0").isNotEmpty();
+        assertThat(payloadSchema("LimitLedgerRebased").path("properties").path("postingSeq").path("description").asString())
+                .contains("재산정 직전 마지막 전기 순번");
+        assertThat(payloadSchema("PayoutCompleted").path("properties").path("paidAt").path("description").asString())
+                .contains("지급 확정").contains("이체 파일 실행 시각이 아니다");
+        assertThat(payloadSchema("CommissionCalculated").path("properties").path("limitCutPolicy").path("description").asString())
+                .contains("over_limit_action 그대로").contains("DEFER_AFTER_FY도 삭감과 같게").contains("LIMIT_DEFER 스케줄이 없어도 오류로 보지 않는다");
     }
 
     /** 포털 defs의 시각·UUID 형식은 공유 핵심의 것과 글자까지 같다(두 정본이 어긋나지 않게). */

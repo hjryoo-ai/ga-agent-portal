@@ -18,7 +18,8 @@
       "$ref": "../defs.schema.json#/$defs/ym"
     },
     "paidAt": {
-      "$ref": "../defs.schema.json#/$defs/instant"
+      "$ref": "../defs.schema.json#/$defs/instant",
+      "description": "지급 확정(정산행 기록·PAID 전이) 시각 — 이체 파일 실행 시각이 아니다(v1.1.1)"
     },
     "paidAmount": {
       "$ref": "../defs.schema.json#/$defs/won",
