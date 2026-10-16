@@ -6,7 +6,9 @@ GA 소속 설계사가 **"이번 달 얼마 받나 · 이 계약 한도가 얼�
 
 ## 상태
 
-Phase 0(골격) 수용(2026-10-16) — [계획](docs/phase-00-계획.md)·[승인](docs/phase-00-계획승인.md)·[보고서](docs/phase-00-보고서.md)·[수용 심사](docs/phase-00-수용심사.md). 태그 `phase-0`(보고서 1판)·`phase-0.1`(수용 조건 반영). 다음: 엔진 E1(아웃박스)·포털 Phase 1(인제스트). 정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.3 — 계약 v1.1), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
+Phase 0(골격) 수용(2026-10-16) — [계획](docs/phase-00-계획.md)·[승인](docs/phase-00-계획승인.md)·[보고서](docs/phase-00-보고서.md)·[수용 심사](docs/phase-00-수용심사.md). 태그 `phase-0`(보고서 1판)·`phase-0.1`(수용 조건 반영).
+
+Phase 1(인제스트) 구현 완료, 수용 심사 대기 — [지시문](docs/phase-01-지시문.md)·[계획](docs/phase-01-계획.md)·[승인](docs/phase-01-계획승인.md)·[보고서](docs/phase-01-보고서.md). 태그 `phase-1`. 계약 v1.1.1(엔진 E1 `UPSTREAM` = `f54d008`). 정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.4), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## 실행
 
