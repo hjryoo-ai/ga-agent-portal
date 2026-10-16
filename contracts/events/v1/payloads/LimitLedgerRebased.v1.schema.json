@@ -6,7 +6,6 @@
   "type": "object",
   "required": [
     "ledgerId",
-    "postingSeq",
     "oldLimit",
     "newLimit",
     "monthlyPremium",
@@ -18,7 +17,8 @@
     },
     "postingSeq": {
       "type": "integer",
-      "minimum": 1
+      "minimum": 1,
+      "description": "선택(v1.1.1) — 재산정 직전 마지막 전기 순번. 재산정은 전기(DTL)가 아니므로 순번이 없고, 전기가 없던 원장이면 이 필드가 없다"
     },
     "oldLimit": {
       "$ref": "../defs.schema.json#/$defs/nonNegativeWon"
