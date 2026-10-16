@@ -13,9 +13,12 @@ dependencies {
 
     testImplementation(platform(libs.spring.boot.bom))
     testImplementation(testFixtures(libs.platform.core))
+    // 시험 픽스처: 피드 계약 스위트(FeedClientContract)·스텁 피드 서버(JDK HttpServer)·샘플 읽기 — portal-app 통합 시험도 쓴다
     testFixturesApi(project(":portal-projection"))
-    testFixturesImplementation(platform(libs.spring.boot.bom))
-    testFixturesImplementation(libs.jackson.databind)
+    testFixturesApi(platform(libs.spring.boot.bom))
+    testFixturesApi(libs.jackson.databind)
+    testFixturesApi(libs.junit.jupiter)
+    testFixturesApi(libs.assertj.core)
 }
 
 // 계약 사본(원격 조회 0 — ContractSchemas): 저장소 contracts/에서 빌드가 복사한다. 원본은 하나다.
