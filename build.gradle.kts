@@ -332,8 +332,10 @@ tasks.register("verifyUpstreamContract") {
             val upstream = java.net.URI("https://raw.githubusercontent.com/$repo/$commit/contracts/$path").toURL().openStream().use { it.readBytes() }
             val local = shared.resolve(path).readBytes()
             val up = MessageDigest.getInstance("SHA-256").digest(upstream).joinToString("") { "%02x".format(it) }
-            if (up != sha256(shared.resolve(path)) || !upstream.contentEquals(local)) {
-                throw GradleException("contracts/shared/ga-disclosure/$path differs from $repo@$commit:contracts/$path — 사본을 고치지 말고 업스트림에서 다시 받는다")
+            val copy = sha256(shared.resolve(path))
+            if (up != copy || !upstream.contentEquals(local)) {
+                throw GradleException("contracts/shared/ga-disclosure/$path differs from $repo@$commit:contracts/$path " +
+                    "(copy sha256=$copy, upstream sha256=$up) — 사본을 고치지 말고 업스트림에서 다시 받는다")
             }
             logger.lifecycle("contracts/shared/ga-disclosure/$path == $repo@$commit:contracts/$path ($up)")
         }

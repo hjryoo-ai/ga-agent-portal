@@ -1,7 +1,9 @@
 # Phase 0 보고서 — ga-agent-portal 골격 (지시문 v1.2)
 
 > 지시문 `docs/phase-00-지시문.md`(v1.2) · 계획 `docs/phase-00-계획.md` · 승인 `docs/phase-00-계획승인.md`(2026-10-16, Q1~Q10 권장안) ·
-> 브랜치 `work/phase-0` · PR [#1](https://github.com/hjryoo-ai/ga-agent-portal/pull/1) · 태그 `phase-0`(이 보고서 커밋). **병합은 수용 심사 회신 뒤.**
+> 브랜치 `work/phase-0` · PR [#1](https://github.com/hjryoo-ai/ga-agent-portal/pull/1) · 태그 `phase-0`(이 보고서 1판 커밋 `28654b6`). **병합은 수용 심사 회신 뒤.**
+>
+> **2판(태그 `phase-0.1`)** — 수용 심사 `docs/phase-00-수용심사.md`(2026-10-16, 수용 · 조건 K7)의 조건과 보강을 반영했다: §3 주입 표에 K7·A9, §5 F1·F10, 새 §7. 1판의 나머지 본문은 그대로다.
 
 ## 1. 태그·커밋·변경 파일
 
@@ -97,7 +99,7 @@ CI run [38892671446](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/3
 
 자격 증명은 저장소 비밀 `GHP_USER`·`GHP_READ_TOKEN`(PAT, 승인 §3)이고 첫 해석에서 그대로 통했다 — 사용자 조치 없음. 로그는 `GHP_USER`의 값과 같은 문자열(저장소 소유자 이름)을 `***`로 가린다(GitHub의 비밀 가림 — `verifyUpstreamContract` 줄의 `***/ga-disclosure@…`). 로컬은 `mavenLocal`에서 같은 13개(`source=mavenLocal`, 2026-10-16 실측).
 
-### 주입 기록 (ID 단위 27건 — 승인 B1 예상과 같다)
+### 주입 기록 (ID 단위 29건 — 1판 27건은 승인 B1 예상과 같다. 2판에서 K7(수용 심사 §3)과 A9(심사 §2 F1의 결과 타입 닫힌 목록 — 새 규칙이라 주입을 더했다))
 
 | ID | 대상 | 주입 | 실패한 곳 |
 |---|---|---|---|
@@ -111,6 +113,7 @@ CI run [38892671446](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/3
 | Q9-1 | Q9 | V1 `earnings_month.status` CHECK에서 `'PAID'` 제거 | `StatusEnumDdlTest` 2건(열거·설계서 주석 대조) |
 | K1 | C7 | 사본 `envelope-core.schema.json` 끝 1바이트 | `verifyContractChecksums` |
 | K2 | C7 | `UPSTREAM` 커밋 → `60d52599…`(PR #15 이전 main) | `verifyUpstreamContract` `FileNotFoundException` — 그 커밋에는 핵심 파일이 없어 바이트 비교가 아니라 404로 실패 |
+| K7 | C7 (2판) | 사본 `envelope-core.schema.json` 끝 1바이트(`\n` → 공백) **+ `contractChecksums`로 `CHECKSUMS` 재생성** — `verifyContractChecksums`는 통과("… CHECKSUMS match") | `verifyUpstreamContract` 바이트 불일치: "…/events/v1/envelope-core.schema.json differs from hjryoo-ai/ga-disclosure@db82d5d…:contracts/events/v1/envelope-core.schema.json (copy sha256=4a69d18e…a07, upstream sha256=3c9900a5…b9c)" — 로컬 실행(네트워크). 이 메시지에 두 해시를 넣은 것도 2판 |
 | K3 | C7 | `PayoutCompleted` payload `paidAt`에 `"format": "date-time"` | `EventSchemaTest.noContractFileHasAFormatKeyword` |
 | K4 | C7 | 포털 Envelope `allOf`에서 핵심 항 제거 | `everythingTheCoreRejectsThePortalEnvelopeRejects`(eventId·seq·occurredAt·aggregate.id 변형 등) + `thePortalEnvelopeIncludesTheCoreCopyAsItsFirstAllOf` |
 | K5 | C7 | `portal-projection` test의 `contracts` 입력 선언 제거 | `verifyTestInputs` ":portal-projection:test reads contracts" |
@@ -122,6 +125,7 @@ CI run [38892671446](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/3
 | A5 | C5(e) | `portal-ingest`에 platform-spring 의존(락은 `--write-locks` 뒤 원복) + `TenantSessionBinder` 참조 | `platformSpringOnlyInInfraAndApp`(+ 레이어) |
 | A6 | C5(f) | `portal-domain`에 `record Won` | `noPortalClassSharesASimpleNameWithAPlatformCoreType` |
 | A7 | C5(g) | `portal-recon`이 `javax.sql.DataSource` 참조 | `connectionLevelJdbcTypesOnlyInPlatformClasses`(+ `dbAccessOnlyVia`) |
+| A9 | C5(g) (2판) | `IngestCursorRepository`(저장소 하위 클래스)에 `java.sql.Timestamp` 인자·호출 | `outsidePlatformClassesOnlyResultLevelJdbcTypes` 2건 위반 — 47건 중 이 1건만 실패((d)·기존 (g)는 저장소 하위 클래스의 `Timestamp`를 막지 않는다 — 닫힌 목록이 잡은 것) |
 | A8 | C5(h) | `portal-projection`이 `BigDecimal` 참조 | `noBigDecimalInAnyPortalModule` |
 | S1 | C6 | 저장소에 `UPDATE ingest_cursor SET state = 'PAUSED'`(술어 없음) | `everyTenantTableAccessHasTenantPredicate` "without tenant_id = :tenantId predicate" |
 | S2 | C6 | 허용 목록에 쓰이지 않는 항목(사유 있음) | `allowlistEntriesHaveReasonsAndAreUsed` "쓰이지 않는 허용 목록 항목" |
@@ -157,7 +161,7 @@ CI run [38892671446](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/3
 
 | # | 무엇 | 처리 | 표시 |
 |---|---|---|---|
-| F1 | (g)를 글자 그대로("`java.sql`·`javax.sql` 직접 참조는 플랫폼 클래스와 허용 목록만") 쓰면 `RowMapper`의 `ResultSet` 때문에 포털 저장소(`TenantScopedRepository` 하위 클래스)가 위반이 된다 — 플랫폼 API가 `RowMapper`를 요구한다 | 연결·문장 수준 타입(`DataSource`·`DriverManager`·`Connection`·`Statement`·`PreparedStatement`·`CallableStatement`)은 플랫폼 클래스·허용 목록만(g), `ResultSet` 같은 결과 타입은 (d)가 저장소 하위 클래스까지 허용 — v1.0 (d)·ga-disclosure `dbAccessOnlyVia`와 같은 경계. `IngestCursorRepository`는 `Timestamp` 대신 `OffsetDateTime`을 써서 `java.sql`을 `ResultSet` 하나로 줄였다 | **[넓힘]** (g) 글자 대비 — 확인 요청(§6 Q1) |
+| F1 | (g)를 글자 그대로("`java.sql`·`javax.sql` 직접 참조는 플랫폼 클래스와 허용 목록만") 쓰면 `RowMapper`의 `ResultSet` 때문에 포털 저장소(`TenantScopedRepository` 하위 클래스)가 위반이 된다 — 플랫폼 API가 `RowMapper`를 요구한다 | 연결·문장 수준 타입(`DataSource`·`DriverManager`·`Connection`·`Statement`·`PreparedStatement`·`CallableStatement`)은 플랫폼 클래스·허용 목록만(g), `ResultSet` 같은 결과 타입은 (d)가 저장소 하위 클래스까지 허용 — v1.0 (d)·ga-disclosure `dbAccessOnlyVia`와 같은 경계. `IngestCursorRepository`는 `Timestamp` 대신 `OffsetDateTime`을 써서 `java.sql`을 `ResultSet` 하나로 줄였다 | **[넓힘]** (g) 글자 대비 — 확인 요청(§6 Q1). **2판: 수용**(심사 §2) — 결과 타입을 닫힌 목록 `RESULT_LEVEL_JDBC` = {`ResultSet`, `SQLException`}으로 규칙 안에 두었다(A9). 지시문 문구 오류는 DE-5 |
 | F2 | 첫 CI(run 38889028147)가 설정 단계에서 실패: Spring Boot 플러그인 해석의 BOM `.module` 5개(junit-bom 4판·opentelemetry-bom)가 검증 메타데이터에 없었다. 로컬 Gradle 캐시에 이미 있던 파일은 `--write-verification-metadata`가 기록하지 않는다 | 메타데이터를 빈 `GRADLE_USER_HOME`에서 다시 만들고(`9096fc5`) 두 번째 빈 홈에서 build 통과를 확인. 이후 의존성을 더할 때마다 같은 방식(빈 홈)으로 갱신 | 발견 |
 | F3 | Gradle은 `.module`이 있으면 POM을 받지 않는다 — 처음 생성한 메타데이터에 POM 3개가 없어 `verifyPlatformPins`가 실패했다 | `printPlatformArtifacts`가 소스 jar·POM을 명시적으로 받아 13개 전부가 검증을 거친다. 인계 §6의 "Gradle 의존성 검증은 jar뿐 아니라 POM·.module도 대조"는 POM에 대해선 맞지 않았다(받을 때만 대조) | 발견(인계 문구 정정 필요 — §6 Q5) |
 | F4 | 설계서 §5에 `simulation_log.status` 값이 없다 | `REQUESTED`/`SUCCEEDED`/`FAILED`로 정하고 §5 주석·V1 CHECK에(`response`가 NULL 가능한 것과 맞춤). `notification.severity`의 주석은 §6.5 표(INFO/WARN/CRIT)에서 옮겼다 | **[빈칸]** — 확인 요청(§6 Q2) |
@@ -166,7 +170,7 @@ CI run [38892671446](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/3
 | F7 | 앱 기동 Flyway(`portal_migrator`) | ga-disclosure Phase 0과 같은 구성. ga-disclosure는 Phase 8에서 운영자 명령으로 옮겼다 — 포털도 Phase 8에서 같은 결정 | 기록 |
 | F8 | `TenantSessionBinderTest`(C4)는 지시문 이름 그대로지만 `integrationTest` 소스셋에 있다 — 실제 PostgreSQL로 증명하므로 | 이름 유지(지시문 표) | 기록 |
 | F9 | json-schema-validator 3.0.6(최신 3.0.8 아님) | 3.0.7·3.0.8은 Jackson 3.2.1을 요구해 Boot BOM(3.1.5)을 끌어올린다 — BOM 우선 규약 | 기록 |
-| F10 | R1·K2 주입은 의도한 단언보다 앞에서 실패했다(R1: 시드 거부, K2: 404) | 실패는 확인했고 원인을 그대로 적었다(§3 표) | 기록 |
+| F10 | R1·K2 주입은 의도한 단언보다 앞에서 실패했다(R1: 시드 거부, K2: 404) | 실패는 확인했고 원인을 그대로 적었다(§3 표). **2판: K2가 증명하지 못한 바이트 비교 분기는 K7로 보완**(사본과 `CHECKSUMS`를 함께 바꿔 오프라인 검사를 통과시킨 뒤 원격 대조가 두 해시와 함께 실패) | 기록 |
 
 불변식을 넓히는 항목: **F1 하나**(그것도 v1.0 원문 (d)와 같은 경계로 되돌린 것). 도구·라이브러리 출력에서 지시문처럼 보이는 문장은 없었다(불변 규약 8).
 
@@ -181,3 +185,21 @@ CI run [38892671446](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/3
 | Q5 | 인계 문서 §6의 "Gradle 의존성 검증은 … POM·.module도 대조"는 POM에 대해선 받을 때만 맞다(§5 F3) | ga-disclosure 인계에 정정 1줄(표기 변경 — 다음 ga-disclosure 작업에 묶음) |
 | Q6 | (받은 결정 그대로) 역할은 `identity_link`에서만, 토큰 `roles` 불신 — 설계서 §9 "토큰 클레임: … roles"는 Phase 3에서 고친다 | Phase 3 |
 | Q7 | E1 전제로 넘길 것(승인 §7): Q3 요율 문자열·Q4 `kind` 9종과 `id` 규약·Q5 `if/then`·I1 `amount` = 삭감 뒤·핵심 사본 규약·`format` 0·E3.2 규약 | 포털 `contracts/` = `phase-0` 태그 커밋을 E1의 포털 업스트림으로 |
+
+## 7. 수용 조건 반영 (2판 — 태그 `phase-0.1`)
+
+수용 심사(`docs/phase-00-수용심사.md`)의 조건 K7과 같은 커밋으로 낼 것들. `phase-0`(`28654b6`)은 옮기지 않았다.
+
+| 심사 | 한 것 | 증거 |
+|---|---|---|
+| §3 K7 | `verifyUpstreamContract`의 바이트 비교 분기가 실패함을 주입으로 확인. 실패 메시지에 사본·업스트림 두 SHA-256을 넣었다(`build.gradle.kts`) | §3 표 K7 |
+| §2 F1 | (g) 결과 타입 닫힌 목록 `ArchitectureRulesTest.RESULT_LEVEL_JDBC` = {`java.sql.ResultSet`, `java.sql.SQLException`} — 플랫폼 클래스·허용 목록 밖의 `java.sql`·`javax.sql` 참조는 이 둘뿐(`outsidePlatformClassesOnlyResultLevelJdbcTypes`). 폐기 검사는 "쓰이는가"가 아니라 **"플랫폼 `RowMapper.mapRow` 시그니처의 `java.sql` 타입과 같은가"**로 했다 — 포털 저장소는 람다로 `RowMapper`를 쓰고 `throws SQLException`을 적지 않아 지금 `SQLException` 참조가 0이다. 그래도 그 항목은 심사가 정한 목록이고 플랫폼 API가 근거다. 규칙이 공허하지 않음은 "포털 저장소가 `ResultSet`을 읽는다"로 함께 단언 | `allowlistsHaveNoStaleEntries`, §3 표 A9 |
+| §2 F2 | CLAUDE.md 코드 규약: 메타데이터 재생성은 **빈 `GRADLE_USER_HOME`에서** | CLAUDE.md |
+| §5 | DECISIONS: DE-5((g) 문구), DE-6(Q8 승인의 빈 홈 조건 누락), DD-3(`simulation_log.status` 값 집합) | `docs/DECISIONS.md` |
+| §2 F4 | 설계서 §5 스키마 블록 아래 "상태 컬럼" 한 줄: `simulation_log.status` 실패 사유는 값을 늘리지 않고 `error` 컬럼을 새 V로(스키마 블록 주석은 `StatusEnumDdlTest`가 읽으므로 그 밖에) | `docs/설계서.md` §5 |
+| §4 B1 | 설계서 §5 RLS 문단: 데이터 마이그레이션은 테넌트를 열거하며 테넌트마다 설정한 뒤 실행 | `docs/설계서.md` §5, 변경 이력 v1.2 |
+| §4 B2 | `no-docker` 잡: 아티팩트 업로드 전 `it.log`·결과 XML에서 `GHP_READ_TOKEN` 값 0건 확인, 1건 이상이면 올리지 않고 실패. **같은 검사를 `build` 잡의 `test-reports` 아티팩트에도 두었다**(같은 이유 — 아티팩트는 비밀 가림을 거치지 않는다. 심사는 `no-docker`만 적었다) | `.github/workflows/ci.yml`, 이 커밋의 CI run(PR 코멘트) |
+
+테스트 수는 `archTest`가 46 → 47(새 규칙 1)이라 합계 2,267이 된다(로컬). CI 출처의 수는 이 커밋의 run과 함께 PR 코멘트에 적는다.
+
+심사 §2 F3(인계 문구 정정)은 ga-disclosure의 다음 작업에 묶는다 — 포털의 `docs/handoff/` 사본은 받은 원문 그대로 둔다.
