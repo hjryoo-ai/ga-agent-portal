@@ -1,5 +1,6 @@
 package com.ga.portal.infra.persistence;
 
+import com.ga.portal.domain.CursorRecord;
 import com.ga.portal.domain.IngestState;
 import com.ga.platform.spring.jdbc.TenantJdbcGateway;
 import com.ga.platform.spring.jdbc.TenantScopedRepository;
@@ -20,7 +21,7 @@ import java.util.Optional;
 @Repository
 public class IngestCursorRepository extends TenantScopedRepository {
 
-    private static final RowMapper<IngestCursor> MAPPER = (rs, rowNum) -> new IngestCursor(
+    private static final RowMapper<CursorRecord> MAPPER = (rs, rowNum) -> new CursorRecord(
             rs.getLong("last_seq"),
             Optional.ofNullable(rs.getString("last_event_id")),
             IngestState.valueOf(rs.getString("state")),
@@ -34,7 +35,7 @@ public class IngestCursorRepository extends TenantScopedRepository {
         this.clock = clock;
     }
 
-    public Optional<IngestCursor> find() {
+    public Optional<CursorRecord> find() {
         return queryAtMostOne("""
                 SELECT last_seq, last_event_id, state, updated_at, error
                   FROM ingest_cursor

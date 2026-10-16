@@ -5,7 +5,7 @@ import com.ga.platform.core.tenant.TenantId;
 import com.ga.platform.spring.jdbc.TenantJdbcGateway;
 import com.ga.platform.spring.jdbc.TenantSessionBinder;
 import com.ga.portal.domain.IngestState;
-import com.ga.portal.infra.persistence.IngestCursor;
+import com.ga.portal.domain.CursorRecord;
 import com.ga.portal.infra.persistence.IngestCursorRepository;
 import com.ga.portal.infra.testing.PostgresHarness;
 import com.ga.portal.infra.testing.SeedData;
@@ -51,7 +51,7 @@ class IngestCursorRepositoryIT {
             return null;
         });
 
-        IngestCursor cursor = in(a, () -> at(T0).find()).orElseThrow();
+        CursorRecord cursor = in(a, () -> at(T0).find()).orElseThrow();
         assertThat(cursor.lastSeq()).isEqualTo(9);
         assertThat(cursor.lastEventId()).contains(EVENT);
         assertThat(cursor.state()).isEqualTo(IngestState.FAILED);
