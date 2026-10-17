@@ -1,7 +1,8 @@
 # 시험 스트림 (포털 Phase 1 계획 ⑧)
 
 JSONL — 첫 줄 머리 `{"tenantId", "schemaVersion"}`, 다음 줄부터 Envelope 한 줄씩(`FileFeedAdapter` 형식). 전부 계약 샘플
-`contracts/events/v1/samples/01~17`(허구 데이터 — 계약 v1.2부터 `a1/`·`contract-only/`·`standalone/` 세 디렉터리, seq로 합친다)에서 만들었고,
+계약 샘플의 **정규 스트림 17건**(허구 데이터 — 계약 v1.3: 엔진 A-1 `a1/a1_portal_150000.jsonl`의 seq 1~10 뒤에 `contract-only/`·`standalone/`의
+단건 예시 7개를 파일 이름 순으로 이어 seq 11~17로 다시 매긴 것, `Samples.all()`)에서 만들었고,
 `StreamFilesTest`가 아래 표의 규칙으로 다시 계산해 파일과 대조한다 — 샘플이 바뀌면 그 시험이 실패한다.
 
 **파일 순서는 시험용 어댑터의 성질이다.** `FileFeedAdapter`는 첫 `seq > afterSeq` 줄부터 파일 순서 그대로 돌려준다(뒤의 작은 seq 포함 —
@@ -10,7 +11,7 @@ JSONL — 첫 줄 머리 `{"tenantId", "schemaVersion"}`, 다음 줄부터 Envel
 
 | 파일 | 테넌트 | 내용 | 쓰는 시험 |
 |---|---|---|---|
-| `a1-golden.jsonl` | GA01 | 샘플 1~17 | C13 결정론, IT 기본 |
+| `a1-golden.jsonl` | GA01 | 정규 스트림 1~17 | C13 결정론, IT 기본 |
 | `dup.jsonl` | GA01 | 1, 2, 3, **3**, 4, 5 (같은 줄 두 번) | C1 |
 | `replay-known.jsonl` | GA01 | 1~5 뒤 **3** 다시 | C2 건너뜀 |
 | `replay-new.jsonl` | GA01 | 1~5 뒤 seq 3에 **새 eventId** `…0000000000f3` | C2 독 `PAST_SEQ_NEW_EVENT` |
@@ -19,4 +20,4 @@ JSONL — 첫 줄 머리 `{"tenantId", "schemaVersion"}`, 다음 줄부터 Envel
 | `poison-kind.jsonl` | GA01 | 1~4, 5의 `aggregate.kind` = `POLICY`, 6~17 | C6 `TYPE_KIND_MISMATCH` |
 | `hash-mismatch.jsonl` | GA01 | 1~5 뒤 5와 같은 eventId·seq, `payload.accumAfter` − 1 | C7 `HASH_MISMATCH` |
 | `version2.jsonl` | GA01 | 1~4, 5의 `version` = 2, 6~17 | C8 `UNSUPPORTED_VERSION` |
-| `other-tenant.jsonl` | **GA02** | 샘플 1~17 | C9 `TENANT_MISMATCH`(GA01이 읽으면) |
+| `other-tenant.jsonl` | **GA02** | 정규 스트림 1~17 | C9 `TENANT_MISMATCH`(GA01이 읽으면) |
