@@ -14,7 +14,7 @@ import java.util.Optional;
 @Repository
 public class AgentProfileRepository extends ViewRepository {
 
-    private static final RowMapper<AgentRow> MAPPER = (rs, n) -> new AgentRow(rs.getString("agent_id"), rs.getString("name"),
+    static final RowMapper<AgentRow> MAPPER = (rs, n) -> new AgentRow(rs.getString("agent_id"), rs.getString("name"),
             optString(rs, "grade"), rs.getString("org_path"), optString(rs, "role"), AgentStatus.valueOf(rs.getString("status")),
             date(rs, "valid_from"), rs.getLong("last_seq"));
 

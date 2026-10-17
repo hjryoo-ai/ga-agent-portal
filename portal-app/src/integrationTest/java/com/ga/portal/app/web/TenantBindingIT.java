@@ -12,7 +12,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * C4: 테넌트는 토큰 발급자({@code iss})가 정하고, 설계사·역할은 {@code identity_link}에서만 — 토큰의 {@code agent_id}·{@code roles} 클레임은 아무것도 바꾸지
- * 않는다. {@code tenant_id} 클레임은 교차 검사(다르면 401). 발급자 표는 요청마다 읽는다(해제가 즉시 효력). 등록된 발급자의 메타데이터는 한 번만 받는다.
+ * 않는다. {@code tenant_id} 클레임은 교차 검사(다르면 401). 발급자 표는 요청마다 읽는다(해제가 즉시 효력). 등록된 발급자의 메타데이터는 애플리케이션마다 한 번만
+ * 받는다(미등록 발급자는 한 번도 받지 않는다).
  */
 class TenantBindingIT extends ApiIntegrationTest {
 
@@ -70,11 +71,15 @@ class TenantBindingIT extends ApiIntegrationTest {
 
     @Test
     void anIssuersMetadataIsFetchedOnceAndOnlyForRegisteredIssuers() {
+        // 발급자 디코더는 애플리케이션(컨텍스트)마다 한 번 만든다 — 같은 JVM의 다른 시험 컨텍스트가 이미 받았을 수 있어 데우고 나서 센다
+        assertThat(get(WHOAMI, ISSUER_1.token(SUB_B, AUD_1)).statusCode()).isEqualTo(200);
+        int warmed = ISSUER_1.metadataRequests();
+        assertThat(warmed).isPositive();
         for (int i = 0; i < 3; i++) {
             assertThat(get(WHOAMI, ISSUER_1.token(SUB_B, AUD_1)).statusCode()).isEqualTo(200);
         }
         assertThat(get(WHOAMI, STRANGER.token(SUB_A, AUD_1)).statusCode()).isEqualTo(401);
-        assertThat(ISSUER_1.metadataRequests()).isEqualTo(1);
+        assertThat(ISSUER_1.metadataRequests()).as("no refetch once this application has the decoder").isEqualTo(warmed);
         assertThat(STRANGER.metadataRequests()).as("no request to an unregistered issuer").isZero();
         assertThat(STRANGER.jwksRequests()).isZero();
     }

@@ -1,6 +1,7 @@
 package com.ga.portal.app.web;
 
 import com.ga.platform.core.tenant.TenantContext;
+import com.ga.portal.query.InvalidRequest;
 import com.ga.portal.query.NotFound;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -58,7 +59,7 @@ final class ApiExceptionHandler {
         }
     }
 
-    @ExceptionHandler({MissingServletRequestParameterException.class, HttpMediaTypeNotAcceptableException.class})
+    @ExceptionHandler({InvalidRequest.class, MissingServletRequestParameterException.class, HttpMediaTypeNotAcceptableException.class})
     void invalid(HttpServletResponse response) throws IOException {
         ProblemResponses.invalidRequest(response);
     }

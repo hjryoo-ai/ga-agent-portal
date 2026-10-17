@@ -72,6 +72,9 @@ testing {
                 // 시험 발급기(TestIssuer): RSA 키·JWKS·서명(계획 ⑦ — Keycloak 컨테이너는 Phase 8)
                 implementation(libs.nimbus.jose.jwt)
                 implementation(libs.spring.boot.starter.security.oauth2.resource.server)
+                // 조회 API 응답 계약 검증(ApiContract — portal-api.openapi.yaml, C11): 계약 사본은 portal-ingest 자원(contracts/api/v1/**)
+                implementation(libs.json.schema.validator)
+                implementation(libs.jackson.dataformat.yaml)
                 implementation(libs.junit.jupiter)
                 implementation(libs.assertj.core)
                 runtimeOnly(libs.junit.platform.launcher)
@@ -88,6 +91,8 @@ testing {
                     // 프로젝션 IT(Phase 2): 골든 스트림·골든 뷰(portal-projection 시험 자원 — 시험 픽스처 GoldenViews·Envelopes가 읽는다)
                     inputs.dir(rootProject.layout.projectDirectory.dir("portal-projection/src/test/resources/golden-streams")).withPathSensitivity(PathSensitivity.RELATIVE)
                     inputs.dir(rootProject.layout.projectDirectory.dir("portal-projection/src/test/resources/golden-views")).withPathSensitivity(PathSensitivity.RELATIVE)
+                    // 조회 API IT(Phase 3): 응답 계약(ApiContract — 클래스패스 사본의 원천)
+                    inputs.file(rootProject.layout.projectDirectory.file("contracts/api/v1/portal-api.openapi.yaml")).withPathSensitivity(PathSensitivity.RELATIVE)
                 }
             }
         }

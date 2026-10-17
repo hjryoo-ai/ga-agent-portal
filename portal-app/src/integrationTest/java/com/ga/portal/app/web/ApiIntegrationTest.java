@@ -58,6 +58,9 @@ abstract class ApiIntegrationTest {
     static final String AGENT_M = "PH3-M-7733";
     static final String AGENT_R = "PH3-R-7734";
     static final String AGENT_A2 = "PH3-A2-7741";
+    // A-1 둘째 판(계약 샘플)을 실제 적용기로 T1에 — 설계사 A-1001, 증권번호 POL-2026-0001(센티널)
+    static final String SUB_A1 = "sub-ph3-a1001-Zq87";
+    static final String AGENT_A1 = "A-1001";
 
     static {
         seedTenant(T1, ISSUER_1.issuer(), AUD_1);
@@ -69,6 +72,53 @@ abstract class ApiIntegrationTest {
         link(T1, SUB_O, null, "OPERATOR", "ACTIVE");
         // 같은 subject 문자열이 다른 테넌트에서는 다른 설계사다 — 테넌트는 발급자가 정한다
         link(T2, SUB_A, AGENT_A2, "AGENT", "ACTIVE");
+        link(T1, SUB_A1, AGENT_A1, "AGENT", "ACTIVE");
+        QuerySeed.agent(DB, T1, AGENT_A, "PH3 설계사 갑");
+        QuerySeed.agent(DB, T1, AGENT_B, "PH3 설계사 을");
+        QuerySeed.agent(DB, T1, AGENT_M, "PH3 조직장");
+        QuerySeed.agent(DB, T2, AGENT_A2, "PH3 설계사 병");
+    }
+
+    /** policyKey HMAC 비밀(허구 — 실행마다 무작위 32바이트, 저장소에 없다). */
+    static final java.nio.file.Path POLICY_KEY_SECRET = secretFile();
+
+    private static java.nio.file.Path secretFile() {
+        try {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("portal-policy-key");
+            java.nio.file.Path file = dir.resolve("secret");
+            byte[] secret = new byte[32];
+            new java.security.SecureRandom().nextBytes(secret);
+            java.nio.file.Files.write(file, secret);
+            return file;
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
+
+    private static volatile boolean a1Applied;
+
+    @Autowired
+    com.ga.portal.ingest.apply.IngestApplier applier;
+
+    @Autowired
+    com.ga.portal.ingest.apply.IngestStore ingestStore;
+
+    @Autowired
+    com.ga.portal.ingest.apply.TenantTransactions tenantTransactions;
+
+    /** A-1(11건)을 T1에 한 번 — 실제 적용기·프로젝터. 커서 last_seq = 11, caught_up_at은 시험이 정한다. */
+    @org.junit.jupiter.api.BeforeEach
+    void applyA1Once() {
+        synchronized (ApiIntegrationTest.class) {
+            if (a1Applied) {
+                return;
+            }
+            tenantTransactions.inTransaction(T1, () -> ingestStore.ensureCursor(java.time.Instant.now()));
+            for (tools.jackson.databind.node.ObjectNode e : com.ga.portal.projection.testing.Envelopes.nodes(com.ga.portal.projection.testing.Envelopes.a1())) {
+                org.assertj.core.api.Assertions.assertThat(applier.apply(T1, e).outcome()).isEqualTo(com.ga.portal.ingest.apply.IngestApplier.Outcome.APPLIED);
+            }
+            a1Applied = true;
+        }
     }
 
     @DynamicPropertySource
@@ -77,6 +127,7 @@ abstract class ApiIntegrationTest {
         registry.add("spring.flyway.url", DB::jdbcUrl);
         registry.add("portal.api.issuer-username", () -> PostgresHarness.ISSUER);
         registry.add("portal.api.issuer-password", () -> PostgresHarness.ISSUER_PASSWORD);
+        registry.add("portal.query.policy-key-secret-file", POLICY_KEY_SECRET::toString);
     }
 
     @Value("${local.server.port}")
@@ -109,9 +160,13 @@ abstract class ApiIntegrationTest {
         return get(path, b -> b.header("Authorization", "Bearer " + token));
     }
 
+    /** 보내고, 응답을 계약으로 검증한다(C11 — 모든 IT 응답). */
     HttpResponse<byte[]> send(HttpRequest.Builder request) {
         try {
-            return http.send(request.build(), HttpResponse.BodyHandlers.ofByteArray());
+            HttpRequest built = request.build();
+            HttpResponse<byte[]> response = http.send(built, HttpResponse.BodyHandlers.ofByteArray());
+            ApiContract.check(built.uri().getPath(), response);
+            return response;
         } catch (IOException e) {
             throw new java.io.UncheckedIOException(e);
         } catch (InterruptedException e) {

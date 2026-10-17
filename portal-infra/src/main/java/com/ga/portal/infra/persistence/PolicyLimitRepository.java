@@ -17,7 +17,7 @@ import java.util.Optional;
 @Repository
 public class PolicyLimitRepository extends ViewRepository {
 
-    private static final RowMapper<LedgerRow> MAPPER = (rs, n) -> new LedgerRow(rs.getString("ledger_id"), rs.getString("agent_id"),
+    static final RowMapper<LedgerRow> MAPPER = (rs, n) -> new LedgerRow(rs.getString("ledger_id"), rs.getString("agent_id"),
             rs.getString("policy_no"), date(rs, "contract_date"), date(rs, "fy_start"), date(rs, "fy_end"),
             rs.getLong("monthly_premium"), rs.getString("limit_multiple"), rs.getLong("limit_amount"), rs.getLong("accum_paid"),
             rs.getLong("cut_total"), rs.getLong("deferred_total"), rs.getLong("last_posting_seq"), rs.getString("rule_version_id"));
