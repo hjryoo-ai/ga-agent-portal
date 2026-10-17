@@ -107,3 +107,23 @@ tasks.named("check") {
 tasks.test {
     inputs.file(rootProject.layout.projectDirectory.file("docs/authz-matrix.md")).withPathSensitivity(PathSensitivity.RELATIVE)
 }
+
+// ---------------------------------------------------------------------------------------------
+// 실 엔진 E2E(포털 Phase 3 지시문 D-16) — 정규 빌드(check) 밖. e2e/engine-feed/run.sh가 부른다(사용자가 손으로 실행).
+//  runTestIssuer: 인프로세스 시험 발급기(TestIssuer)를 띄워 토큰·발급자 URL을 상태 디렉터리에 쓴다(종료될 때까지 JWKS를 낸다)
+//  e2eCheck     : 뷰 9표 = 골든 a1, GET /api/v1/me/earnings/202608 계약 통과 → RESULT.md
+// ---------------------------------------------------------------------------------------------
+val integrationTestSourceSet = sourceSets.named("integrationTest")
+tasks.register<JavaExec>("runTestIssuer") {
+    group = "e2e"
+    description = "Runs the in-process test OIDC issuer for e2e/engine-feed (writes token and issuer URL to the given state dir)."
+    classpath = integrationTestSourceSet.get().runtimeClasspath
+    mainClass = "com.ga.portal.app.web.TestIssuerMain"
+}
+tasks.register<JavaExec>("e2eCheck") {
+    group = "e2e"
+    description = "Checks the e2e/engine-feed run: 9 views = golden a1 and one /api/v1/me response against the contract; writes RESULT.md."
+    classpath = integrationTestSourceSet.get().runtimeClasspath
+    mainClass = "com.ga.portal.app.web.EngineFeedE2eCheck"
+    systemProperty("ga.repoRoot", rootDir.absolutePath)
+}

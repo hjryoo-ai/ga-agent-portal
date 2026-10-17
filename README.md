@@ -53,6 +53,8 @@ java -jar portal-app.jar --spring.profiles.active=cli ingest rebuild --tenant=GA
 
 설계사 본인 조회 `/api/v1/me/**`(계약 `contracts/api/v1/portal-api.openapi.yaml`, 인가 표 `docs/authz-matrix.md`). 인증은 테넌트 IdP의 RS256 액세스 토큰 — 테넌트는 토큰 발급자(`iss`)로, 설계사·역할은 `identity_link`로만 정한다(경로·쿼리에 agentId 없음). 거부는 같은 바이트(401 하나·404 하나·쿼리 형식 400 하나). 증권번호는 응답에 없고 `policyMasked`·`policyKey`(배포 비밀 HMAC)만. 운영 등록(발급자·설계사 링크·운영자·`policyKey` 비밀)은 `docs/운영.md`. 배포에 필요한 것: `PORTAL_ISSUER_USER`·`PORTAL_ISSUER_PASSWORD`(전용 롤 `portal_issuer`), `PORTAL_POLICY_KEY_SECRET_FILE`.
 
+실 엔진 E2E(정규 빌드 밖, 손으로 실행): `ENGINE_REPO=<엔진 commission-system 경로> e2e/engine-feed/run.sh` — 엔진 로컬 스택 → 포털(인제스트 켬) → 뷰 9표 = 골든 `a1`, 조회 API 한 건 계약 통과 → `e2e/engine-feed/RESULT.md`. 절차·비밀 처리는 `e2e/engine-feed/README.md`.
+
 ## 모듈
 
 | 모듈 | 역할 | Phase |
