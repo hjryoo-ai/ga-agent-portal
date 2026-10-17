@@ -56,16 +56,20 @@ final class IssuerTenantResolver implements AuthenticationManager {
 
     private final Function<String, Optional<IssuerRegistration>> issuers;
     private final Function<String, JwtDecoder> decoderFactory;
+    private final ApiMetrics metrics;
     private final JwtTimestampValidator timestamps;
     private final Map<String, JwtDecoder> decoders = new ConcurrentHashMap<>();
 
     /**
      * @param issuers        {@code iss} → 등록(전용 롤 리더)
      * @param decoderFactory 발급자 URL → 서명만 검증하는 디코더(검증기는 여기서 돌린다)
+     * @param metrics        JWKS 장애 지표(500 — 401 지표가 아니다)
      */
-    IssuerTenantResolver(Function<String, Optional<IssuerRegistration>> issuers, Function<String, JwtDecoder> decoderFactory, Clock clock) {
+    IssuerTenantResolver(Function<String, Optional<IssuerRegistration>> issuers, Function<String, JwtDecoder> decoderFactory, ApiMetrics metrics,
+                         Clock clock) {
         this.issuers = issuers;
         this.decoderFactory = decoderFactory;
+        this.metrics = metrics;
         this.timestamps = new JwtTimestampValidator(CLOCK_SKEW);
         this.timestamps.setClock(clock);
     }
@@ -114,6 +118,7 @@ final class IssuerTenantResolver implements AuthenticationManager {
         } catch (BadJwtException e) {
             throw new TokenRejectedException(RejectionReason.SIGNATURE, tenant);
         } catch (JwtException e) {
+            metrics.jwksFailure(registration.issuer());
             throw new AuthenticationServiceException("JWKS_UNAVAILABLE");
         }
 

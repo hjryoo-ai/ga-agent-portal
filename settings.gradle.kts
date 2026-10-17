@@ -51,6 +51,15 @@ dependencyResolutionManagement {
             filter { includeGroup("com.ga.platform") }
         }
         mavenCentral()
+        // web(포털 Phase 4): node-gradle 플러그인이 내려받는 Node.js 배포본. 프로젝트 저장소 금지 규약 때문에 여기 두고, 그 모듈 하나로 좁힌다.
+        // 받은 파일의 SHA-256은 gradle/verification-metadata.xml에 고정된다.
+        ivy {
+            name = "Node.js"
+            setUrl("https://nodejs.org/dist/")
+            patternLayout { artifact("v[revision]/[artifact](-v[revision]-[classifier]).[ext]") }
+            metadataSources { artifact() }
+            content { includeModule("org.nodejs", "node") }
+        }
     }
 }
 
@@ -64,4 +73,5 @@ include(
     "portal-infra",
     "portal-app",
     "portal-demo",
+    "web",
 )

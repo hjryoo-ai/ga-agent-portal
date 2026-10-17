@@ -1,3 +1,6 @@
+import java.util.zip.ZipFile
+import java.util.zip.ZipInputStream
+
 // Spring Boot 조립(설계서 §3.3). Phase 0: 진입점 + /actuator/health(DB 헬스 비활성 — 포털 Phase 8에서 전용 롤로 복원).
 // integrationTest: Testcontainers PostgreSQL로 부팅 스모크(Flyway는 portal_migrator, 데이터소스는 portal_app).
 // archTest: 전 모듈 아키텍처 규칙(ArchUnit) + SQL 테넌트 조건 스캔(5단계).
@@ -23,6 +26,8 @@ dependencies {
     implementation(libs.spring.boot.starter.security.oauth2.resource.server)
     runtimeOnly(libs.flyway.postgresql)
     runtimeOnly(libs.postgresql)
+    // 설계사 화면(포털 Phase 4 — 단일 아티팩트): web 모듈 jar의 classpath:/portal-web/(Vite 산출물)
+    runtimeOnly(project(":web"))
 }
 
 val portalModules = listOf(
@@ -93,6 +98,10 @@ testing {
                     inputs.dir(rootProject.layout.projectDirectory.dir("portal-projection/src/test/resources/golden-views")).withPathSensitivity(PathSensitivity.RELATIVE)
                     // 조회 API IT(Phase 3): 응답 계약(ApiContract — 클래스패스 사본의 원천)
                     inputs.file(rootProject.layout.projectDirectory.file("contracts/api/v1/portal-api.openapi.yaml")).withPathSensitivity(PathSensitivity.RELATIVE)
+                    // 화면 서빙 IT(Phase 4): 화면 경로 목록(WebScreensIT가 서버 목록과 대조)
+                    inputs.file(rootProject.layout.projectDirectory.file("web/src/routes.ts")).withPathSensitivity(PathSensitivity.RELATIVE)
+                    // 화면 E2E 하네스(WebE2eHarness — 같은 소스셋)가 읽는 포털 손 스트림
+                    inputs.dir(rootProject.layout.projectDirectory.dir("web/e2e/streams")).withPathSensitivity(PathSensitivity.RELATIVE)
                 }
             }
         }
@@ -102,6 +111,34 @@ testing {
 tasks.named("check") {
     dependsOn(testing.suites.named("archTest"), testing.suites.named("integrationTest"))
 }
+
+// 단일 아티팩트(포털 Phase 4 지시문 ⑧·C12): bootJar 안에 web jar가 있고 그 안에 화면(portal-web/index.html)과 자원이 있어야 한다.
+val verifyBootJarScreens = tasks.register("verifyBootJarScreens") {
+    group = "verification"
+    description = "Fails unless the boot jar carries the web jar with portal-web/index.html and its assets."
+    val bootJar = tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar").flatMap { it.archiveFile }
+    inputs.file(bootJar)
+    outputs.upToDateWhen { false }
+    doLast {
+        val jar = bootJar.get().asFile
+        ZipFile(jar).use { outer ->
+            val web = outer.entries().asSequence().singleOrNull { it.name.matches(Regex("BOOT-INF/lib/web-[^/]+\\.jar")) }
+                ?: throw GradleException("${jar.name}: no BOOT-INF/lib/web-*.jar — the screens are not in the single artifact")
+            val names = ZipInputStream(outer.getInputStream(web)).use { z ->
+                generateSequence { z.nextEntry }.map { it.name }.toList()
+            }
+            val assets = names.count { it.startsWith("portal-web/assets/") && it.endsWith(".js") }
+            if ("portal-web/index.html" !in names || assets == 0) {
+                throw GradleException("${web.name}: portal-web/index.html or its scripts are missing ($assets scripts)")
+            }
+            if (names.any { it.startsWith("portal-web/.vite/") || it.endsWith(".map") }) {
+                throw GradleException("${web.name}: build metadata or source maps in the served files")
+            }
+            logger.lifecycle("verifyBootJarScreens: ${jar.name} ⊃ ${web.name.substringAfterLast('/')} ⊃ portal-web/index.html + $assets scripts")
+        }
+    }
+}
+tasks.named("check") { dependsOn(verifyBootJarScreens) }
 
 // AuthzMatrixTest(Phase 3 C5)가 인가 매트릭스 정본을 읽는다(verifyTestInputs)
 tasks.test {
@@ -119,6 +156,17 @@ tasks.register<JavaExec>("runTestIssuer") {
     description = "Runs the in-process test OIDC issuer for e2e/engine-feed (writes token and issuer URL to the given state dir)."
     classpath = integrationTestSourceSet.get().runtimeClasspath
     mainClass = "com.ga.portal.app.web.TestIssuerMain"
+}
+// 화면 E2E(포털 Phase 4 계획 ⑨): web/e2e/run.mjs가 하네스(WebE2eHarness — 통합 시험 소스셋)를 java -cp로 띄운다. 그 클래스패스를 파일로 넘긴다
+// (명령 인자에 긴 경로 목록·비밀 없음). :web:e2e가 부른다 — check 밖.
+tasks.register("webE2eHarnessClasspath") {
+    group = "e2e"
+    description = "Writes the integrationTest runtime classpath for the web E2E harness."
+    val classpath = integrationTestSourceSet.map { it.runtimeClasspath }
+    val out = layout.buildDirectory.file("web-e2e/harness.classpath")
+    inputs.files(classpath)
+    outputs.file(out)
+    doLast { out.get().asFile.writeText(classpath.get().files.joinToString(File.pathSeparator)) }
 }
 tasks.register<JavaExec>("e2eCheck") {
     group = "e2e"

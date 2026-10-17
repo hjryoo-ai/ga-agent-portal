@@ -12,6 +12,7 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.PlainJWT;
 import com.nimbusds.jwt.SignedJWT;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -51,6 +52,7 @@ class IssuerTenantResolverTest {
 
     final List<String> lookups = new ArrayList<>();
     final List<String> decodersBuilt = new ArrayList<>();
+    final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
     @BeforeAll
     static void keys() throws JOSEException {
@@ -65,7 +67,7 @@ class IssuerTenantResolverTest {
         }, iss -> {
             decodersBuilt.add(iss);
             return decoders.apply(iss);
-        }, Clock.fixed(NOW, ZoneOffset.UTC));
+        }, new ApiMetrics(Optional.of(registry)), Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     IssuerTenantResolver resolver() {
@@ -220,6 +222,9 @@ class IssuerTenantResolverTest {
         });
         assertThatThrownBy(() -> authenticate(down, rs256(b -> b))).isInstanceOf(AuthenticationServiceException.class)
                 .hasMessage("JWKS_UNAVAILABLE");
+        // Phase 3 수용 심사 §2 F6: 장애는 발급자 해시 태그 하나로 센다(URL 원문·테넌트·subject 태그 없음)
+        assertThat(registry.get("api_jwks_failures_total").tag("issuer_hash", LogIds.issuer(ISS)).counter().count()).isEqualTo(1.0);
+        assertThat(registry.get("api_jwks_failures_total").counter().getId().getTags()).hasSize(1);
     }
 
     TokenRejectedException rejection(IssuerTenantResolver r, String token) {

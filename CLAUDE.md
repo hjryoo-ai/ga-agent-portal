@@ -53,6 +53,17 @@
 - 모든 응답은 `contracts/api/v1/portal-api.openapi.yaml`을 통과한다(시험이 전 응답 검증). 선택 필드는 값이 없으면 뺀다(`null` 금지). 캐시는 `private, no-cache` + 약한 ETag `seq.sync.cfg`, `If-None-Match`는 소유 확인 뒤에만 비교.
 - 운영 CLI의 행위자는 실행한 OS 사용자 하나(`cli:<user>`)이고 그 테넌트의 `OPERATOR` 링크가 있어야 한다. 인자로 행위자를 고르지 않는다.
 
+## 화면 규약 (포털 Phase 4 — 설계서 §6.2·§8·§9·§10)
+- **화면은 금액을 계산·비교·변환하지 않는다.** 생성 클라이언트의 금액은 불투명 `Won`(`client-lock.mjs`의 변환 훅) — 산술·비교·템플릿 보간·JSX 직접 렌더는 타입 오류이거나 ESLint `portal/no-money-arithmetic`(이름 또는 구조 표식 `__@wonBrand@`로 인식) 위반이다. 숫자로 바꾸는 곳은 `src/money/won.ts` 하나(`formatWon`·`isZero`·`present`) — 닫힌 목록. 있음/없음 확인도 `present()`로. 번들 스캔이 산출물에서 한 번 더 본다.
+- **모든 금액은 라벨과 함께만** `<Amount value label>` — `StatusLabel`은 `src/labels/labels.ts`만 만든다. 세후는 16칸 표(설계서 §6.2)를 따르고 표 밖 조합은 숨긴다. 화면 문구는 `src/messages.ko.json`만(한글 리터럴은 ESLint `portal/no-hangul-literal`), 계약 열거와 양방향 대조(`messages.test.ts`).
+- **네트워크는 생성 클라이언트 하나**(`src/api/client.ts`만 `openapi-fetch`를 import). `fetch`·XHR·WebSocket·`sendBeacon`·서비스 워커 금지. 계약이 바뀌면 `pnpm client:lock`으로 생성물·`contracts-client.lock.json`을 같은 커밋에(`clientCheck`가 해시 대조).
+- **토큰은 메모리에만**(`src/boot/token.ts` — 프래그먼트에서 읽고 지운다). `localStorage`·`sessionStorage`·IndexedDB·Cache API·쿠키 금지(ESLint + E2E 저장소 검사). 콘솔에 응답·토큰을 쓰지 않는다.
+- **경로는 `src/routes.ts` 닫힌 목록** = 서버 `ScreenConfiguration.SCREEN_PATHS`(`WebScreensIT`가 대조). 경로·쿼리에 증권번호·`policyKey`·`agentId`를 두지 않는다.
+- **CSP 그대로**: 인라인 스크립트·스타일·`eval` 없음(스타일은 CSS 파일 + CSSOM 사용자 속성). 외부 출처(글꼴·CDN·분석) 없음. 산출물 스캔과 E2E가 위반 0을 본다.
+- 초기 로드 gzip ≤ 127 KiB(`scripts/bundle-size.mjs`). 넘으면 상한을 올리지 말고 경로 지연 로드로 옮긴다 — 올려야 하면 사유 보고 후 승인.
+- 의존성: pnpm `--frozen-lockfile`, 정확한 판(`saveExact`), 공개 1일 미만 판 금지(`minimumReleaseAge`), 라이선스 표 `web/THIRD-PARTY.md`(`webLicenses`가 대조), `pnpm audit` 결과는 CI 아티팩트로 기록.
+- E2E 센티널(허구 증권번호·식별자)은 `pii-sentinels.properties`의 `e2e` 키 — 평문 스캔은 웹 산출물·Vitest 결과·E2E 결과도 본다.
+
 ## 작업 방식
 - Phase 단위: 계획 → 승인 → 단계 커밋(테스트와 같은 커밋) → 보고서 → 태그 → PR. 지시문의 완료 기준(C-n)을 전부 테스트로 증명해야 다음 Phase로 간다.
 - 테스트 없는 기능 코드 커밋 금지. 통합 테스트는 Testcontainers(PostgreSQL, digest 고정). Docker가 없으면 통합 테스트는 **실패**해야 한다(스킵 금지).

@@ -1,0 +1,199 @@
+{
+  "app": {
+    "title": "내 수수료·한도",
+    "loading": "불러오는 중",
+    "back": "뒤로"
+  },
+  "fill": {
+    "won": "{value}원",
+    "ym": "{y}년 {m}월",
+    "dDay": "D-{n}",
+    "dDayToday": "오늘",
+    "dDayPast": "D+{n}"
+  },
+  "auth": {
+    "reloginTitle": "로그인이 만료되었습니다",
+    "reloginBody": "앱에서 다시 열어 주세요.",
+    "retry": "다시 시도",
+    "unregisteredTitle": "등록되지 않은 사용자입니다",
+    "unregisteredBody": "소속 GA에 문의해 주세요.",
+    "serverErrorTitle": "잠시 후 다시 시도해 주세요",
+    "serverErrorBody": "지금은 정보를 불러올 수 없습니다."
+  },
+  "sync": {
+    "ok": "기준 {at}",
+    "delayed": "동기화 지연 — 기준 {at}",
+    "none": "동기화 전"
+  },
+  "status": {
+    "month": {
+      "PROVISIONAL": "예상",
+      "ESTIMATED": "예상",
+      "CONFIRMED": "확정",
+      "PAID": "지급완료"
+    },
+    "monthData": {
+      "OK": "",
+      "DRIFT": "확인 중",
+      "REBUILDING": "확인 중"
+    },
+    "net": {
+      "pendingNightly": "세후는 야간 산출 후 표시",
+      "pendingPayout": "세후는 지급 시 확정",
+      "unavailable": "세후 정보 없음"
+    },
+    "estimateAsOf": "기준 {at}",
+    "paidOn": "{date} 지급",
+    "ledger": "원장 기준",
+    "contract": "계약 정보"
+  },
+  "enums": {
+    "stage": {
+      "OK": "정상",
+      "WARN": "주의",
+      "CRIT": "경고",
+      "FULL": "소진"
+    },
+    "flag": {
+      "CANCELLED": "해약",
+      "LAPSED": "실효",
+      "OVERDUE": "납입 지연",
+      "REDUCED": "감액"
+    },
+    "deferral": {
+      "SCHEDULED": "예정",
+      "RELEASED": "이번 달 지급 대상",
+      "HELD": "보류",
+      "CANCELLED": "취소"
+    },
+    "deferralReason": {
+      "CURVE": "분급",
+      "LIMIT_DEFER": "한도 이연"
+    },
+    "statusReason": {
+      "DUE_RELEASED": "도래",
+      "POLICY_NOT_INFORCE": "유지 조건 미충족",
+      "POLICY_TERMINATED": "계약 종료",
+      "SOURCE_REVERSED": "원 라인 취소"
+    },
+    "receivable": {
+      "OPEN": "미상계",
+      "OFFSET": "상계 중",
+      "CLOSED": "종결",
+      "WRITTEN_OFF": "대손"
+    },
+    "historyKind": {
+      "POST": "전기",
+      "REBASE": "재산정"
+    },
+    "commType": {
+      "FY_COMM": "초년도",
+      "RENEWAL": "유지",
+      "INCENTIVE": "시책",
+      "OVERRIDE": "오버라이드",
+      "DEFERRED": "분급",
+      "CLAWBACK": "환수",
+      "ADJUSTMENT": "정정"
+    }
+  },
+  "limitCut": {
+    "label": "한도 초과 삭감",
+    "deferAfterFyNote": "(사규: 초년도 후 이연 — 현재 이연 스케줄 없음)"
+  },
+  "adjustmentOnly": "정정 {amount} — 지급 반영은 정산팀 확인",
+  "nav": {
+    "home": "홈",
+    "statements": "월별 명세",
+    "limits": "한도 현황",
+    "timeline": "분급 타임라인",
+    "simulation": "시뮬레이션",
+    "notifications": "알림함",
+    "inquiry": "이 항목 문의하기",
+    "comingSoon": "준비 중"
+  },
+  "home": {
+    "thisMonth": "이번 달 · {ym}",
+    "noMonth": "이번 달 내역이 아직 없습니다",
+    "toStatements": "월별 명세 보기",
+    "net": "실수령",
+    "gross": "세전",
+    "clawbackOffset": "환수 상계",
+    "withholdingTax": "원천세",
+    "adjustment": "정정",
+    "payoutExpected": "지급예정일 {date} · {d}",
+    "paidOn": "지급일 {date}",
+    "attention": "주의 계약",
+    "attentionLimits": "한도 주의 {n}건",
+    "attentionFlags": "납입 지연·실효 {n}건",
+    "toLimits": "한도 현황 보기",
+    "more": "더 보기"
+  },
+  "statement": {
+    "title": "월별 명세",
+    "months": "월 선택",
+    "noMonths": "명세가 아직 없습니다",
+    "byType": "유형별 합계",
+    "lines": "라인 {n}건",
+    "noLines": "라인이 없습니다",
+    "page": "{page} / {pages}",
+    "prev": "이전",
+    "next": "다음",
+    "payoutRun": "지급 내역",
+    "payable": "지급액",
+    "receivableOffset": "채권 상계",
+    "carriedReceivable": "이월 채권",
+    "cancelled": "취소됨",
+    "cancelledTo": "취소됨 → {ym}",
+    "cancelOf": "취소 ← {ym}",
+    "showOriginal": "취소된 원 라인 보기",
+    "notFound": "이 달의 명세가 없습니다"
+  },
+  "line": {
+    "title": "라인 상세",
+    "basis": "근거",
+    "rate": "적용 요율",
+    "payoutRate": "지급률",
+    "installmentNo": "회차",
+    "installmentValue": "{n}회차",
+    "limit": "한도 판정",
+    "noCut": "한도 삭감 없음",
+    "policy": "계약",
+    "product": "상품",
+    "productUnknown": "상품 정보 없음",
+    "insured": "피보험자",
+    "policyNo": "증권번호",
+    "contractDate": "체결일",
+    "monthlyPremium": "월납 보험료",
+    "deferrals": "연결 분급",
+    "receivable": "환수 채권",
+    "receivableAmount": "채권액",
+    "receivableRemaining": "잔액",
+    "toLedger": "이 계약의 한도 보기",
+    "notFound": "라인을 찾을 수 없습니다"
+  },
+  "limits": {
+    "title": "한도 현황",
+    "filter": "보기",
+    "filterAttention": "주의",
+    "filterAll": "전체",
+    "empty": "해당 계약이 없습니다",
+    "utilization": "소진율 {pct}",
+    "remaining": "잔여",
+    "contractDate": "체결일 {date}",
+    "fyEnd": "초년도 종료 {date} · {d}",
+    "detail": "상세 보기"
+  },
+  "limit": {
+    "title": "한도 상세",
+    "formula": "월납 {premium} × {multiple}배 → 한도 {limit}",
+    "accumPaid": "누적 지급",
+    "remaining": "잔여",
+    "fy": "초년도 {start} ~ {end}",
+    "history": "원장 타임라인",
+    "accumAfter": "누적",
+    "limitAfter": "한도",
+    "amount": "금액",
+    "impact": "이 계약 해약 시 영향",
+    "notFound": "한도 원장을 찾을 수 없습니다"
+  }
+}

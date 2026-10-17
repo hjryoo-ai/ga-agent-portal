@@ -207,3 +207,50 @@
 | P3-8 | V5 기존 행 채우기 | `ADD COLUMN … DEFAULT` + `DROP DEFAULT`(`UPDATE` 없음) | `TenantPredicateScanTest`가 `tenant_id` 술어 없는 `UPDATE`를 거부했다 — 규칙을 좁히지 않고 문장을 바꿨다 |
 | P3-9 | (계획에 없음) | `TenantContextGuardTest`의 목록 = 패키지의 모든 저장소(코드 출처로 열거) | 목록 대조를 더하자 Phase 2의 `ViewResetRepository`가 빠져 있던 것이 드러났다 — 지금은 덮인다 |
 | P3-10 | 자리 단계 E2E README 4번 "`ingest rebuild` 뒤 재대조", D-16 "`ingest_lag_seq = 0` 대기" | 재구축 재대조 없음, 대기는 DB의 `caught_up_at` | D-16 범위 밖이고 `RebuildIT`가 계약 사본으로 증명한다. actuator는 `health`만 노출 — `caught_up_at`이 같은 조건(`last_seq = headSeq`·`RUNNING`)이다 |
+
+## 2026-10-17 — Phase 3 수용 심사 (`docs/phase-03-수용심사.md`)
+
+### 지시문·승인 오류
+
+| # | 문구 | 무엇이 틀렸나 | 정한 것 |
+|---|---|---|---|
+| DE-19 | 계획 승인 Q6 "지표 `tenant` 태그는 발급자가 등록된 경우만" | Micrometer Prometheus 레지스트리는 같은 이름에 다른 태그 키 집합을 거부한다 — 레지스트리 제약을 보지 않았다 | 태그 키는 늘 있고 미등록 발급자는 `none`(P3-5 그대로 — 심사 Q10). `none`은 테넌트 식별자가 아니다 |
+
+### 심사 누락
+
+| # | 무엇 | 처리 |
+|---|---|---|
+| RM-2 | Phase 2 심사가 `TenantContextGuardTest` 목록에서 `ViewResetRepository`가 빠진 것을 보지 못했다(Phase 3 F8) | Phase 3이 목록을 "패키지의 모든 저장소"(코드 출처로 열거)로 바꿨다(P3-9) — 다음 누락은 시험이 스스로 실패한다 |
+
+### 플랫폼 질문
+
+| # | 질문 | 처리 |
+|---|---|---|
+| PQ-1 | 플랫폼 0.2.0 `ResolvedIdentity`는 설계사 없는 주체(`OPERATOR`)를 표현하지 못한다(Phase 3 F14) | 지금은 포털 처리(`identity_link.agent_id` NULL은 `OPERATOR`만, 운영 명령 인가는 포털 코드)로 충분. ga-disclosure 다음 정비 때 `ResolvedIdentity`에 "설계사 없는 주체" 표현을 넣을지 |
+
+### 결정 (설계서 v1.6.1)
+
+- F5 라인 목록 404 → §7 한 줄, F9 `exp ≤ iat` → §9 각주, F6 JWKS 장애 → 지표 `api_jwks_failures_total{issuer_hash}`(이 커밋 — `IssuerTenantResolverTest`), Q11 → §14.1 "구현 위치" 열, Q3 → §14.1 #12, Q5 → §14.1 #13.
+- Q12 E2E 결과는 `main`에 별도 커밋(사용자 실행 뒤). 실패하면 정비 PR.
+- 심사 §3 Q1~Q6(화면 규약)은 Phase 4 지시문의 일부, Q7~Q9는 Phase 5.
+
+## 2026-10-17 — Phase 4 구현에서 계획과 다르게 한 것 (보고서 §5)
+
+| # | 계획 | 구현 | 이유 |
+|---|---|---|---|
+| P4-1 | 계획 ③ 판 표 eslint 10.13.0 | **10.12.0** | `pnpm-workspace.yaml`의 `minimumReleaseAge: 1440`(공개 1일 미만 판 금지)에 10.13.0이 걸렸다 — 규칙을 끄지 않고 판을 내렸다 |
+| P4-2 | ④b `portal/no-money-arithmetic` — "피연산자 중 하나라도 `Won`이면" | 타입 이름 `Won` **또는 구조 표식**(`__@wonBrand@` 속성)으로 인식 | `openapi-fetch` 응답 타입(매핑 타입)을 거치면 별칭 이름이 사라진다 — 이름만 보면 `data.gross + 1`을 놓쳤다. 실제 `api.GET` 응답 타입을 쓰는 RuleTester 사례가 이름만 보는 규칙에서 실패한다 |
+| P4-3 | ④b 비교 금지 | 있음/없음 확인(`!== undefined`)도 금지 그대로 — **`present()`**(`won.ts`)로 옮겼다 | 규칙 거짓 양성은 규칙을 좁히지 않고 코드를 옮긴다(`CLAUDE.md` 작업 방식) |
+| P4-4 | ④b 캐스트 | `as`·`<T>` 단언으로 `Won`을 벗기는 것도 금지 | 주입 사례에서 `(x as unknown as number) + 1`이 통과했다 |
+| P4-5 | ⑧ 표 "정정만 있는 달: `byType` 비어 있음" | **`byType` 키 ⊆ {`ADJUSTMENT`}**(비어 있음 포함) | GA03(엔진 E1 바이트 그대로)의 정정 달 202611은 `ADJUSTMENT` 라인을 가진다 — 계획 조건이면 실제 정정만 있는 달이 문구를 받지 못한다 |
+| P4-6 | (계획에 없음) | 생성 클라이언트 `baseUrl` = `window.location.origin` | 상대 경로는 Vitest(Node `Request`)에서 거부된다. 브라우저에서는 같은 출처라 결과가 같다 |
+| P4-7 | ⑨ E2E 센티널을 평문 스캔 목록에 | `pii-sentinels.properties`의 **새 키 `e2e`** | 기존 `identifiers`에 넣으면 `ResponseLeakScanIT`(Phase 3)가 E2E 전용 센티널을 자기 응답에서 찾다 실패한다 — Phase 3 시험은 그대로 두고 키를 나눴다 |
+| P4-8 | ⑨ 키보드 시험 — 데스크톱 | 모바일 두 프로젝트에서는 `testIgnore`(건너뜀 0) | 건너뛰는 시험으로 두면 결과에 "skipped"가 남는다 — 스킵 0 원칙 |
+| P4-9 | ⑦ 계약 요청 CR-1~3 | **CR-4** 추가(`Ledger.productName`·`productKey`·`insuredMasked`) | 한도 카드의 상품명·피보험자(설계서 §8)가 원장 응답에 없다 — 카드는 그 둘 없이 그린다 |
+| P4-10 | ⑪ C9 W23 "큰 라이브러리(예: 전체 locale 데이터)" | `react-dom/server`를 진입 청크에 정적 import | locale 데이터 패키지는 의존성에 없다(설치하면 락이 바뀐다). 결과: 초기 로드 178,573 B > 상한 130,048 B로 실패, 복원 |
+| P4-11 | ⑨ 로컬 실행 "`.state/` 파일의 로그인 URL" | `:web:e2eServe`(`run.mjs --serve`) — C 사본 테넌트의 피드를 끝까지 열고 `build/e2e/.state/login-urls.txt`(600)에만 쓴다 | 토큰을 터미널·인자·환경 변수에 싣지 않는다 |
+
+### 결정 (설계서 v1.7)
+
+- 화면 라벨 16칸 → §6.2, `DEFER_AFTER_FY` 문구 → §6.3, `REBUILDING` → §6.6, CR-1~4 → §7, 화면 구현 규약 → §8, 토큰 주입·화면 헤더 → §9, 홈 `status=ALL`·번들 상한 → §10, 스택 → §11, 알림함 Phase 6 → §12, 프론트 시험 → §13.
+- §14.1 #14(웹뷰 호스트의 토큰 갱신 규약) — 기본 가정 "401이면 호스트가 프래그먼트로 다시 연다", `TODO(confirm#14)`는 `web/src/boot/token.ts`·`web/src/ui/States.tsx`.

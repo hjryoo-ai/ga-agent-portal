@@ -44,6 +44,10 @@ jobs:
       - name: C7 — shared contract copy equals ga-disclosure at the UPSTREAM merge commit (network)
         run: ./gradlew verifyUpstreamContract --console=plain
 
+      # 포털 Phase 4 지시문 ①·C12: 화면 의존성 취약점 기록(결과로 실패하지 않는다 — 올림 없음). build/web/audit.json을 아티팩트로.
+      - name: Web — pnpm audit record
+        run: ./gradlew :web:webAudit --console=plain
+
       # 아티팩트는 GitHub의 비밀 가림을 거치지 않는다 — 올리기 전에 토큰 값이 없음을 센다(Phase 0 수용 심사 B2). 있으면 올리지 않는다.
       - name: Token absent from the report artifact
         id: token-check
@@ -51,7 +55,8 @@ jobs:
         shell: bash
         run: |
           test -n "$GHP_READ_TOKEN" || { echo 'GHP_READ_TOKEN is empty'; exit 1; }
-          hits=$( { find . -type f \( -path '*/build/test-results/*.xml' -o -path '*/build/reports/tests/*' \) -print0 \
+          hits=$( { find . -type f \( -path '*/build/test-results/*.xml' -o -path '*/build/reports/tests/*' -o -path './web/build/reports/vitest/*' \
+                    -o -path './web/build/web/*.json' \) -print0 \
                     | xargs -0 -r grep -l -F -- "$GHP_READ_TOKEN" || true; } | wc -l)
           echo "files containing the token: $hits"
           test "$hits" -eq 0
@@ -64,6 +69,55 @@ jobs:
           path: |
             **/build/reports/tests/**
             **/build/test-results/**/*.xml
+            web/build/reports/vitest/junit.xml
+            web/build/web/bundle-size.json
+            web/build/web/bundle-modules.json
+            web/build/web/audit.json
+
+  web-e2e:
+    # 포털 Phase 4 계획 ⑨·Q14: 화면 E2E — 하네스(PostgreSQL 컨테이너·시험 발급기·피드 스텁) + 포털 bootJar + Playwright(Chromium·WebKit, 시스템 라이브러리 포함).
+    # Docker가 없으면 하네스가 실패한다(스킵 없음). 산출물은 run.mjs가 E2E 토큰·센티널로 이미 스캔했다(artifact-scan.json) — 여기서는 저장소 비밀을 한 번 더 센다.
+    runs-on: ubuntu-latest
+    env:
+      CI: 'true'
+      GHP_USER: ${{ secrets.GHP_USER }}
+      GHP_READ_TOKEN: ${{ secrets.GHP_READ_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Docker available
+        run: docker info --format '{{.ServerVersion}}'
+
+      - name: Web E2E (3 projects — mobile Android/Chromium, mobile iOS/WebKit, desktop/Chromium)
+        run: ./gradlew :web:e2e --console=plain
+
+      - name: Token absent from the E2E artifact
+        id: token-check
+        if: always()
+        shell: bash
+        run: |
+          test -n "$GHP_READ_TOKEN" || { echo 'GHP_READ_TOKEN is empty'; exit 1; }
+          hits=$( { find web/build/e2e -type f -print0 2>/dev/null | xargs -0 -r grep -l -F -- "$GHP_READ_TOKEN" || true; } | wc -l)
+          echo "files containing the token: $hits"
+          test "$hits" -eq 0
+
+      - name: E2E reports
+        if: always() && steps.token-check.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-e2e-reports
+          path: |
+            web/build/e2e/junit.xml
+            web/build/e2e/artifact-scan.json
+            web/build/e2e/summary.json
+            web/build/e2e/leak-scan/**
+            web/build/e2e/axe/**
+            web/build/e2e/logs/**
 
   no-docker:
     # CLAUDE.md: Docker가 없으면 통합 테스트는 스킵이 아니라 실패해야 한다. 이 잡은 "실패해야 성공"이다(지시문 v1.2 §7·C8).
