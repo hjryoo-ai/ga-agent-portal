@@ -23,7 +23,7 @@ interface Watch {
   requestUrls: string[];
   external: string[];
   doms: number;
-  axeStates: number;
+  axe: { label: string; violations: number; passes: number; incomplete: number }[];
   opened: Set<string>;
 }
 
@@ -76,7 +76,7 @@ async function motion(page: Page): Promise<string[]> {
 export const test = base.extend<{ portal: Portal; watch: Watch }>({
   watch: [
     async ({ page }, use, info) => {
-      const w: Watch = { console: [], bodies: [], urls: [], requestUrls: [], external: [], doms: 0, axeStates: 0, opened: new Set() };
+      const w: Watch = { console: [], bodies: [], urls: [], requestUrls: [], external: [], doms: 0, axe: [], opened: new Set() };
       await page.addInitScript((mark) => {
         document.addEventListener('securitypolicyviolation', (ev) => {
           console.log(`${mark} ${ev.violatedDirective} ${ev.blockedURI}`);
@@ -114,13 +114,35 @@ export const test = base.extend<{ portal: Portal; watch: Watch }>({
       const navigations = w.urls.filter((u) => !w.opened.has(u));
       expect(navigations.flatMap((u) => leaks(u)), 'addresses after boot').toEqual([]);
       expect(w.requestUrls.flatMap((u) => leaks(u)), 'request addresses').toEqual([]);
-      expect(w.console.filter((c) => c.startsWith(CSP_MARK) || /Content Security Policy|Refused to/i.test(c)), 'CSP').toEqual([]);
+      const csp = w.console.filter((c) => c.startsWith(CSP_MARK) || /Content Security Policy|Refused to/i.test(c));
+      expect(csp, 'CSP').toEqual([]);
       expect(w.external, 'external origins').toEqual([]);
+      // 요약은 시험마다 한 파일 — 이름은 testId(프로젝트·시험마다 유일, 제목의 한글을 지워 겹치는 일이 없다)
+      const name = `${info.project.name}--${info.testId}.json`;
+      const title = info.titlePath.slice(1).join(' › ');
       mkdirSync(resolve(out, 'leak-scan'), { recursive: true });
       writeFileSync(
-        resolve(out, 'leak-scan', `${info.project.name}--${info.titlePath.slice(1).join('--').replace(/[^\w-]+/g, '_')}.json`),
-        JSON.stringify({ responses: w.bodies.length, doms: w.doms, consoleLines: w.console.length, addresses: w.urls.length, axeStates: w.axeStates, sentinels: FORBIDDEN.length }, null, 2),
+        resolve(out, 'leak-scan', name),
+        JSON.stringify(
+          {
+            project: info.project.name,
+            title,
+            responses: w.bodies.length,
+            doms: w.doms,
+            consoleLines: w.console.length,
+            addresses: w.urls.length,
+            requests: w.requestUrls.length,
+            cspViolations: csp.length,
+            externalRequests: w.external.length,
+            sentinels: FORBIDDEN.length,
+            tokens: TOKENS.length,
+          },
+          null,
+          2,
+        ),
       );
+      mkdirSync(resolve(out, 'axe'), { recursive: true });
+      writeFileSync(resolve(out, 'axe', name), JSON.stringify({ project: info.project.name, title, states: w.axe }, null, 2));
     },
     { auto: true },
   ],
@@ -140,9 +162,7 @@ export const test = base.extend<{ portal: Portal; watch: Watch }>({
         watch.doms++;
         expect(leaks(await page.content()), `DOM: ${label}`).toEqual([]);
         const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
-        watch.axeStates++;
-        mkdirSync(resolve(out, 'axe'), { recursive: true });
-        writeFileSync(resolve(out, 'axe', `${label.replace(/[^\w-]+/g, '_')}-${String(watch.axeStates)}.json`), JSON.stringify(axe.violations.map((v) => ({ id: v.id, nodes: v.nodes.length })), null, 2));
+        watch.axe.push({ label, violations: axe.violations.length, passes: axe.passes.length, incomplete: axe.incomplete.length });
         expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`), `axe: ${label}`).toEqual([]);
         expect(await smallTargets(page), `44px: ${label}`).toEqual([]);
         await page.emulateMedia({ reducedMotion: 'reduce' });

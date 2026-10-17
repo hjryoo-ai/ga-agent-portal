@@ -114,6 +114,7 @@ jobs:
           path: |
             web/build/e2e/junit.xml
             web/build/e2e/artifact-scan.json
+            web/build/e2e/summary.json
             web/build/e2e/leak-scan/**
             web/build/e2e/axe/**
             web/build/e2e/logs/**

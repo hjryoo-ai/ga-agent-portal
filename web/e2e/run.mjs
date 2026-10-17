@@ -111,12 +111,49 @@ try {
     const narrow = (process.env.PORTAL_E2E_PLAYWRIGHT_ARGS ?? '').split(' ').filter((a) => a !== '');
     const pw = spawnSync(resolve(web, 'node_modules/.bin/playwright'), ['test', '--config', resolve(web, 'playwright.config.ts'), ...narrow], { cwd: web, stdio: 'inherit', env: { ...process.env, TZ: 'UTC' } });
     status = pw.status ?? 1;
+    if (!summarize()) status = 1;
   }
 } catch (e) {
   console.error(String(e));
   status = 1;
 } finally {
   await stopAll();
+}
+
+// 요약: 통과한 시험마다 누출·axe 요약이 한 파일씩 있어야 한다(이름이 겹쳐 덮어쓰면 수가 모자란다). 합계는 build/e2e/summary.json.
+function summarize() {
+  const junit = readFileSync(join(out, 'junit.xml'), 'utf8');
+  const attr = (n) => Number(new RegExp(`<testsuites[^>]*\\s${n}="(\\d+)"`).exec(junit)?.[1] ?? 'NaN');
+  const passed = attr('tests') - attr('failures') - attr('errors') - attr('skipped');
+  const read = (d) => (existsSync(join(out, d)) ? readdirSync(join(out, d)).map((f) => JSON.parse(readFileSync(join(out, d, f), 'utf8'))) : []);
+  const leak = read('leak-scan');
+  const axe = read('axe');
+  const sum = (k) => leak.reduce((n, x) => n + x[k], 0);
+  const states = axe.flatMap((x) => x.states);
+  const summary = {
+    tests: attr('tests'),
+    passed,
+    skipped: attr('skipped'),
+    leakFiles: leak.length,
+    axeFiles: axe.length,
+    responses: sum('responses'),
+    doms: sum('doms'),
+    consoleLines: sum('consoleLines'),
+    addresses: sum('addresses'),
+    requests: sum('requests'),
+    cspViolations: sum('cspViolations'),
+    externalRequests: sum('externalRequests'),
+    axeStates: states.length,
+    axeViolations: states.reduce((n, x) => n + x.violations, 0),
+    axeRulesPassedMin: states.length === 0 ? 0 : Math.min(...states.map((x) => x.passes)),
+    axeIncomplete: states.reduce((n, x) => n + x.incomplete, 0),
+    byProject: Object.fromEntries(Object.keys(PROJECTS).map((p) => [p, { tests: leak.filter((x) => x.project === p).length, axeStates: axe.filter((x) => x.project === p).flatMap((x) => x.states).length }])),
+  };
+  writeFileSync(join(out, 'summary.json'), JSON.stringify(summary, null, 2));
+  console.log(`E2E summary: ${JSON.stringify(summary)}`);
+  const ok = leak.length === passed && axe.length === passed;
+  if (!ok) console.error(`E2E summaries: ${String(leak.length)} leak and ${String(axe.length)} axe files for ${String(passed)} passed tests`);
+  return ok;
 }
 
 // ⑤ 산출물 스캔: 토큰 값과 센티널(스트림의 증권번호 원문·이웃 설계사 ID — 허구)이 로그·보고서에 한 번도 없어야 한다. .state(비밀 자체)는 빼고 본다.
