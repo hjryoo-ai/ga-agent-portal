@@ -39,3 +39,10 @@ portal:
     directory-password: ${PORTAL_DIRECTORY_PASSWORD:directory_local_only}
     # 재구축(설계서 §6.7) 상한 — 한 트랜잭션 재생의 길이를 묶는다(긴 트랜잭션 비용은 §14.1)
     rebuild-max-events: 50000
+  # 조회 API(포털 Phase 3 — 설계서 §9 v1.6). 토큰의 iss → 테넌트는 전용 롤 portal_issuer(V5: tenant의 세 열만)로 요청마다 조회한다.
+  # 기본 자격 증명은 로컬 개발 전용(docker/postgres/init-roles.sql과 짝) — 운영은 환경으로 준다.
+  api:
+    issuer-username: ${PORTAL_ISSUER_USER:portal_issuer}
+    issuer-password: ${PORTAL_ISSUER_PASSWORD:issuer_local_only}
+    issuer-pool-size: 4
+    jwks-timeout: 5s

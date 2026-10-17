@@ -1,5 +1,8 @@
 package com.ga.portal.infra;
 
+import com.ga.platform.core.tenant.TenantId;
+import com.ga.portal.infra.directory.IssuerDirectoryReader;
+import com.ga.portal.infra.directory.IssuerRegistration;
 import com.ga.portal.infra.testing.PostgresHarness;
 import com.ga.portal.infra.testing.SeedData;
 import org.junit.jupiter.api.BeforeAll;
@@ -40,6 +43,18 @@ class IssuerDirectoryIT {
     void theRoleReadsTheThreeIssuerColumnsOfEveryTenant() {
         List<String> rows = query("SELECT tenant_id || '|' || coalesce(oidc_issuer, '-') || '|' || coalesce(oidc_audience, '-') FROM tenant");
         assertThat(rows).contains(A + "|https://idp.invalid/" + A + "|portal", B + "|-|-");
+    }
+
+    /** 리더(허용 목록 항목 — 이 롤로 접속): {@code iss} 정확 일치 하나만, 대소문자·꼬리 슬래시가 다르면 없음, 발급자 없는 테넌트는 찾지 않는다. */
+    @Test
+    void theReaderFindsATenantByTheExactIssuerOnly() {
+        String issuer = "https://idp.invalid/" + A;
+        try (IssuerDirectoryReader reader = new IssuerDirectoryReader(DB.jdbcUrl(), PostgresHarness.ISSUER, PostgresHarness.ISSUER_PASSWORD, 1)) {
+            assertThat(reader.find(issuer)).contains(new IssuerRegistration(TenantId.of(A), issuer, "portal"));
+            assertThat(reader.find(issuer + "/")).isEmpty();
+            assertThat(reader.find(issuer.toUpperCase(java.util.Locale.ROOT))).isEmpty();
+            assertThat(reader.find("https://idp.invalid/" + B)).isEmpty();
+        }
     }
 
     @ParameterizedTest

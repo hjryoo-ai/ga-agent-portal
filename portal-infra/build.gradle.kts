@@ -11,6 +11,8 @@ dependencies {
     implementation(project(":portal-domain"))
     implementation(libs.platform.spring)
     implementation(libs.spring.context)
+    // 발급자 리더(Phase 3 Q1): 전용 롤 portal_issuer 연결 풀
+    implementation(libs.hikaricp)
     runtimeOnly(libs.postgresql)
 
     // PostgresHarness: 컨테이너 1회 기동 → init-roles.sql → portal_migrator로 Flyway → portal_app 데이터소스

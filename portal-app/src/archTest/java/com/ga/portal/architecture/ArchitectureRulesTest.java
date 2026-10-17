@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * (g)는 수용 심사 §2 F1대로 둘로 나뉜다 — 연결·문장 수준 타입은 플랫폼 클래스·허용 목록만, 그 밖에서는 결과 타입 닫힌 목록
  * ({@link #RESULT_LEVEL_JDBC})만.
  *
- * <p><b>허용 목록</b>은 패턴이 아니라 FQN 열거이고 항목마다 사유를 적는다. 포털의 직접 DB 접근 허용 목록은 Phase 0에서 비어 있다
+ * <p><b>허용 목록</b>은 패턴이 아니라 FQN 열거이고 항목마다 사유를 적는다. 포털의 직접 DB 접근 허용 목록은 Phase 0~2에 비어 있었고 Phase 3이 발급자 리더 하나를 더했다
  * (불변 규약 2 — 닫힌 FQN + 전용 롤 + 테넌트 데이터 미접근). 플랫폼 클래스는 jar SHA-256으로 고정된 공급물이라 따로 적는다.
  * {@link #allowlistsHaveNoStaleEntries()}가 폐기 항목을 잡는다.
  */
@@ -59,8 +59,14 @@ class ArchitectureRulesTest {
                     "테넌트 ID 목록 전용 리더 — 포털 Phase 1 인제스트 스케줄러가 쓴다. 전용 롤 portal_directory(V3: tenant.tenant_id 컬럼 SELECT와 "
                             + "전용 정책만, 테넌트 데이터 권한 0 — TenantDirectoryIT)"));
 
-    /** 포털의 직접 DB 접근 허용 목록 — Phase 0은 비어 있다(지시문 v1.2 불변 규약 2). */
-    static final List<Allowed> PORTAL_DB_ALLOWLIST = List.of();
+    /**
+     * 포털의 직접 DB 접근 허용 목록(지시문 v1.2 불변 규약 2 — 닫힌 FQN + 전용 롤 + 테넌트 업무 데이터 미접근). Phase 0~2는 비어 있었고 Phase 3이 첫 항목을
+     * 더한다(계획 승인 Q1).
+     */
+    static final List<Allowed> PORTAL_DB_ALLOWLIST = List.of(
+            new Allowed("com.ga.portal.infra.directory.IssuerDirectoryReader",
+                    "발급자 표는 테넌트 설정 — 테넌트 바인딩 전에 읽어야 한다. 전용 롤 portal_issuer(V5: tenant의 tenant_id·oidc_issuer·oidc_audience "
+                            + "열 SELECT와 전용 정책만, 다른 열·표 권한 0 — IssuerDirectoryIT)"));
 
     /** 연결·문장 수준 JDBC 타입 — (g) 플랫폼 클래스와 포털 허용 목록만. */
     static final Set<String> CONNECTION_LEVEL_JDBC = Set.of(
@@ -147,7 +153,7 @@ class ArchitectureRulesTest {
         ArchRules.noDoubleOrFloat().check(classes);
     }
 
-    // (d) DB 접근은 TenantScopedRepository 하위 클래스만. 원시 진입점(DataSource·JdbcClient·JdbcTemplate…)은 플랫폼 클래스와 포털 허용 목록(빈)만.
+    // (d) DB 접근은 TenantScopedRepository 하위 클래스만. 원시 진입점(DataSource·JdbcClient·JdbcTemplate…)은 플랫폼 클래스와 포털 허용 목록만.
     @Test
     void dbAccessOnlyViaTenantScopedRepository() {
         ArchRules.dbAccessOnlyVia(REPOSITORY_BASE.fqn(), dbAnchors()).check(classes);
@@ -177,7 +183,7 @@ class ArchitectureRulesTest {
         assertThat(clashes).as("portal classes named like a com.ga.platform.core type").isEmpty();
     }
 
-    // (g) 연결·문장 수준 JDBC 타입(DataSource·DriverManager·Connection·Statement 계열)은 플랫폼 클래스와 포털 허용 목록(빈)만.
+    // (g) 연결·문장 수준 JDBC 타입(DataSource·DriverManager·Connection·Statement 계열)은 플랫폼 클래스와 포털 허용 목록만.
     @Test
     void connectionLevelJdbcTypesOnlyInPlatformClasses() {
         Set<String> anchors = dbAnchors().stream().map(Allowed::fqn).collect(Collectors.toSet());
@@ -222,7 +228,8 @@ class ArchitectureRulesTest {
         all.add(REPOSITORY_BASE);
         assertThat(all).allSatisfy(a -> assertThat(a.reason()).as("reason for %s", a.fqn()).isNotBlank());
         assertThat(ArchRules.staleClasses(classes, all)).as("stale class entries").isEmpty();
-        assertThat(PORTAL_DB_ALLOWLIST).as("portal direct-DB allowlist (Phase 0: empty)").isEmpty();
+        assertThat(PORTAL_DB_ALLOWLIST).as("portal direct-DB allowlist (Phase 3: the issuer directory only)")
+                .extracting(Allowed::fqn).containsExactly("com.ga.portal.infra.directory.IssuerDirectoryReader");
         // 결과 타입 닫힌 목록 = RowMapper.mapRow 시그니처의 java.sql 타입(남는 항목·빠진 항목 없음). 그리고 실제로 쓰여 규칙이 공허하지 않다.
         Method mapRow = RowMapper.class.getMethod("mapRow", ResultSet.class, int.class);
         Set<String> signatureTypes = Stream.concat(Arrays.stream(mapRow.getParameterTypes()), Arrays.stream(mapRow.getExceptionTypes()))

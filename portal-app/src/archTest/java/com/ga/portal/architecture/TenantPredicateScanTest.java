@@ -13,7 +13,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -27,11 +26,23 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class TenantPredicateScanTest {
 
+    /** 허용 항목: 그 파일(저장소 상대 경로)의 그 문장(공백 정규화·소문자화)만 — 같은 문장이 다른 파일에 있으면 허용되지 않는다. */
+    record AllowedStatement(String source, String statement, String reason) {
+    }
+
     /**
-     * 허용 목록: 공백 정규화·소문자화된 문장 → 사유. 비어 있는 상태로 시작한다.
-     * 항목을 추가하려면 사유를 반드시 적는다(빈 사유·쓰이지 않는 항목은 {@link #allowlistEntriesHaveReasonsAndAreUsed()}가 거부).
+     * 허용 목록 — Phase 0~2는 비어 있었다. 항목을 추가하려면 사유를 반드시 적는다(빈 사유·쓰이지 않는 항목은 {@link #allowlistEntriesHaveReasonsAndAreUsed()}가
+     * 거부). 항목은 아키텍처 규칙의 직접 DB 접근 허용 목록(닫힌 FQN)에 있는 클래스의 문장뿐이다.
      */
-    static final Map<String, String> ALLOWLIST = Map.of();
+    static final List<AllowedStatement> ALLOWLIST = List.of(
+            new AllowedStatement("portal-infra/src/main/java/com/ga/portal/infra/directory/IssuerDirectoryReader.java",
+                    "select tenant_id, oidc_issuer, oidc_audience from tenant where oidc_issuer = :issuer",
+                    "발급자 → 테넌트(Phase 3 계획 승인 Q1): 테넌트를 바인딩하기 전의 조회. 전용 롤 portal_issuer가 tenant의 세 열만 읽는다 — "
+                            + "ArchitectureRulesTest.PORTAL_DB_ALLOWLIST의 항목, IssuerDirectoryIT"));
+
+    private static boolean allowed(SqlTenantScanner.Violation v) {
+        return ALLOWLIST.stream().anyMatch(a -> a.source().equals(v.source()) && a.statement().equals(v.statement()));
+    }
 
     static final List<String> MODULES = List.of(
             "portal-domain", "portal-projection", "portal-ingest", "portal-query", "portal-sim", "portal-recon",
@@ -89,24 +100,28 @@ class TenantPredicateScanTest {
         long javaSqlCount = javaFiles.stream().mapToLong(p -> SqlTenantScanner.sqlLiteralsInJava(read(p)).size()).sum();
         assertThat(javaSqlCount).as("repository SQL literals found (TenantRepository 1, IngestCursorRepository 3, IngestEventRepository 4, "
                 + "IngestLockRepository 1, AuditAccessRepository 2; Phase 2: AgentProfile 2, EarningsLine 3, EarningsMonth 2, PolicyLimit 5, "
-                + "DeferralItem 3, ClawbackItem 2, PolicyFlag 2, ReconResult 1, ViewReset 8 DELETE + 3 invariant queries; Phase 3: IngestCursor +2 caught_up_at)").isEqualTo(11 + 20 + 11 + 2);
+                + "DeferralItem 3, ClawbackItem 2, PolicyFlag 2, ReconResult 1, ViewReset 8 DELETE + 3 invariant queries; Phase 3: IngestCursor +2 caught_up_at, IssuerDirectoryReader 1, IdentityLink 1, "
+                + "AuditAccess +1 denial)").isEqualTo(11 + 20 + 11 + 2 + 3);
     }
 
     @Test
     void everyTenantTableAccessHasTenantPredicate() {
         List<SqlTenantScanner.Violation> violations = scanAll().stream()
-                .filter(v -> !ALLOWLIST.containsKey(v.statement()))
+                .filter(v -> !allowed(v))
                 .toList();
         assertThat(violations).as("tenant_id 없는 테이블 접근 문장(불변 규약 2)").isEmpty();
     }
 
     @Test
     void allowlistEntriesHaveReasonsAndAreUsed() {
-        List<String> flagged = scanAll().stream().map(SqlTenantScanner.Violation::statement).toList();
-        ALLOWLIST.forEach((statement, reason) -> {
-            assertThat(reason).as("사유 없는 허용 목록 항목: %s", statement).isNotBlank();
-            assertThat(flagged).as("쓰이지 않는 허용 목록 항목(제거할 것): %s", statement).contains(statement);
+        List<SqlTenantScanner.Violation> flagged = scanAll();
+        ALLOWLIST.forEach(a -> {
+            assertThat(a.reason()).as("사유 없는 허용 목록 항목: %s", a.statement()).isNotBlank();
+            assertThat(flagged).as("쓰이지 않는 허용 목록 항목(제거할 것): %s", a.statement())
+                    .anyMatch(v -> v.source().equals(a.source()) && v.statement().equals(a.statement()));
         });
+        assertThat(ALLOWLIST).extracting(AllowedStatement::source).as("Phase 3: the issuer directory reader only")
+                .containsExactly("portal-infra/src/main/java/com/ga/portal/infra/directory/IssuerDirectoryReader.java");
     }
 
     // ------------------------------------------------------------------ 스캐너 자체의 음성·양성 시험(영구 보존)

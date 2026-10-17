@@ -46,6 +46,12 @@ spring-boot-starter-jdbc = { module = "org.springframework.boot:spring-boot-star
 spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
 spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+# 조회 API 보안(포털 Phase 3 — 계획 승인 F8): 리소스 서버(전이 nimbus-jose-jwt). 시험 발급기(TestIssuer)가 nimbus로 서명한다.
+spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
+spring-boot-starter-security-oauth2-resource-server = { module = "org.springframework.boot:spring-boot-starter-security-oauth2-resource-server" }
+nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt" }
+# 발급자 리더(IssuerDirectoryReader)의 전용 롤 연결 풀 — 요청마다 조회하므로 연결을 새로 열지 않는다
+hikaricp = { module = "com.zaxxer:HikariCP" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
