@@ -9,6 +9,10 @@
 > - 참고 구현 ga-disclosure Phase 7: `disclosure-web/` — `build.gradle.kts`, `vite.config.ts`, `eslint.config.js`, `scripts/client-lock.mjs`·`scan-dist.mjs`, `playwright.config.ts`, `e2e/support/fixtures.ts`, `DemoWebConfiguration`, Phase 7 계획·수용 심사.
 > - npm 레지스트리·nodejs.org·Gradle 플러그인 포털(2026-10-17 조회).
 
+## 승인 반영 (2026-10-17, `docs/phase-04-계획승인.md`) — 아래 본문보다 우선한다
+
+- **Q1~Q16은 전부 권장안이다.** 조건은 없다. 단계는 ⑪ 순서를 따른다.
+
 ## 0. 먼저 결정이 필요한 것 (요약)
 
 지시문 §3 질문(Q1~Q8)에 더해 계획이 고른 것(Q9~Q16)도 승인 대상이다.
