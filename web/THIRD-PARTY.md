@@ -62,8 +62,8 @@
 | `@remix-run/route-pattern` | 0.22.1 | MIT |  |
 | `@rolldown/binding-<platform>` | 1.2.14 | MIT |  |
 | `@rolldown/pluginutils` | 1.0.1 | MIT |  |
-| `@tanstack/query-core` | 5.104.3 | MIT |  |
-| `@tanstack/react-query` | 5.104.3 | MIT |  |
+| `@tanstack/query-core` | 5.104.3 | MIT | 예 |
+| `@tanstack/react-query` | 5.104.3 | MIT | 예 |
 | `@testing-library/dom` | 10.4.2 | MIT |  |
 | `@testing-library/react` | 16.3.3 | MIT |  |
 | `@types/aria-query` | 5.0.4 | MIT |  |
@@ -192,7 +192,7 @@
 | `natural-compare` | 1.4.0 | MIT |  |
 | `node-releases` | 2.0.59 | MIT |  |
 | `obug` | 3.0.0 | MIT |  |
-| `openapi-fetch` | 0.17.0 | MIT |  |
+| `openapi-fetch` | 0.17.0 | MIT | 예 |
 | `openapi-typescript` | 7.13.0 | MIT |  |
 | `openapi-typescript-helpers` | 0.1.0 | MIT |  |
 | `optionator` | 0.9.4 | MIT |  |
@@ -213,7 +213,7 @@
 | `react` | 19.3.1 | MIT | 예 |
 | `react-dom` | 19.3.1 | MIT | 예 |
 | `react-is` | 17.0.2 | MIT |  |
-| `react-router` | 8.4.0 | MIT |  |
+| `react-router` | 8.4.0 | MIT | 예 |
 | `require-from-string` | 2.0.2 | MIT |  |
 | `rolldown` | 1.2.14 | MIT |  |
 | `saxes` | 6.0.0 | ISC |  |

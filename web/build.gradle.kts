@@ -80,6 +80,9 @@ val webTest = tasks.register<PnpmTask>("webTest") {
     description = "Vitest unit, component and lint-rule tests (JUnit XML in build/reports/vitest)."
     webInputs()
     dependsOn(clientCheck)
+    // messages.test.ts가 이벤트 계약의 commType 목록을 읽는다(소스셋 밖 파일 = 입력)
+    inputs.file(rootProject.layout.projectDirectory.file("contracts/events/v1/payloads/CommissionCalculated.v1.schema.json"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     args.set(listOf("run", "test"))
     outputs.dir(layout.buildDirectory.dir("reports/vitest"))
 }

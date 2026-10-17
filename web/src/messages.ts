@@ -3,3 +3,8 @@ import messages from './messages.ko.json';
 
 export type Messages = typeof messages;
 export const m: Messages = messages;
+
+/** 문구의 {이름} 자리를 채운다(값은 이미 형식화된 문자열). */
+export function fill(template: string, values: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole);
+}
