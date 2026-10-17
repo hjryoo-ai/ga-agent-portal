@@ -1,6 +1,8 @@
 // 화면 E2E(포털 Phase 4 계획 ⑨): ./gradlew :web:e2e가 부른다. 순서:
 //  ① Java 하네스(WebE2eHarness — PostgreSQL·발급기·피드 스텁·등록, 상태 디렉터리에 파일로만) ② 포털 bootJar(인제스트 켬, 같은 출처로 화면 서빙)
 //  ③ Playwright(세 프로젝트) ④ 내리기(실패해도) ⑤ build/e2e 산출물(로그·보고서) 전체를 토큰·센티널로 스캔.
+// --serve(로컬 실행 — ./gradlew :web:e2eServe): ③ 대신 모든 테넌트의 머리를 끝까지 열고, 설계사 로그인 주소(…/#token=…)를 .state/login-urls.txt(600)에만
+// 쓴 뒤 Ctrl-C까지 기다린다. 주소(토큰)는 출력하지 않는다 — 파일 경로만.
 // 비밀(토큰·서비스 토큰·policyKey 비밀)은 build/e2e/.state(700)의 파일에만 — 명령 인자·환경 변수·출력에 싣지 않는다. 환경 변수로 넘기는 것은 경로뿐.
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -89,10 +91,27 @@ try {
     }
   });
   writeFileSync(join(out, 'run.json'), JSON.stringify({ baseUrl, controlUrl: env.controlUrl, tokenDir: env.tokenDir, streamLength: env.streamLength, projects: PROJECTS }, null, 2));
-  // 주입 시험에서 범위를 좁힐 때만(예 "--project=desktop ga03") — 비밀이 아닌 Playwright 인자. CI는 쓰지 않는다(전체).
-  const narrow = (process.env.PORTAL_E2E_PLAYWRIGHT_ARGS ?? '').split(' ').filter((a) => a !== '');
-  const pw = spawnSync(resolve(web, 'node_modules/.bin/playwright'), ['test', '--config', resolve(web, 'playwright.config.ts'), ...narrow], { cwd: web, stdio: 'inherit', env: { ...process.env, TZ: 'UTC' } });
-  status = pw.status ?? 1;
+  if (process.argv.includes('--serve')) {
+    const lines = [];
+    for (const [tenant, length] of Object.entries(env.streamLength)) {
+      if (!tenant.endsWith('C')) continue; // 한 벌이면 된다(데스크톱 벌)
+      const r = await fetch(`${env.controlUrl}/head/${tenant}/${String(length)}`, { method: 'POST' });
+      if (r.status !== 204) throw new Error(`could not open the feed of ${tenant}`);
+      lines.push(`${tenant}\t${baseUrl}/#token=${readFileSync(join(env.tokenDir, `${tenant}-agent.jwt`), 'utf8').trim()}`);
+    }
+    writeFileSync(join(state, 'login-urls.txt'), lines.join('\n') + '\n', { mode: 0o600 });
+    console.log(`portal ${baseUrl} — open a login URL from ${join(state, 'login-urls.txt')} (tokens expire in 3 h). Ctrl-C stops everything.`);
+    await new Promise((ok) => {
+      process.once('SIGINT', ok);
+      process.once('SIGTERM', ok);
+    });
+    status = 0;
+  } else {
+    // 주입 시험에서 범위를 좁힐 때만(예 "--project=desktop ga03") — 비밀이 아닌 Playwright 인자. CI는 쓰지 않는다(전체).
+    const narrow = (process.env.PORTAL_E2E_PLAYWRIGHT_ARGS ?? '').split(' ').filter((a) => a !== '');
+    const pw = spawnSync(resolve(web, 'node_modules/.bin/playwright'), ['test', '--config', resolve(web, 'playwright.config.ts'), ...narrow], { cwd: web, stdio: 'inherit', env: { ...process.env, TZ: 'UTC' } });
+    status = pw.status ?? 1;
+  }
 } catch (e) {
   console.error(String(e));
   status = 1;

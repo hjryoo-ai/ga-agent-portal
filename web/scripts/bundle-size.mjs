@@ -6,8 +6,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
-// 상한(바이트, gzip). 5단계에서 측정값 + 10%(KiB 올림)로 고정한다 — 그 전까지는 골격용 임시 값.
-const INITIAL_GZIP_CAP = 300 * 1024;
+// 상한(바이트, gzip — 계획 Q3): 5단계 측정값 118,135 B(화면 다섯·React 19·라우터·TanStack Query·openapi-fetch) + 10%를 KiB로 올림 = 127 KiB.
+// 늘려야 하면 측정표와 함께 계획·보고서에서 다시 정한다(조용히 올리지 않는다).
+const INITIAL_GZIP_CAP = 127 * 1024;
 
 const web = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const dist = resolve(web, 'build/web/dist');

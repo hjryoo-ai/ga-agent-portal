@@ -146,6 +146,21 @@ tasks.register<PnpmTask>("e2e") {
     outputs.upToDateWhen { false }
 }
 
+// 로컬 실행(지시문 ⑧): 같은 하네스로 포털을 띄우고 테넌트 넷(데스크톱 벌)의 스트림을 끝까지 연다. 로그인 주소는 web/build/e2e/.state/login-urls.txt(600)에만
+// — 출력·인자·환경 변수에 토큰 없음. Ctrl-C로 끝낸다(하네스·포털을 내리고 상태 디렉터리를 지운다).
+tasks.register<PnpmTask>("e2eServe") {
+    group = "application"
+    description = "Starts the harness and the boot jar for a local look at the screens; login URLs go to web/build/e2e/.state/login-urls.txt."
+    dependsOn(tasks.named("pnpmInstall"), ":portal-app:bootJar", ":portal-app:webE2eHarnessClasspath")
+    val bootJar = project(":portal-app").tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar").flatMap { it.archiveFile }
+    val launcher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(libs.versions.java.get()) }
+    environment.put("PORTAL_E2E_JAR", bootJar.map { it.asFile.absolutePath })
+    environment.put("PORTAL_E2E_JAVA", launcher.map { it.executablePath.asFile.absolutePath })
+    environment.put("PORTAL_E2E_HARNESS_CP", project(":portal-app").layout.buildDirectory.file("web-e2e/harness.classpath").map { it.asFile.absolutePath })
+    args.set(listOf("run", "e2e:serve"))
+    outputs.upToDateWhen { false }
+}
+
 tasks.named<ProcessResources>("processResources") {
     from(webBuild.map { it.outputs.files.files.first { f -> f.name == "dist" } }) {
         into("portal-web")

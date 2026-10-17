@@ -24,6 +24,7 @@ export function currentToken(): string | null {
 }
 
 /** 401을 받으면 버린다 — 다시 넣는 것은 웹뷰 호스트다. */
+// TODO(confirm#14): 호스트의 갱신 규약(만료 전 재주입 방법)은 미정 — 기본 가정은 "401이면 호스트가 프래그먼트로 다시 연다"(설계서 §14.1 #14).
 export function dropToken(): void {
   if (token !== null) {
     token = null;

@@ -17,7 +17,8 @@
     "licenses": "node scripts/licenses.mjs",
     "audit:record": "node scripts/audit-record.mjs",
     "e2e:install": "playwright install chromium webkit",
-    "e2e": "node e2e/run.mjs"
+    "e2e": "node e2e/run.mjs",
+    "e2e:serve": "node e2e/run.mjs --serve"
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.3",

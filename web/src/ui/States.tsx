@@ -25,6 +25,7 @@ export function ReloginScreen() {
       action={{
         text: m.auth.retry,
         run: () => {
+          // TODO(confirm#14): "다시 시도"가 호스트에 닿는 방법은 미정 — 기본 가정은 새로고침(호스트가 토큰을 다시 넣는다, 설계서 §14.1 #14).
           window.location.reload();
         },
       }}
