@@ -207,3 +207,29 @@
 | P3-8 | V5 기존 행 채우기 | `ADD COLUMN … DEFAULT` + `DROP DEFAULT`(`UPDATE` 없음) | `TenantPredicateScanTest`가 `tenant_id` 술어 없는 `UPDATE`를 거부했다 — 규칙을 좁히지 않고 문장을 바꿨다 |
 | P3-9 | (계획에 없음) | `TenantContextGuardTest`의 목록 = 패키지의 모든 저장소(코드 출처로 열거) | 목록 대조를 더하자 Phase 2의 `ViewResetRepository`가 빠져 있던 것이 드러났다 — 지금은 덮인다 |
 | P3-10 | 자리 단계 E2E README 4번 "`ingest rebuild` 뒤 재대조", D-16 "`ingest_lag_seq = 0` 대기" | 재구축 재대조 없음, 대기는 DB의 `caught_up_at` | D-16 범위 밖이고 `RebuildIT`가 계약 사본으로 증명한다. actuator는 `health`만 노출 — `caught_up_at`이 같은 조건(`last_seq = headSeq`·`RUNNING`)이다 |
+
+## 2026-10-17 — Phase 3 수용 심사 (`docs/phase-03-수용심사.md`)
+
+### 지시문·승인 오류
+
+| # | 문구 | 무엇이 틀렸나 | 정한 것 |
+|---|---|---|---|
+| DE-19 | 계획 승인 Q6 "지표 `tenant` 태그는 발급자가 등록된 경우만" | Micrometer Prometheus 레지스트리는 같은 이름에 다른 태그 키 집합을 거부한다 — 레지스트리 제약을 보지 않았다 | 태그 키는 늘 있고 미등록 발급자는 `none`(P3-5 그대로 — 심사 Q10). `none`은 테넌트 식별자가 아니다 |
+
+### 심사 누락
+
+| # | 무엇 | 처리 |
+|---|---|---|
+| RM-2 | Phase 2 심사가 `TenantContextGuardTest` 목록에서 `ViewResetRepository`가 빠진 것을 보지 못했다(Phase 3 F8) | Phase 3이 목록을 "패키지의 모든 저장소"(코드 출처로 열거)로 바꿨다(P3-9) — 다음 누락은 시험이 스스로 실패한다 |
+
+### 플랫폼 질문
+
+| # | 질문 | 처리 |
+|---|---|---|
+| PQ-1 | 플랫폼 0.2.0 `ResolvedIdentity`는 설계사 없는 주체(`OPERATOR`)를 표현하지 못한다(Phase 3 F14) | 지금은 포털 처리(`identity_link.agent_id` NULL은 `OPERATOR`만, 운영 명령 인가는 포털 코드)로 충분. ga-disclosure 다음 정비 때 `ResolvedIdentity`에 "설계사 없는 주체" 표현을 넣을지 |
+
+### 결정 (설계서 v1.6.1)
+
+- F5 라인 목록 404 → §7 한 줄, F9 `exp ≤ iat` → §9 각주, F6 JWKS 장애 → 지표 `api_jwks_failures_total{issuer_hash}`(이 커밋 — `IssuerTenantResolverTest`), Q11 → §14.1 "구현 위치" 열, Q3 → §14.1 #12, Q5 → §14.1 #13.
+- Q12 E2E 결과는 `main`에 별도 커밋(사용자 실행 뒤). 실패하면 정비 PR.
+- 심사 §3 Q1~Q6(화면 규약)은 Phase 4 지시문의 일부, Q7~Q9는 Phase 5.
