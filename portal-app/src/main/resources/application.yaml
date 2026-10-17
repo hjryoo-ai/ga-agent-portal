@@ -37,3 +37,5 @@ portal:
     token-dir: ${PORTAL_ENGINE_TOKEN_DIR:/run/secrets/portal-engine-tokens}
     directory-username: ${PORTAL_DIRECTORY_USER:portal_directory}
     directory-password: ${PORTAL_DIRECTORY_PASSWORD:directory_local_only}
+    # 재구축(설계서 §6.7) 상한 — 한 트랜잭션 재생의 길이를 묶는다(긴 트랜잭션 비용은 §14.1)
+    rebuild-max-events: 50000

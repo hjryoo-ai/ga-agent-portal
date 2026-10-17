@@ -38,6 +38,11 @@ public class IngestPollingConfiguration {
 
     @Bean
     FeedClient feedClient(IngestProperties props, TenantTransactions transactions, TenantRepository tenants, ServiceTokenSource tokens) {
+        return httpFeed(props, transactions, tenants, tokens);
+    }
+
+    /** 폴링과 재구축(CLI)이 같은 피드 조립을 쓴다. */
+    static FeedClient httpFeed(IngestProperties props, TenantTransactions transactions, TenantRepository tenants, ServiceTokenSource tokens) {
         return new HttpFeedClient(HttpClient.newBuilder().connectTimeout(props.httpTimeout()).build(),
                 tenant -> URI.create(transactions.inTransaction(tenant, tenants::current).orElseThrow().engineBaseUrl()),
                 tokens, props.httpTimeout());

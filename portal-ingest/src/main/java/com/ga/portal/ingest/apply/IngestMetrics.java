@@ -3,6 +3,8 @@ package com.ga.portal.ingest.apply;
 import com.ga.platform.core.tenant.TenantId;
 import com.ga.portal.domain.IngestState;
 
+import java.time.Duration;
+
 /**
  * 인제스트 지표 포트(지시문 D-9, 설계서 §10). 구현은 {@code portal-app}(Micrometer, 태그 {@code tenant}). 시각은 주입된 시계에서 온다.
  */
@@ -20,6 +22,10 @@ public interface IngestMetrics {
 
     /** 마감·지급 이벤트의 합계가 포털 합산과 달랐다(Phase 2 지시문 D-3). */
     default void drift(TenantId tenant) {
+    }
+
+    /** 재구축 한 번의 걸린 시간(주입된 시계로 잰다) — 결과: succeeded·failed. */
+    default void rebuild(TenantId tenant, String outcome, Duration took) {
     }
 
     IngestMetrics NONE = new IngestMetrics() {

@@ -8,10 +8,14 @@ import com.ga.portal.domain.IngestTransitions;
 import com.ga.portal.domain.IngestTrigger;
 import com.ga.portal.infra.persistence.AuditAccessRepository;
 import com.ga.portal.ingest.apply.IngestLock;
+import com.ga.portal.ingest.apply.IngestMetrics;
 import com.ga.portal.ingest.apply.IngestStore;
+import com.ga.portal.ingest.apply.Rebuilder;
 import com.ga.portal.ingest.apply.TenantTransactions;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -19,7 +23,7 @@ import java.util.OptionalLong;
 import java.util.regex.Pattern;
 
 /**
- * 운영 명령(Phase 1 지시문 D-8, 설계서 §6.1): {@code ingest status|resume|pause}. 전 건 {@code audit_access}에 같은 트랜잭션으로 남긴다 —
+ * 운영 명령(Phase 1 지시문 D-8, 설계서 §6.1·§6.7): {@code ingest status|resume|pause|rebuild}. 전 건 {@code audit_access}에 같은 트랜잭션으로 남긴다 —
  * 거부도. {@code resume}은 {@code FAILED}·{@code PAUSED} → {@code RUNNING}이고 커서를 n에 둔다 — n은 마지막 {@code APPLIED} seq 이하만
  * (건너뛰기는 재구축으로만). 인가는 Phase 3 전이라 실행한 OS 사용자를 믿는다(운영 호스트 접근 통제가 곧 인가 — README·보고서).
  */
@@ -30,11 +34,16 @@ public final class IngestCommands {
     public static final String RESUME_REJECTED = "INGEST_RESUME_REJECTED";
     public static final String PAUSE = "INGEST_PAUSE";
     public static final String PAUSE_REJECTED = "INGEST_PAUSE_REJECTED";
+    /** 재구축(Phase 2 계획 ⑥): 시작(txA)·거부·결과(txB 커밋 또는 txC) — 단계마다 그 트랜잭션 안에서. */
+    public static final String REBUILD = "INGEST_REBUILD";
+    public static final String REBUILD_REJECTED = "INGEST_REBUILD_REJECTED";
+    public static final String REBUILD_SUCCEEDED = "INGEST_REBUILD_SUCCEEDED";
+    public static final String REBUILD_FAILED = "INGEST_REBUILD_FAILED";
 
     /** 행위자 이름: 감사 행에 그대로 들어가므로 짧은 식별자만. */
     private static final Pattern ACTOR = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$");
 
-    /** 명령 결과 — 종료 코드(0 성공, 2 거부)와 출력 줄. */
+    /** 명령 결과 — 종료 코드(0 성공, 1 재구축 실패, 2 거부)와 출력 줄. */
     public record Outcome(int exitCode, List<String> lines) {
         static Outcome ok(List<String> lines) {
             return new Outcome(0, List.copyOf(lines));
@@ -50,15 +59,19 @@ public final class IngestCommands {
     private final IngestLock lock;
     private final AuditAccessRepository audit;
     private final IngestScheduler.TenantDirectory directory;
+    private final Rebuilder rebuilder;
+    private final IngestMetrics metrics;
     private final Clock clock;
 
     public IngestCommands(TenantTransactions transactions, IngestStore store, IngestLock lock, AuditAccessRepository audit,
-                          IngestScheduler.TenantDirectory directory, Clock clock) {
+                          IngestScheduler.TenantDirectory directory, Rebuilder rebuilder, IngestMetrics metrics, Clock clock) {
         this.transactions = transactions;
         this.store = store;
         this.lock = lock;
         this.audit = audit;
         this.directory = directory;
+        this.rebuilder = rebuilder;
+        this.metrics = metrics;
         this.clock = clock;
     }
 
@@ -134,6 +147,29 @@ public final class IngestCommands {
             audit.record(actorSubject, PAUSE, target, clock.instant());
             return Outcome.ok(List.of(tenant.value() + " PAUSED at seq " + c.lastSeq()));
         });
+    }
+
+    /** {@code RUNNING}·{@code PAUSED}·{@code FAILED} → 재구축(설계서 §6.7 v1.5). 실패해도 뷰는 그대로이고 커서가 {@code FAILED(REBUILD_FAILED)}다. */
+    public Outcome rebuild(TenantId tenant, String actorSubject) {
+        Instant started = clock.instant();
+        Rebuilder.Result result = rebuilder.rebuild(tenant, (step, target) -> audit.record(actorSubject, switch (step) {
+            case STARTED -> REBUILD;
+            case REJECTED -> REBUILD_REJECTED;
+            case SUCCEEDED -> REBUILD_SUCCEEDED;
+            case FAILED -> REBUILD_FAILED;
+        }, target, clock.instant()));
+        Duration took = Duration.between(started, clock.instant());
+        return switch (result) {
+            case Rebuilder.Result.Rebuilt r -> {
+                metrics.rebuild(tenant, "succeeded", took);
+                yield Outcome.ok(List.of(tenant.value() + " RUNNING at seq " + r.lastSeq() + " (rebuilt " + r.events() + " events)"));
+            }
+            case Rebuilder.Result.Rejected r -> Outcome.rejected(r.reason());
+            case Rebuilder.Result.Failed f -> {
+                metrics.rebuild(tenant, "failed", took);
+                yield new Outcome(1, List.of(tenant.value() + " FAILED " + f.error() + " — views unchanged"));
+            }
+        };
     }
 
     private Outcome reject(String action, String actorSubject, String target, String message) {

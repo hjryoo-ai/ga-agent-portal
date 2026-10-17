@@ -36,6 +36,18 @@ public final class InMemoryViewStore implements ViewStore {
     final Map<List<Object>, ReconRow> recon = new LinkedHashMap<>();
     private long rowsRead;
 
+    /** 재구축의 뷰 삭제(설계서 §6.7) — 뷰 8표, {@code recon_result}는 남긴다. */
+    public void clearViews() {
+        agents.clear();
+        lines.clear();
+        months.clear();
+        ledgers.clear();
+        history.clear();
+        deferrals.clear();
+        receivables.clear();
+        flags.clear();
+    }
+
     public long rowsRead() {
         return rowsRead;
     }

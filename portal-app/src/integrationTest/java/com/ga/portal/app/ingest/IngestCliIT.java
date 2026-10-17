@@ -5,6 +5,7 @@ import com.ga.portal.domain.IngestErrorCode;
 import com.ga.portal.domain.IngestState;
 import com.ga.portal.infra.persistence.AuditAccessRepository;
 import com.ga.portal.infra.testing.SeedData;
+import com.ga.portal.ingest.apply.IngestMetrics;
 import com.ga.portal.projection.RecordingProjector;
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +30,8 @@ class IngestCliIT {
     private final AuditAccessRepository audit = new AuditAccessRepository(rig.gateway);
 
     private IngestCommands commands(TenantId only) {
-        return new IngestCommands(rig.transactions, rig.store, rig.lock, audit, () -> List.of(only), IngestRig.CLOCK);
+        return new IngestCommands(rig.transactions, rig.store, rig.lock, audit, () -> List.of(only),
+                rig.rebuilder(IngestRig.feed("dup.jsonl"), new RecordingProjector(), 200, 50_000), IngestMetrics.NONE, IngestRig.CLOCK);
     }
 
     private List<AuditAccessRepository.AuditRow> audits(TenantId t) {

@@ -1,6 +1,5 @@
 package com.ga.portal.ingest.apply;
 
-import com.ga.platform.canonical.CanonicalizationException;
 import com.ga.platform.core.tenant.TenantId;
 import com.ga.portal.domain.CursorRecord;
 import com.ga.portal.domain.IngestErrorCode;
@@ -9,8 +8,6 @@ import com.ga.portal.domain.IngestEventStatus;
 import com.ga.portal.domain.IngestState;
 import com.ga.portal.domain.IngestTransitions;
 import com.ga.portal.ingest.EnvelopeValidator;
-import com.ga.portal.ingest.EnvelopeVerdict;
-import com.ga.portal.ingest.PayloadHasher;
 import com.ga.portal.projection.Envelope;
 import com.ga.portal.projection.NoopNotificationDeriver;
 import com.ga.portal.projection.NotificationDeriver;
@@ -141,37 +138,21 @@ public final class IngestApplier {
         if (!IngestTransitions.polls(cursor.state())) {
             return Result.of(Outcome.NOT_RUNNING);
         }
-        EnvelopeVerdict verdict = validator.validate(event);
-        if (verdict instanceof EnvelopeVerdict.Rejected r) {
-            Optional<IngestEventRecord> row = r.code() == IngestErrorCode.UNSUPPORTED_VERSION
-                    ? Optional.empty()
-                    : r.envelope().flatMap(e -> hashOf(event).map(h -> failedRow(tenant, e, h, r.code(), r.detail())));
-            throw new Stop(r.code(), r.detail(), row);
-        }
-        Envelope envelope = ((EnvelopeVerdict.Valid) verdict).envelope();
-        String keys = "seq " + envelope.seq() + " eventId " + envelope.eventId();
-        String hash = hashOf(event).orElseThrow(() -> new Stop(IngestErrorCode.SCHEMA_VIOLATION, keys + " not canonicalizable", Optional.empty()));
-
-        Optional<IngestEventRecord> existing = store.event(envelope.eventId());
-        if (existing.isPresent() && existing.get().status() == IngestEventStatus.APPLIED) {
-            IngestEventRecord known = existing.get();
-            if (!known.payloadHash().equals(hash)) {
-                throw new Stop(IngestErrorCode.HASH_MISMATCH, keys + " differs from the applied event", Optional.empty());
+        EventCheck.Verdict verdict = EventCheck.check(validator, store, event, cursor.lastSeq() + 1);
+        Envelope envelope;
+        String hash;
+        switch (verdict) {
+            case EventCheck.Verdict.Poison p -> throw new Stop(p.code(), p.detail(),
+                    p.recordable().map(r -> failedRow(tenant, r.envelope(), r.hash(), p.code(), p.detail())));
+            case EventCheck.Verdict.Known k -> {
+                return Result.of(Outcome.SKIPPED);
             }
-            if (known.seq() != envelope.seq()) {
-                throw new Stop(IngestErrorCode.EVENT_SEQ_CONFLICT, keys + " was applied at seq " + known.seq(), Optional.empty());
+            case EventCheck.Verdict.Fresh f -> {
+                envelope = f.envelope();
+                hash = f.hash();
             }
-            return Result.of(Outcome.SKIPPED);
         }
-        long expected = cursor.lastSeq() + 1;
-        if (envelope.seq() < expected) {
-            String detail = keys + " is new but expected seq " + expected;
-            throw new Stop(IngestErrorCode.PAST_SEQ_NEW_EVENT, detail,
-                    Optional.of(failedRow(tenant, envelope, hash, IngestErrorCode.PAST_SEQ_NEW_EVENT, detail)));
-        }
-        if (envelope.seq() > expected) {
-            throw new Stop(IngestErrorCode.SEQ_GAP, "expected seq " + expected + ", got " + keys, Optional.empty());
-        }
+        String keys = EventCheck.keys(envelope);
 
         store.markApplied(new IngestEventRecord(tenant, envelope.eventId(), envelope.seq(), envelope.type(), clock.instant(),
                 IngestEventStatus.APPLIED, Optional.empty(), hash));
@@ -196,14 +177,6 @@ public final class IngestApplier {
     private IngestEventRecord failedRow(TenantId tenant, Envelope e, String hash, IngestErrorCode code, String detail) {
         return new IngestEventRecord(tenant, e.eventId(), e.seq(), e.type(), clock.instant(), IngestEventStatus.FAILED,
                 Optional.of(code.format(detail)), hash);
-    }
-
-    private static Optional<String> hashOf(JsonNode event) {
-        try {
-            return Optional.of(PayloadHasher.hash(event));
-        } catch (CanonicalizationException | IllegalArgumentException e) {
-            return Optional.empty();
-        }
     }
 
     /** 검증 전에 실패했을 때 쓸 키(형식을 보장하지 않으므로 숫자·짧은 문자열만). */
