@@ -6,6 +6,7 @@ package com.ga.portal.query.rule;
  */
 public final class PolicyMask {
 
+    // TODO(confirm#5): 기본 가정 — 모든 테넌트 끝 4자, 포털 응답 시점 마스킹(설계서 §14.1 #5)
     static final int VISIBLE = 4;
 
     private PolicyMask() {

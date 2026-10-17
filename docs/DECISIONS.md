@@ -171,3 +171,39 @@
 | V14-1 | N5 "`contract-only/07-StatementEstimated` → 둘째 판 마지막 줄(실 샘플)" | 파일을 **지웠다** — 실 샘플은 `a1/` seq 11 그 자체 | 같은 줄을 `contract-only/`에 복사하면 정규 스트림(`Samples.all()`)에 같은 eventId가 두 seq로 들어가 `EVENT_SEQ_CONFLICT`가 된다. `contract-only/`의 뜻("엔진이 내지 않는 형태")에도 맞지 않는다. 13종 덮기(Phase 0 C7)는 a1 seq 11이 맡는다 |
 | V14-2 | N5 "`golden-streams/engine-e2-estimate-*/`" | 디렉터리 하나 `golden-streams/engine-e2-estimate/`에 엔진 파일 이름 그대로 다섯, 골든 뷰는 `golden-views/engine-e2-estimate/<파일 이름>/` | 출처 경로와 이름이 같아야 바이트 대조·추적이 쉽다 |
 | V14-3 | N4 "골든 뷰 `a1` 재생성(202702 `ESTIMATED` 행 추가)" | 행이 늘지 않고 202702 행이 `PROVISIONAL` → `ESTIMATED`로 바뀐다(세액 0·순액 0·`net_basis ESTIMATE`·`estimate_basis_seq` 10) | 202702 행은 seq 9(환수 라인)에서 이미 있다. 잠정 명세의 `receivableOffset`·`carriedReceivable`(720,000)·`payable`은 지급 런 열에 넣지 않는다(Phase 2 계획 ② `StatementEstimated` — 예상 합계·이월은 쓰지 않음) — 화면에 예상 이월을 보일지는 Phase 4 질문 |
+
+## 2026-10-17 — Phase 3 계획 승인 (`docs/phase-03-계획승인.md`)
+
+### 지시문 오류 (승인 §3)
+
+| # | 지시문 문구 | 무엇이 틀렸나 | 정한 것 |
+|---|---|---|---|
+| DE-12 | D-1 "테넌트는 토큰의 `iss`로", "`portal_directory`는 이 두 열을 읽지 못한다" | 테넌트를 바인딩하기 **전에** 발급자 열을 읽을 롤을 정하지 않았다 — `portal_app`은 RLS로 못 읽고 `portal_directory`는 못 읽게 했다 | 전용 롤 `portal_issuer`(세 열 SELECT + 전용 정책, V5) — 포털 직접 접근 허용 목록 첫 항목 `IssuerDirectoryReader`(Q1). 발급자 URL은 로그에 해시 |
+| DE-13 | D-2·D-9·D-10 | `identity_link.agent_id NOT NULL`(V1)인데 `OPERATOR`에는 설계사가 없다. 플랫폼 0.2.0 `ResolvedIdentity`는 `orgPath` 공백에 예외를 던지는데 A-1 둘째 판에 `AgentSnapshot`이 없어 `agent_profile`에서 읽으면 A-1 설계사 전원이 404였다 | `agent_id` NULL은 `OPERATOR`만(CHECK), `identity_link.org_path`(포털 사실·인가용, `OPERATOR` 밖 필수) — `agent_profile.org_path`(엔진 사실·표시용)와 다른 출처, 달라도 어느 쪽도 고치지 않는다(Q2, 설계서 §14.1 #9) |
+| DE-14 | D-6 "`now − 커서 updated_at` > `sync_delay_seconds`" | 유휴 폴링은 `updated_at`을 바꾸지 않는다 — 이벤트 없는 밤마다 모든 테넌트가 `SYNC_DELAYED`가 된다 | `ingest_cursor.caught_up_at`(V5): 피드 호출 성공 **그리고** `last_seq = headSeq` **그리고** `RUNNING`일 때만 잠금 안에서 갱신. `SYNC_DELAYED` ⇔ 상태 ≠ `RUNNING` ∨ `caught_up_at` 없음 ∨ `now − caught_up_at > 기준`(Q3) |
+| DE-15 | D-7 "`policyKey` = SHA-256(…) 앞 16자(비가역)" | 비밀 없는 해시는 증권번호 형식이 좁아 열거로 되돌아가고, 키는 쿼리 문자열로 접근 로그에 남는다 | HMAC-SHA256(배포 비밀 파일, `tenant_id` + `U+001F` + `policy_no`) 앞 16자. 회전하면 모든 키가 바뀐다 — 화면은 키를 저장하지 않는다(`docs/운영.md` §4). 키 → 원문은 그 설계사의 증권번호 집합 안에서만(Q5) |
+| DE-16 | D-8 "`ETag: W/"<seq>"`" | 같은 `seq`에서도 응답이 바뀐다 — 지연 상태(시간)와 테넌트 설정(지급일 규칙·임계치·지연 기준) | `W/"<seq>.<sync>.<cfg>"`, `cfg` = 그 응답이 실제로 읽은 설정의 지문, 라인 목록은 `.<page>.<size>.<필터>`. 비교는 소유 확인 뒤(Q4) |
+| DE-17 | D-3 "감사 `audit_access` … detail = 사유 코드" | `audit_access`에 `detail` 열이 없고, 테넌트를 모르는 401은 감사 행을 쓸 곳이 없다. 등록된 `iss`만 실은 위조 토큰이 감사 표를 채울 수 있다(쓰기 증폭) | V5 `audit_access.detail`(닫힌 코드만). 404 → 감사(별도 트랜잭션), 401 → 지표만(Q6) |
+| DE-18 | D-10 "`USING limit_multiple::text`", D-11 "모든 컨트롤러 메서드는 `@UseCaseEntry` 표식" | `NUMERIC(6,2)::text`는 `"12.00"` — 계약 원문 `"12"`와 다르다. 표식을 컨트롤러에 두면 ga-disclosure 6A(표식은 유스케이스 메서드)와 다르고, 컨트롤러가 유스케이스를 건너뛰어도 잡지 못한다 | `trim_scale(limit_multiple)::text`(F6, M14). 표식은 `portal-query`의 유스케이스 메서드, 컨트롤러는 그것을 정확히 하나 부른다(Q8 — `ApiLayerRulesTest` ⓐⓒⓓ) |
+
+### 설계서 결함 (설계서 v1.6 변경 이력에도)
+
+| # | 무엇 | 정한 것 |
+|---|---|---|
+| DD-12 | §7 공통 필드 `dataStatus: OK\|DRIFT\|SYNC_DELAYED` 한 필드가 두 뜻 — 동기화(테넌트 커서, 시간)와 대사(그 달의 `data_status`)를 섞었다. 지연 중인 DRIFT 달을 표현할 수 없다 | `dataStatus: OK\|SYNC_DELAYED`(모든 응답) + 월 응답의 `monthDataStatus: OK\|DRIFT`(지시문 D-6) |
+| DD-13 | §7 `/me` "마스킹된 이름" — 본인에게 본인 이름을 가릴 이유가 없고, 설계서 §9의 마스킹 대상(고객)과 섞였다 | 본인 이름 그대로, `agent_profile` 행이 없으면 프로필 필드 생략 200(Q9) |
+
+## 2026-10-17 — Phase 3 구현에서 계획과 다르게 한 것 (보고서 §5)
+
+| # | 계획 | 구현 | 이유 |
+|---|---|---|---|
+| P3-1 | ② Spring `JwtIssuerAuthenticationManagerResolver`에 `IssuerTenantResolver`를 꽂는다 | **포털 `AuthenticationManager` 하나**(`IssuerTenantResolver`)가 검사 2~8을 계획 순서대로 하고, 발급자별 디코더만 캐시한다 | 그 리졸버는 형식 오류와 미등록 발급자를 같은 예외로 내고 `alg` 검사 전에 발급자를 찾는다 — 여덟 사유를 계획 순서로 가를 수 없다(바이트는 같아도 지표 사유가 틀린다) |
+| P3-2 | ③ `Jwt` 멤버를 호출하는 클래스 셋의 닫힌 목록 | **하나**(`IssuerTenantResolver`) | 검증기가 클레임을 직접 읽고 (테넌트, `sub`)만 남긴다 — 읽는 곳이 적을수록 목록이 짧다. `ApiLayerRulesTest` ⓑ |
+| P3-3 | `portal-infra` `persistence.query.AgentQueryRepository` | **`persistence.AgentQueryRepository`** | 뷰 저장소의 행 매퍼를 그대로 쓰려고(패키지 비공개로 넓혔다) — 매퍼를 복제하면 두 곳이 갈린다 |
+| P3-4 | 조회 행 타입은 `portal-query` | **`portal-domain.view`**(`LineItem`·`LineDetail`·`LinePage`·`LedgerItem`·`DueMonth`·`SyncSnapshot`) | P2-1과 같은 이유 — `portal-infra`는 `portal-query`를 볼 수 없다 |
+| P3-5 | 승인 Q6 "지표 `tenant` 태그는 발급자가 등록된 경우만" | 태그 키는 늘 있고 미등록 발급자는 값 **`none`** | Micrometer Prometheus 레지스트리는 같은 이름에 다른 태그 키 집합을 거부한다. `none`은 테넌트 ID 형식(`^[A-Z0-9]…`)과 겹칠 수 없다 |
+| P3-6 | (계획에 없음) | 라인 목록은 그 설계사의 그 달 월 행이 없으면 **404** | `/earnings/{ym}`과 같은 자원 판단 — 같은 `ym`이 한 엔드포인트에서는 404, 다른 엔드포인트에서는 빈 200이 되지 않게 |
+| P3-7 | (계획에 없음) | JWKS를 받지 못하면 **500**(401 아님) | 발급자 장애는 토큰의 잘못이 아니다 — 401이면 클라이언트가 재로그인을 되풀이한다. 본문은 같은 500 바이트 |
+| P3-8 | V5 기존 행 채우기 | `ADD COLUMN … DEFAULT` + `DROP DEFAULT`(`UPDATE` 없음) | `TenantPredicateScanTest`가 `tenant_id` 술어 없는 `UPDATE`를 거부했다 — 규칙을 좁히지 않고 문장을 바꿨다 |
+| P3-9 | (계획에 없음) | `TenantContextGuardTest`의 목록 = 패키지의 모든 저장소(코드 출처로 열거) | 목록 대조를 더하자 Phase 2의 `ViewResetRepository`가 빠져 있던 것이 드러났다 — 지금은 덮인다 |
+| P3-10 | 자리 단계 E2E README 4번 "`ingest rebuild` 뒤 재대조", D-16 "`ingest_lag_seq = 0` 대기" | 재구축 재대조 없음, 대기는 DB의 `caught_up_at` | D-16 범위 밖이고 `RebuildIT`가 계약 사본으로 증명한다. actuator는 `health`만 노출 — `caught_up_at`이 같은 조건(`last_seq = headSeq`·`RUNNING`)이다 |

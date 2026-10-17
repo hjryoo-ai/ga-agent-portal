@@ -34,6 +34,7 @@ public class IdentityLinkResolver implements IdentityResolver {
     public Optional<ResolvedIdentity> resolve(String oidcSubject) {
         return link(oidcSubject)
                 .filter(r -> r.status() == LinkStatus.ACTIVE)
+                // TODO(confirm#9): 기본 가정 — 조직은 identity_link.org_path(인가용), agent_profile.org_path(표시용)와 따로(설계서 §14.1 #9)
                 .flatMap(r -> r.agentId().map(agent -> new ResolvedIdentity(agent, Set.of(r.role().name()), r.orgPath().orElseThrow())));
     }
 }

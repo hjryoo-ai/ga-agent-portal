@@ -21,6 +21,7 @@ public final class PayoutDay {
     public record Result(Optional<LocalDate> date, Optional<Omission> omitted) {
     }
 
+    // TODO(confirm#2): 기본 가정 — NEXT_MONTH_D{n}만, 영업일 보정 없음, 그 달에 없는 n은 생략(설계서 §14.1 #2)
     private static final Pattern NEXT_MONTH = Pattern.compile("NEXT_MONTH_D([1-9][0-9]?)");
 
     private PayoutDay() {
