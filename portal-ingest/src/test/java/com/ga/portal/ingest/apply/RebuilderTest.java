@@ -6,6 +6,7 @@ import com.ga.portal.domain.IngestState;
 import com.ga.portal.ingest.ContractSchemas;
 import com.ga.portal.ingest.EnvelopeValidator;
 import com.ga.portal.ingest.feed.FeedClient;
+import com.ga.portal.ingest.feed.FeedPage;
 import com.ga.portal.ingest.feed.FileFeedAdapter;
 import com.ga.portal.ingest.testing.InMemoryIngest;
 import com.ga.portal.ingest.testing.Samples;
@@ -134,5 +135,29 @@ class RebuilderTest {
                 new Rebuilder.Result.Rejected("GA01 is REBUILDING — only RUNNING, PAUSED or FAILED rebuilds"));
         assertThat(views.deletes).isZero();
         assertThat(steps).containsExactly("REJECTED cursor:GA01@-", "REJECTED cursor:GA01@17");
+    }
+
+    /** 재생 중 엔진이 더 발행해도(머리 10 → 17) 재생은 첫 페이지의 머리까지 — 상한이 txB 길이를 묶는다. 나머지는 워커가 이어 받는다. */
+    @Test
+    void theReplayStopsAtTheFirstPagesHeadEvenIfTheHeadMovesOn() {
+        ingest(200);
+        FeedClient growing = new FeedClient() {
+            private boolean first = true;
+
+            @Override
+            public FeedPage fetch(TenantId tenant, long afterSeq, int limit) {
+                FeedPage page = A1.fetch(tenant, afterSeq, limit);
+                if (first) {
+                    first = false;
+                    return new FeedPage(page.tenantId(), page.events(), page.nextSeq(), 10, page.schemaVersion());
+                }
+                return page;
+            }
+        };
+        Rebuilder rebuilder = new Rebuilder(new EnvelopeValidator(ContractSchemas.get()), db, db, db, recorder, views, growing, CLOCK, 4, 10);
+
+        assertThat(rebuilder.rebuild(T, audit)).isEqualTo(new Rebuilder.Result.Rebuilt(10, 10));
+        assertThat(recorder.applied(T)).hasSize(27);   // 적용 17 + 재생 10(셋째 페이지의 11·12는 재생하지 않는다)
+        assertThat(db.cursorOf(T).orElseThrow().lastSeq()).isEqualTo(10);
     }
 }

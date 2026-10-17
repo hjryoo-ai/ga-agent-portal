@@ -26,7 +26,8 @@ import java.util.Optional;
  * 재구축(설계서 §6.7 v1.5, Phase 2 지시문 D-11, 승인 Q10) — 트랜잭션 셋:
  * <ol>
  *   <li><b>txA</b>: 잠금 → 커서 상태가 {@code OPERATOR_REBUILD}를 받는지 → {@code REBUILDING} 커밋(워커·운영 명령이 보고 비켜 간다). 거부는 감사만.</li>
- *   <li>첫 페이지({@code afterSeq=0})의 {@code headSeq}가 상한을 넘으면 시작하지 않고 txC.</li>
+ *   <li>첫 페이지({@code afterSeq=0})의 {@code headSeq}가 상한을 넘으면 시작하지 않고 txC. 재생은 그 {@code headSeq}까지만 — 재생 중 늘어난
+ *       머리는 따라가지 않는다(워커가 이어 받는다). 재생 수가 상한에 닿으면 실패(이중 방어).</li>
  *   <li><b>txB</b>(한 트랜잭션 — D-11의 원자성): 잠금 → 뷰 삭제 → seq 1부터 끝까지 재생(적용기와 같은 수신 검증·해시·seq 규칙, 이미 {@code APPLIED}인
  *       행은 해시·seq가 같아야 하고 같으면 프로젝터를 다시 부른다, 없거나 {@code FAILED}면 {@code APPLIED}로) → 전수 불변식 → 커서
  *       {@code RUNNING}·마지막 seq. 피드 호출이 이 트랜잭션 안에 있다 — 상한이 그 길이를 묶는다.</li>
@@ -138,18 +139,27 @@ public final class Rebuilder {
             throw new ReplayFailure("lock held by another worker");
         }
         views.deleteViews();
+        // 재생 범위는 첫 페이지의 headSeq까지로 고정한다 — 재생 중 엔진이 더 발행해도 따라가지 않는다(상한이 txB 길이를 묶는 전제).
+        // 그 뒤의 이벤트는 RUNNING이 된 커서에서 워커가 이어 받는다.
+        long target = first.headSeq();
         long lastSeq = 0;
         Optional<String> lastEventId = Optional.empty();
         int count = 0;
         FeedPage page = first;
         while (true) {
             for (JsonNode event : page.events()) {
+                if (lastSeq >= target) {
+                    break;
+                }
+                if (count >= maxEvents) {
+                    throw new ReplayFailure("replayed " + count + " events, the limit is " + maxEvents);
+                }
                 Envelope e = replayOne(tenant, event, lastSeq + 1);
                 lastSeq = e.seq();
                 lastEventId = Optional.of(e.eventId());
                 count++;
             }
-            if (page.events().isEmpty() || lastSeq >= page.headSeq()) {
+            if (page.events().isEmpty() || lastSeq >= target) {
                 break;
             }
             try {
