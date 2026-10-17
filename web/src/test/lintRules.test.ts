@@ -17,6 +17,7 @@ const cases: Record<string, string> = {
   'moneyTemplate.ts': `import type { components } from '../gen/portal-api';\nexport const f = (m: components['schemas']['MonthSummary']) => \`\${String(m.gross)}\`;\n`,
   'moneyMath.ts': `import type { components } from '../gen/portal-api';\n// @ts-expect-error Won is not a number\nexport const f = (m: components['schemas']['MonthSummary']) => Math.abs(m.gross);\n`,
   'moneyUnary.ts': `import type { Won } from '../money/won';\nexport const f = (w: Won) => -w;\n`,
+  'moneyMapped.ts': `import { api } from '../api/client';\n// 실제 응답 타입(openapi-fetch의 data)은 스키마를 매핑 타입으로 복사해 'Won' 이름이 사라진다 — 3단계에서 이름만 보던 규칙이 놓친 모양 그대로\nexport const f = async () => {\n  const r = await api.GET('/api/v1/me/earnings/lines/{calcId}', { params: { path: { calcId: '1' } } });\n  return r.data?.policySummary.monthlyPremium === undefined;\n};\n`,
   'moneyPresence.ts': `import type { components } from '../gen/portal-api';\nexport const f = (m: components['schemas']['MonthSummary']) => m.net !== undefined;\n`,
   'moneyOk.ts': `import type { components } from '../gen/portal-api';\nimport { isZero, present } from '../money/won';\nexport const f = (m: components['schemas']['MonthSummary'], n: number) => [isZero(m.adjustment), present(m.net), n + 1, m.closeYm.length > 0];\nexport const g = (items: components['schemas']['MonthSummary'][]) => items.map((m) => m.gross);\n`,
   'hangul.tsx': `export const C = () => <p>정정</p>;\nexport const s = '확정';\n`,
@@ -43,7 +44,7 @@ afterAll(() => {
 const rules = (name: string) => results.get(name) ?? [];
 
 describe('portal/no-money-arithmetic', () => {
-  it.each(['moneyPlus.ts', 'moneyNumber.ts', 'moneyCompare.ts', 'moneyTemplate.ts', 'moneyMath.ts', 'moneyUnary.ts', 'moneyPresence.ts'])('%s is reported', (name) => {
+  it.each(['moneyPlus.ts', 'moneyNumber.ts', 'moneyCompare.ts', 'moneyTemplate.ts', 'moneyMath.ts', 'moneyUnary.ts', 'moneyPresence.ts', 'moneyMapped.ts'])('%s is reported', (name) => {
     expect(rules(name)).toContain('portal/no-money-arithmetic');
   });
 

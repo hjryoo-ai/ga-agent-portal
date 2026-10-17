@@ -13,11 +13,14 @@ const ARITH = new Set(['+', '-', '*', '/', '%', '**', '<', '>', '<=', '>=', '=='
 const CONVERTERS = new Set(['Number', 'String', 'parseInt', 'parseFloat', 'BigInt']);
 const HANGUL = /[ᄀ-ᇿ㄰-㆏가-힣]/;
 
+// Won은 이름으로도, 구조로도 알아본다: openapi-fetch의 응답 타입(data)은 스키마를 매핑 타입으로 복사해 'Won'이라는 이름이 사라진다 —
+// 남는 것은 브랜드 속성(unique symbol wonBrand)이다. 이름만 보면 실제 API 응답의 금액을 놓친다(3단계 번들 스캔이 잡은 누락).
 function isWonType(type) {
   if (type.isUnion() || type.isIntersection()) return type.types.some(isWonType);
   const symbol = type.aliasSymbol ?? type.getSymbol();
-  if (!symbol || symbol.getName() !== 'Won') return false;
-  return (symbol.getDeclarations() ?? []).some((d) => d.getSourceFile().fileName.replaceAll('/', sep).endsWith(MONEY_FILE));
+  const fromMoneyFile = (s) => (s?.getDeclarations() ?? []).some((d) => d.getSourceFile().fileName.replaceAll('/', sep).endsWith(MONEY_FILE));
+  if (symbol && symbol.getName() === 'Won' && fromMoneyFile(symbol)) return true;
+  return type.getProperties().some((p) => String(p.escapedName).startsWith('__@wonBrand@') && fromMoneyFile(p));
 }
 
 const noMoneyArithmetic = {

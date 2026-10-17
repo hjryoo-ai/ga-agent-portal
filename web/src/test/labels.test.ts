@@ -2,7 +2,7 @@
 // (같은 코드로 기대값을 만들지 않는다).
 import { describe, expect, it } from 'vitest';
 import type { MonthStatus, NetBasis } from '../api/queries';
-import { ledgerLabel, monthLabel, netView, payoutLabel } from '../labels/labels';
+import { contractLabel, deferralLabel, ledgerLabel, monthLabel, netView, payoutLabel, receivableLabel } from '../labels/labels';
 
 type Expected = { show: string } | { hide: string };
 const NIGHTLY = '세후는 야간 산출 후 표시';
@@ -43,8 +43,12 @@ describe('status label table', () => {
     }
   });
 
-  it('ledger and payout facts have their own labels', () => {
+  it('ledger, payout, contract, deferral and receivable amounts have their own labels', () => {
     expect(ledgerLabel()).toBe('원장 기준');
     expect(payoutLabel()).toBe('지급완료');
+    expect(contractLabel()).toBe('계약 정보');
+    expect(deferralLabel('HELD')).toBe('보류');
+    expect(deferralLabel('RELEASED')).toBe('이번 달 지급 대상');
+    expect(receivableLabel('OPEN')).toBe('미상계');
   });
 });

@@ -51,8 +51,8 @@ export function useEarnings(from: string, to: string) {
   });
 }
 
-export function useMonth(ym: string) {
-  return useQuery({ queryKey: ['month', ym], queryFn: () => unwrap(api.GET('/api/v1/me/earnings/{ym}', { params: { path: { ym } } })) });
+export function useMonth(ym: string, enabled = true) {
+  return useQuery({ queryKey: ['month', ym], queryFn: () => unwrap(api.GET('/api/v1/me/earnings/{ym}', { params: { path: { ym } } })), enabled });
 }
 
 /** 그 달의 라인 전부(페이지를 total까지 이어 받는다) + 마지막 응답의 asOf·dataStatus. */

@@ -1,10 +1,10 @@
-// 생성 클라이언트(포털 Phase 4 C1): 화면의 모든 API 호출이 이 하나를 거친다. 같은 출처(/api) — baseUrl 없음, CORS 없음.
+// 생성 클라이언트(포털 Phase 4 C1): 화면의 모든 API 호출이 이 하나를 거친다. 같은 출처(/api — 기준 주소는 그 문서의 출처), CORS 없음.
 // 토큰은 메모리에서 꺼내 Authorization 헤더에만 싣는다(주소·본문·저장소 0). 304는 브라우저 HTTP 캐시가 처리한다(Phase 3 ETag).
 import createClient from 'openapi-fetch';
 import { currentToken } from '../boot/token';
 import type { paths } from '../gen/portal-api';
 
-export const api = createClient<paths>();
+export const api = createClient<paths>({ baseUrl: window.location.origin });
 
 api.use({
   onRequest({ request }) {

@@ -1,6 +1,6 @@
 // 상태 라벨 표(포털 Phase 4 계획 ⑤ — Phase 3 수용 심사 Q1·Q2): 문구는 messages.ko.json의 데이터, 여기서는 "어느 상태에 어느 문구"만 정한다.
-// 금액 컴포넌트(Amount)는 이 파일이 만든 StatusLabel 없이는 그릴 수 없다(C3) — 라벨을 만드는 함수는 아래 넷뿐이다.
-import type { MonthStatus, NetBasis } from '../api/queries';
+// 금액 컴포넌트(Amount)는 이 파일이 만든 StatusLabel 없이는 그릴 수 없다(C3) — 라벨을 만드는 함수는 이 파일의 export 함수뿐이다.
+import type { MonthStatus, NetBasis, Schemas } from '../api/queries';
 import { m } from '../messages';
 
 declare const statusLabelBrand: unique symbol;
@@ -18,6 +18,21 @@ export function monthLabel(status: MonthStatus): StatusLabel {
 /** 원장 금액(한도액·누적·잔여·삭감) — 사실 값. */
 export function ledgerLabel(): StatusLabel {
   return label(m.status.ledger);
+}
+
+/** 계약 사실(월납 보험료) — 엔진이 계약 이벤트로 준 값. */
+export function contractLabel(): StatusLabel {
+  return label(m.status.contract);
+}
+
+/** 분급 항목 금액 — 그 항목의 상태(예정·이번 달 지급 대상·보류·취소). */
+export function deferralLabel(status: Schemas['LineDetailResponse']['deferrals'][number]['status']): StatusLabel {
+  return label(m.enums.deferral[status]);
+}
+
+/** 환수 채권 금액 — 채권 상태(미상계·상계 중·종결·대손). */
+export function receivableLabel(status: NonNullable<Schemas['LineDetailResponse']['receivable']>['status']): StatusLabel {
+  return label(m.enums.receivable[status]);
 }
 
 /** 지급 런 확정값(지급액·채권 상계·이월 채권) — PAID 달에만 보인다. */
