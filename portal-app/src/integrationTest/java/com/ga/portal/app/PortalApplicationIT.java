@@ -8,7 +8,7 @@ import com.ga.portal.infra.testing.PostgresHarness;
 import com.ga.portal.ingest.apply.IngestApplier;
 import com.ga.portal.ingest.feed.FeedClient;
 import com.ga.portal.projection.Projector;
-import com.ga.portal.projection.RecordingProjector;
+import com.ga.portal.projection.ViewProjector;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -71,7 +71,7 @@ class PortalApplicationIT {
     @Test
     void ingestPartsAreWiredAndPollingIsOffByDefault() {
         assertThat(context.getBean(IngestApplier.class)).isNotNull();
-        assertThat(context.getBean(Projector.class)).isInstanceOf(RecordingProjector.class);
+        assertThat(context.getBean(Projector.class)).isInstanceOf(ViewProjector.class);
         assertThat(context.getBeanNamesForType(IngestScheduler.class)).isEmpty();
         assertThat(context.getBeanNamesForType(FeedClient.class)).isEmpty();
     }

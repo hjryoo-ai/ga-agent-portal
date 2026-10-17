@@ -25,10 +25,15 @@ class IngestTransitionsTest {
                 IngestTrigger.FEED_UNAVAILABLE, IngestState.RUNNING,
                 IngestTrigger.STOP_FAILED, IngestState.FAILED,
                 IngestTrigger.STOP_PAUSED, IngestState.PAUSED,
-                IngestTrigger.OPERATOR_PAUSE, IngestState.PAUSED));
-        EXPECTED.put(IngestState.FAILED, Map.of(IngestTrigger.OPERATOR_RESUME, IngestState.RUNNING));
-        EXPECTED.put(IngestState.PAUSED, Map.of(IngestTrigger.OPERATOR_RESUME, IngestState.RUNNING));
-        EXPECTED.put(IngestState.REBUILDING, Map.of());
+                IngestTrigger.OPERATOR_PAUSE, IngestState.PAUSED,
+                IngestTrigger.OPERATOR_REBUILD, IngestState.REBUILDING));
+        EXPECTED.put(IngestState.FAILED, Map.of(IngestTrigger.OPERATOR_RESUME, IngestState.RUNNING,
+                IngestTrigger.OPERATOR_REBUILD, IngestState.REBUILDING));
+        EXPECTED.put(IngestState.PAUSED, Map.of(IngestTrigger.OPERATOR_RESUME, IngestState.RUNNING,
+                IngestTrigger.OPERATOR_REBUILD, IngestState.REBUILDING));
+        // Phase 2 승인 Q10: 재구축 중에는 재생의 끝(성공·실패)만 받는다
+        EXPECTED.put(IngestState.REBUILDING, Map.of(IngestTrigger.REBUILD_SUCCEEDED, IngestState.RUNNING,
+                IngestTrigger.REBUILD_FAILED, IngestState.FAILED));
     }
 
     @ParameterizedTest
@@ -48,18 +53,24 @@ class IngestTransitionsTest {
     }
 
     @Test
-    void resumeIsRejectedWhileRunningAndEverythingIsRejectedWhileRebuilding() {
+    void resumeIsRejectedWhileRunningAndOnlyTheRebuildsEndIsAcceptedWhileRebuilding() {
         assertThat(IngestTransitions.next(IngestState.RUNNING, IngestTrigger.OPERATOR_RESUME)).isEmpty();
         assertThat(IngestTransitions.next(IngestState.FAILED, IngestTrigger.OPERATOR_PAUSE)).isEmpty();
         for (IngestTrigger t : IngestTrigger.values()) {
-            assertThat(IngestTransitions.next(IngestState.REBUILDING, t)).as(t.name()).isEmpty();
+            boolean end = t == IngestTrigger.REBUILD_SUCCEEDED || t == IngestTrigger.REBUILD_FAILED;
+            assertThat(IngestTransitions.next(IngestState.REBUILDING, t).isPresent()).as(t.name()).isEqualTo(end);
+        }
+        for (IngestState s : new IngestState[] {IngestState.RUNNING, IngestState.PAUSED, IngestState.FAILED}) {
+            assertThat(IngestTransitions.next(s, IngestTrigger.REBUILD_SUCCEEDED)).as("%s rebuild end without a rebuild", s).isEmpty();
+            assertThat(IngestTransitions.next(s, IngestTrigger.REBUILD_FAILED)).as("%s rebuild end without a rebuild", s).isEmpty();
         }
     }
 
-    /** 각 사유는 표가 허용하는 사건을 일으키고, 그 사건은 RUNNING에서 사유의 정지 상태로 간다. */
+    /** 각 사유는 표가 허용하는 사건을 일으키고, 그 사건은 RUNNING(재구축 실패는 REBUILDING)에서 사유의 정지 상태로 간다. */
     @ParameterizedTest
     @EnumSource(IngestErrorCode.class)
     void everyErrorCodeStopsARunningCursorInItsState(IngestErrorCode code) {
-        assertThat(IngestTransitions.next(IngestState.RUNNING, code.trigger())).contains(code.stopsAs());
+        IngestState from = code == IngestErrorCode.REBUILD_FAILED ? IngestState.REBUILDING : IngestState.RUNNING;
+        assertThat(IngestTransitions.next(from, code.trigger())).contains(code.stopsAs());
     }
 }

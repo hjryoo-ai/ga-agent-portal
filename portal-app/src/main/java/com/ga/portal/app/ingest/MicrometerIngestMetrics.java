@@ -5,14 +5,18 @@ import com.ga.portal.domain.IngestState;
 import com.ga.portal.ingest.apply.IngestMetrics;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 인제스트 지표(지시문 D-9, 설계서 §10) — 태그 {@code tenant}: {@code ingest_lag_seq}, {@code ingest_lag_seconds}, {@code ingest_state}
- * (상태별 0/1), {@code ingest_events_total{result}}, {@code ingest_feed_errors_total}. 대시보드·알림은 Phase 7.
+ * (상태별 0/1), {@code ingest_events_total{result}}, {@code ingest_feed_errors_total}, {@code projection_drift_total}(Phase 2 D-3),
+ * {@code ingest_rebuild_seconds{outcome}}(Phase 2 계획 ⑥).
+ * 대시보드·알림은 Phase 7.
  */
 final class MicrometerIngestMetrics implements IngestMetrics {
 
@@ -31,6 +35,16 @@ final class MicrometerIngestMetrics implements IngestMetrics {
     @Override
     public void feedError(TenantId tenant) {
         registry.counter("ingest_feed_errors_total", "tenant", tenant.value()).increment();
+    }
+
+    @Override
+    public void drift(TenantId tenant) {
+        registry.counter("projection_drift_total", "tenant", tenant.value()).increment();
+    }
+
+    @Override
+    public void rebuild(TenantId tenant, String outcome, Duration took) {
+        Timer.builder("ingest_rebuild_seconds").tag("tenant", tenant.value()).tag("outcome", outcome).register(registry).record(took);
     }
 
     @Override

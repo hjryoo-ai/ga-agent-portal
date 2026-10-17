@@ -57,6 +57,7 @@ testing {
                 implementation(project())
                 implementation(testFixtures(project(":portal-infra")))
                 implementation(testFixtures(project(":portal-ingest")))
+                implementation(testFixtures(project(":portal-projection")))
                 implementation(project(":portal-ingest"))
                 implementation(project(":portal-infra"))
                 implementation(project(":portal-domain"))
@@ -77,6 +78,9 @@ testing {
                     // 인제스트 IT: 계약 샘플과 시험 스트림(portal-ingest 시험 자원)을 읽는다
                     inputs.dir(rootProject.layout.projectDirectory.dir("contracts/events/v1/samples")).withPathSensitivity(PathSensitivity.RELATIVE)
                     inputs.dir(rootProject.layout.projectDirectory.dir("portal-ingest/src/test/resources/streams")).withPathSensitivity(PathSensitivity.RELATIVE)
+                    // 프로젝션 IT(Phase 2): 골든 스트림·골든 뷰(portal-projection 시험 자원 — 시험 픽스처 GoldenViews·Envelopes가 읽는다)
+                    inputs.dir(rootProject.layout.projectDirectory.dir("portal-projection/src/test/resources/golden-streams")).withPathSensitivity(PathSensitivity.RELATIVE)
+                    inputs.dir(rootProject.layout.projectDirectory.dir("portal-projection/src/test/resources/golden-views")).withPathSensitivity(PathSensitivity.RELATIVE)
                 }
             }
         }

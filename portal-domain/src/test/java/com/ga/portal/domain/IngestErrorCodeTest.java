@@ -16,12 +16,13 @@ class IngestErrorCodeTest {
     void vocabularyAndStopStatesFollowDesign61() {
         assertThat(Arrays.stream(IngestErrorCode.values()).filter(c -> c.stopsAs() == IngestState.FAILED).map(Enum::name))
                 .containsExactlyInAnyOrder("SEQ_GAP", "TENANT_MISMATCH", "AFTER_BEYOND_HEAD", "SCHEMA_VIOLATION", "TYPE_KIND_MISMATCH",
-                        "HASH_MISMATCH", "EVENT_SEQ_CONFLICT", "PAST_SEQ_NEW_EVENT", "PROJECTOR_ERROR", "APPLY_ERROR");
+                        "HASH_MISMATCH", "EVENT_SEQ_CONFLICT", "PAST_SEQ_NEW_EVENT", "PROJECTOR_ERROR", "REBUILD_FAILED", "APPLY_ERROR");
         assertThat(Arrays.stream(IngestErrorCode.values()).filter(c -> c.stopsAs() == IngestState.PAUSED).map(Enum::name))
                 .containsExactlyInAnyOrder("UNSUPPORTED_VERSION", "FEED_UNAUTHORIZED", "TOKEN_MISSING", "OPERATOR_PAUSE");
         assertThat(IngestErrorCode.OPERATOR_PAUSE.trigger()).isEqualTo(IngestTrigger.OPERATOR_PAUSE);
         assertThat(IngestErrorCode.SEQ_GAP.trigger()).isEqualTo(IngestTrigger.STOP_FAILED);
         assertThat(IngestErrorCode.TOKEN_MISSING.trigger()).isEqualTo(IngestTrigger.STOP_PAUSED);
+        assertThat(IngestErrorCode.REBUILD_FAILED.trigger()).isEqualTo(IngestTrigger.REBUILD_FAILED);
     }
 
     @ParameterizedTest

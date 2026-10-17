@@ -11,12 +11,12 @@ import java.util.Optional;
 
 /**
  * {@code cli} 프로파일의 진입: {@code ingest status [--tenant=T]}, {@code ingest resume --tenant=T --from-seq=n},
- * {@code ingest pause --tenant=T}, 공통 {@code --actor=A}(없으면 OS 사용자 {@code user.name}, 둘 다 없거나 형식 밖이면 거부 — 감사할 행위자가 없다).
- * 결과는 표준 출력과 종료 코드(0 성공, 2 거부, 64 사용법).
+ * {@code ingest pause --tenant=T}, {@code ingest rebuild --tenant=T}, 공통 {@code --actor=A}(없으면 OS 사용자 {@code user.name}, 둘 다 없거나 형식 밖이면 거부 — 감사할 행위자가 없다).
+ * 결과는 표준 출력과 종료 코드(0 성공, 1 재구축 실패, 2 거부, 64 사용법).
  */
 public final class IngestCliRunner implements ApplicationRunner, ExitCodeGenerator {
 
-    static final String USAGE = "usage: ingest status [--tenant=T] | ingest resume --tenant=T --from-seq=n | ingest pause --tenant=T  [--actor=A]";
+    static final String USAGE = "usage: ingest status [--tenant=T] | ingest resume --tenant=T --from-seq=n | ingest pause --tenant=T | ingest rebuild --tenant=T  [--actor=A]";
 
     private final IngestCommands commands;
     private final PrintStream out;
@@ -50,6 +50,7 @@ public final class IngestCliRunner implements ApplicationRunner, ExitCodeGenerat
                 case "resume" -> commands.resume(TenantId.of(tenant.orElseThrow(() -> new IllegalArgumentException("--tenant"))),
                         Long.parseLong(fromSeq.orElseThrow(() -> new IllegalArgumentException("--from-seq"))), subject.get());
                 case "pause" -> commands.pause(TenantId.of(tenant.orElseThrow(() -> new IllegalArgumentException("--tenant"))), subject.get());
+                case "rebuild" -> commands.rebuild(TenantId.of(tenant.orElseThrow(() -> new IllegalArgumentException("--tenant"))), subject.get());
                 default -> new IngestCommands.Outcome(64, List.of(USAGE));
             };
         } catch (IllegalArgumentException e) {

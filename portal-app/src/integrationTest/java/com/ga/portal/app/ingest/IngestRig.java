@@ -9,6 +9,7 @@ import com.ga.portal.infra.persistence.IngestCursorRepository;
 import com.ga.portal.infra.persistence.IngestEventRepository;
 import com.ga.portal.infra.persistence.IngestLockRepository;
 import com.ga.portal.infra.persistence.TenantRepository;
+import com.ga.portal.infra.persistence.ViewResetRepository;
 import com.ga.portal.infra.testing.PostgresHarness;
 import com.ga.portal.ingest.ContractSchemas;
 import com.ga.portal.ingest.EnvelopeValidator;
@@ -16,6 +17,7 @@ import com.ga.portal.ingest.apply.IngestApplier;
 import com.ga.portal.ingest.apply.IngestLock;
 import com.ga.portal.ingest.apply.IngestMetrics;
 import com.ga.portal.ingest.apply.IngestWorker;
+import com.ga.portal.ingest.apply.Rebuilder;
 import com.ga.portal.ingest.feed.FeedClient;
 import com.ga.portal.projection.Projector;
 
@@ -67,6 +69,12 @@ final class IngestRig {
 
     IngestWorker worker(FeedClient feed, IngestApplier applier, int limit) {
         return new IngestWorker(feed, store, transactions, applier, IngestMetrics.NONE, CLOCK, limit);
+    }
+
+    /** 재구축기 — 뷰 삭제·불변식은 실제 저장소, 피드·프로젝터·페이지 크기·상한은 시험이 고른다. */
+    Rebuilder rebuilder(FeedClient feed, Projector projector, int pageLimit, long maxEvents) {
+        return new Rebuilder(new EnvelopeValidator(ContractSchemas.get()), store, transactions, lock, projector,
+                new JdbcViewReset(new ViewResetRepository(gateway)), feed, CLOCK, pageLimit, maxEvents);
     }
 
     /**

@@ -72,6 +72,9 @@ public final class IngestWorker {
             if (r.outcome() == IngestApplier.Outcome.APPLIED) {
                 applied++;
                 metrics.event(tenant, "applied");
+                if (r.drift()) {
+                    metrics.drift(tenant);
+                }
             } else if (r.outcome() == IngestApplier.Outcome.SKIPPED) {
                 skipped++;
                 metrics.event(tenant, "skipped");

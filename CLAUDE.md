@@ -34,6 +34,16 @@
 - 갭은 건너뛰지 않는다(건너뛰기는 재구축으로만). `ingest_cursor.error`와 로그에 payload 값·서비스 토큰·DB 오류 메시지를 쓰지 않는다(seq·eventId·스키마 위치·키워드·예외 이름만).
 - 계약 스키마는 클래스패스 사본에서만 읽는다(원격 조회 0) — type ↔ kind 짝·지원 최대 version은 스키마에서 읽고 코드에 적지 않는다.
 
+## 프로젝션 규약 (포털 Phase 2 — 설계서 §4.2·§5·§6.2·§6.6·§6.7)
+- **각 이벤트는 자기 테이블만 닫는다.** 전기는 라인을, 분급 전이는 원 라인을 요구하지 않는다 — 이벤트 순서(엔진은 `계산·계산·전기·전기`)에 기대지 않고 `calcId`·`ledgerId`·`scheduleId`로 잇는다. 범위는 그 이벤트가 건드린 키뿐(월 합산은 그 `(agent, closeYm)` 집계 한 번 — 전수 검증은 재구축 끝에서만).
+- **불변 사실**(`CommissionCalculated`·`AdjustmentPosted`(`ADJ:` 접두 키)·`LimitLedgerOpened`·`DeferralScheduled`)은 두 번째가 독 `DUPLICATE_KEY`, **상태 사실**은 엔진 전이 표 그대로 upsert. 표 밖 전이·저장 상태와 다른 `from`은 독 `STATE_MISMATCH`.
+- **합산은 정수 합뿐**: `gross` = Σ comm_type ∉ {CLAWBACK, ADJUSTMENT}, `clawback_offset` = Σ CLAWBACK, `adjustment` = Σ ADJUSTMENT(전 상태). 세후·지급 확정값·`limit_multiple`·`accumAfter`는 엔진 값을 그대로 담는다(곱하지 않는다, 숫자로 바꾸지 않는다).
+- **마감월(`CONFIRMED`·`PAID`)에 새 라인은 독** `CLOSED_MONTH` — 정정은 `AdjustmentPosted`로만. 원장은 엔진 규칙(양수 전기 뒤 `≤ limit`, 모든 전기 뒤 누적 ≥ 0, 순번 연속, 재산정은 `oldLimit` 대조만 — DD-8).
+- **대사 불일치는 독이 아니다**: 그 달 `DRIFT` + `recon_result(EVENT, seq)` 한 행(`ON CONFLICT DO NOTHING`) + `projection_drift_total`. 인제스트는 계속된다.
+- 독의 detail은 `{사유} seq n eventId id {필드}` — 값을 쓰지 않는다. `basis.reason` 같은 엔진 자유 문자열은 저장하되 로그·오류에 옮기지 않는다.
+- **재구축**은 트랜잭션 셋(txA `REBUILDING` 커밋 → txB 뷰 삭제·재생·불변식·`RUNNING`을 한 트랜잭션 → 실패면 txC `FAILED(REBUILD_FAILED)`). 재생은 적용기와 같은 판정(`EventCheck`)을 쓰고 첫 페이지 `headSeq`까지만. `ingest_event`·`recon_result`·감사·사용자 데이터는 지우지 않는다.
+- 결정론: 같은 스트림 → 뷰 9표·`ingest_event`·`ingest_cursor` 바이트 동일(고정 `Clock`) — 한 번에·재시작·재구축 모두. 골든 뷰는 `-Pgolden.update=true`로 쓰고 **손으로 검산한 뒤** 커밋한다.
+
 ## 작업 방식
 - Phase 단위: 계획 → 승인 → 단계 커밋(테스트와 같은 커밋) → 보고서 → 태그 → PR. 지시문의 완료 기준(C-n)을 전부 테스트로 증명해야 다음 Phase로 간다.
 - 테스트 없는 기능 코드 커밋 금지. 통합 테스트는 Testcontainers(PostgreSQL, digest 고정). Docker가 없으면 통합 테스트는 **실패**해야 한다(스킵 금지).

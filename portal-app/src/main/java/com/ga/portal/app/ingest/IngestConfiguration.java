@@ -10,8 +10,19 @@ import com.ga.portal.ingest.apply.IngestLock;
 import com.ga.portal.ingest.apply.IngestMetrics;
 import com.ga.portal.ingest.apply.IngestStore;
 import com.ga.portal.ingest.apply.TenantTransactions;
+import com.ga.portal.infra.persistence.AgentProfileRepository;
+import com.ga.portal.infra.persistence.ClawbackItemRepository;
+import com.ga.portal.infra.persistence.DeferralItemRepository;
+import com.ga.portal.infra.persistence.EarningsLineRepository;
+import com.ga.portal.infra.persistence.EarningsMonthRepository;
+import com.ga.portal.infra.persistence.PolicyFlagRepository;
+import com.ga.portal.infra.persistence.PolicyLimitRepository;
+import com.ga.portal.infra.persistence.ReconResultRepository;
+import com.ga.portal.projection.NoopNotificationDeriver;
+import com.ga.portal.projection.NotificationDeriver;
 import com.ga.portal.projection.Projector;
-import com.ga.portal.projection.RecordingProjector;
+import com.ga.portal.projection.ViewProjector;
+import com.ga.portal.projection.view.ViewStore;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -51,8 +62,21 @@ public class IngestConfiguration {
     }
 
     @Bean
-    Projector projector() {
-        return new RecordingProjector();
+    ViewStore viewStore(AgentProfileRepository agents, EarningsLineRepository lines, EarningsMonthRepository months, PolicyLimitRepository limits,
+                        DeferralItemRepository deferrals, ClawbackItemRepository receivables, PolicyFlagRepository flags, ReconResultRepository recon) {
+        return new JdbcViewStore(agents, lines, months, limits, deferrals, receivables, flags, recon);
+    }
+
+    /** Phase 2: 뷰 프로젝터(Phase 1의 기록 프로젝터는 시험 픽스처로 옮겼다). */
+    @Bean
+    Projector projector(ViewStore store) {
+        return new ViewProjector(store);
+    }
+
+    /** 알림 파생 — Phase 6까지 no-op(지시문 D-15). */
+    @Bean
+    NotificationDeriver notificationDeriver() {
+        return new NoopNotificationDeriver();
     }
 
     @Bean
@@ -62,7 +86,7 @@ public class IngestConfiguration {
 
     @Bean
     IngestApplier ingestApplier(EnvelopeValidator validator, IngestStore store, TenantTransactions transactions, IngestLock lock,
-                                Projector projector, Clock clock) {
-        return new IngestApplier(validator, store, transactions, lock, projector, clock);
+                                Projector projector, NotificationDeriver notifications, Clock clock) {
+        return new IngestApplier(validator, store, transactions, lock, projector, notifications, clock);
     }
 }
