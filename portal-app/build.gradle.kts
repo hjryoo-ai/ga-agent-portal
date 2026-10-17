@@ -102,3 +102,8 @@ testing {
 tasks.named("check") {
     dependsOn(testing.suites.named("archTest"), testing.suites.named("integrationTest"))
 }
+
+// AuthzMatrixTest(Phase 3 C5)가 인가 매트릭스 정본을 읽는다(verifyTestInputs)
+tasks.test {
+    inputs.file(rootProject.layout.projectDirectory.file("docs/authz-matrix.md")).withPathSensitivity(PathSensitivity.RELATIVE)
+}

@@ -19,12 +19,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class CachingIT extends ApiIntegrationTest {
 
+    /**
+     * T2의 커서 전체를 이 시험이 정한다 — 같은 JVM의 폴링 시험({@code IngestPollingIT})이 그 사이 모든 테넌트를 돌며 T2의 커서를 {@code seq 0}으로 만들어 둘 수
+     * 있다(전 컬럼 덮어쓰기 — 일부만 고치면 순서에 따라 결과가 달라진다).
+     */
     @BeforeAll
     static void cursor() {
         DB.seed(T2.value(), c -> SeedData.exec(c, """
-                INSERT INTO ingest_cursor (tenant_id, last_seq, state, updated_at, caught_up_at)
-                VALUES (?, 40, 'RUNNING', TIMESTAMPTZ '2026-10-17 00:00:00+00', ?)
-                ON CONFLICT (tenant_id) DO UPDATE SET caught_up_at = EXCLUDED.caught_up_at
+                INSERT INTO ingest_cursor (tenant_id, last_seq, state, updated_at, caught_up_at, error)
+                VALUES (?, 40, 'RUNNING', TIMESTAMPTZ '2026-10-17 00:00:00+00', ?, NULL)
+                ON CONFLICT (tenant_id) DO UPDATE SET last_seq = EXCLUDED.last_seq, last_event_id = NULL, state = EXCLUDED.state,
+                    updated_at = EXCLUDED.updated_at, caught_up_at = EXCLUDED.caught_up_at, error = NULL
                 """, T2.value(), OffsetDateTime.ofInstant(Instant.now(), ZoneOffset.UTC)));
     }
 

@@ -135,15 +135,15 @@ class ArchitectureRulesTest {
                 .check(classes);
     }
 
-    // (b) Spring·DB 무의존: portal-domain·portal-projection, 그리고 그 둘이 기대는 platform-core(의존성 그래프로 확인).
-    //     domain·projection이 의존할 수 있는 플랫폼 모듈은 platform-core뿐이다.
+    // (b) Spring·DB 무의존: portal-domain·portal-projection·portal-query(Phase 3 계획 F7), 그리고 그것들이 기대는 platform-core(의존성 그래프로 확인).
+    //     이 모듈들이 의존할 수 있는 플랫폼 모듈은 platform-core뿐이다.
     @Test
     void springAndDbFreeModules() {
-        ArchRules.springFreeModules(List.of(P + "domain..", P + "projection..", "com.ga.platform.core.."), List.of()).check(classes);
-        noClasses().that().resideInAnyPackage(P + "domain..", P + "projection..")
+        ArchRules.springFreeModules(List.of(P + "domain..", P + "projection..", P + "query..", "com.ga.platform.core.."), List.of()).check(classes);
+        noClasses().that().resideInAnyPackage(P + "domain..", P + "projection..", P + "query..")
                 .should().dependOnClassesThat().resideInAnyPackage("org.flywaydb..", "com.ga.platform.spring..", "com.ga.platform.canonical..")
                 .allowEmptyShould(true)
-                .as("portal-domain·portal-projection depend only on platform-core (no Flyway, platform-spring, platform-canonical)")
+                .as("portal-domain·portal-projection·portal-query depend only on platform-core (no Flyway, platform-spring, platform-canonical)")
                 .check(classes);
     }
 

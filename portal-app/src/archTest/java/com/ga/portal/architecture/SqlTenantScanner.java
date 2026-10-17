@@ -79,6 +79,52 @@ final class SqlTenantScanner {
         return out;
     }
 
+    /** 스크립트들의 CREATE TABLE 중 {@code column} 열을 가진 표(포털 Phase 3 — 두 번째 술어의 대상 표: {@code agent_id}). */
+    static Set<String> tablesWithColumn(List<String> scripts, String column) {
+        Pattern col = Pattern.compile("\\b" + column + "\\b");
+        Set<String> tables = new LinkedHashSet<>();
+        for (String script : scripts) {
+            for (String statement : statementsOf(script)) {
+                Matcher m = CREATE_TABLE.matcher(statement);
+                if (m.find() && col.matcher(statement.substring(m.end())).find()) {
+                    tables.add(m.group(1));
+                }
+            }
+        }
+        return tables;
+    }
+
+    private static final Pattern AGENT_PREDICATE = Pattern.compile("\\bagent_id\\s*=\\s*:agentid\\b");
+
+    /**
+     * 두 번째 술어(포털 Phase 3 지시문 D-4): 문장의 {@code FROM}/{@code JOIN} 참조 중 {@code agentTables}에 드는 것의 수 ≤ {@code agent_id = :agentId}의 수.
+     * 조인·부분 질의의 표마다 설계사 술어가 있어야 한다는 보수적 근사다(술어가 어느 표에 붙었는지는 보지 않는다 — 그래서 수로 센다). 설계사 표를 하나도 읽지 않는
+     * 문장도 위반이다(이 저장소는 설계사 데이터만 읽는다).
+     */
+    static List<Violation> scanAgentPredicate(String source, String sql, Set<String> agentTables) {
+        List<Violation> out = new ArrayList<>();
+        for (String statement : statementsOf(sql)) {
+            int references = 0;
+            Matcher m = FROM_JOIN.matcher(statement);
+            while (m.find()) {
+                if (agentTables.contains(m.group(1))) {
+                    references++;
+                }
+            }
+            int predicates = 0;
+            Matcher a = AGENT_PREDICATE.matcher(statement);
+            while (a.find()) {
+                predicates++;
+            }
+            if (references == 0) {
+                out.add(new Violation(source, statement, "agent-scoped repository statement reads no agent table"));
+            } else if (predicates < references) {
+                out.add(new Violation(source, statement, references + " agent table references but " + predicates + " agent_id = :agentId predicates"));
+            }
+        }
+        return out;
+    }
+
     /** 주석 제거·리터럴 비우기·달러 본문 분리 후 {@code ;} 단위 문장(소문자, 공백 정규화). 달러 본문의 문장도 포함한다. */
     static List<String> statementsOf(String sql) {
         List<String> bodies = new ArrayList<>();

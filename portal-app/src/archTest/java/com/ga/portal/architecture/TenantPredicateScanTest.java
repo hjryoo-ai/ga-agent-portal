@@ -124,6 +124,67 @@ class TenantPredicateScanTest {
                 .containsExactly("portal-infra/src/main/java/com/ga/portal/infra/directory/IssuerDirectoryReader.java");
     }
 
+    // ------------------------------------------------------------------ 두 번째 술어(포털 Phase 3 지시문 D-4)
+
+    /**
+     * 조회 API 저장소 — 닫힌 목록(저장소 상대 경로). 이 파일들의 <b>모든</b> 문장은 설계사 표 참조마다 {@code agent_id = :agentId}를 가진다. 허용 목록은
+     * 비어 있다({@link #AGENT_ALLOWLIST}).
+     */
+    static final List<String> AGENT_SCOPED_SOURCES = List.of("portal-infra/src/main/java/com/ga/portal/infra/persistence/AgentQueryRepository.java");
+
+    /** 두 번째 술어의 허용 목록(파일, 문장, 사유) — 비어 있다. */
+    static final List<AllowedStatement> AGENT_ALLOWLIST = List.of();
+
+    private static Set<String> agentTables() {
+        return SqlTenantScanner.tablesWithColumn(sqlFiles.stream().map(TenantPredicateScanTest::read).toList(), "agent_id");
+    }
+
+    @Test
+    void everyAgentScopedStatementHasAnAgentPredicatePerAgentTable() {
+        Set<String> agentTables = agentTables();
+        assertThat(agentTables).contains("earnings_line", "earnings_month", "policy_limit", "policy_flag", "deferral_item", "clawback_item",
+                "agent_profile").doesNotContain("policy_limit_history", "tenant", "ingest_cursor");
+        List<SqlTenantScanner.Violation> violations = new ArrayList<>();
+        int statements = 0;
+        for (String source : AGENT_SCOPED_SOURCES) {
+            Path file = ROOT.resolve(source);
+            assertThat(file).as("agent-scoped source exists").isRegularFile();
+            for (String literal : SqlTenantScanner.sqlLiteralsInJava(read(file))) {
+                statements++;
+                violations.addAll(SqlTenantScanner.scanAgentPredicate(source, literal, agentTables));
+            }
+        }
+        assertThat(statements).as("AgentQueryRepository statements (not vacuous)").isEqualTo(16);
+        assertThat(violations).as("agent-scoped statements without agent_id = :agentId per agent table (D-4)").isEmpty();
+        assertThat(AGENT_ALLOWLIST).as("second-predicate allowlist (Phase 3: empty)").isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "SELECT * FROM earnings_line WHERE tenant_id = :tenantId AND calc_id = :calcId",
+            "SELECT l.* FROM earnings_line l JOIN deferral_item d ON d.source_calc_id = l.calc_id WHERE l.tenant_id = :tenantId AND l.agent_id = :agentId",
+            "SELECT (SELECT min(r.calc_id) FROM earnings_line r WHERE r.tenant_id = :tenantId) FROM earnings_line l WHERE l.tenant_id = :tenantId AND l.agent_id = :agentId",
+            "SELECT * FROM earnings_line WHERE tenant_id = :tenantId AND agent_id = :other",
+            "SELECT * FROM earnings_line WHERE tenant_id = :tenantId AND agent_id IS NOT NULL",
+            "SELECT h.* FROM policy_limit_history h WHERE h.tenant_id = :tenantId AND h.ledger_id = :ledgerId",
+    })
+    void theSecondPredicateFlagsMissingAgentPredicates(String sql) {
+        Set<String> agentTables = Set.of("earnings_line", "deferral_item", "policy_limit");
+        assertThat(SqlTenantScanner.scanAgentPredicate("inline", sql, agentTables)).as(sql).isNotEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "SELECT * FROM earnings_line WHERE tenant_id = :tenantId AND agent_id = :agentId AND calc_id = :calcId",
+            "SELECT (SELECT min(r.calc_id) FROM earnings_line r WHERE r.tenant_id = :tenantId AND r.agent_id = :agentId) FROM earnings_line l "
+                    + "WHERE l.tenant_id = :tenantId AND l.agent_id = :agentId",
+            "SELECT h.* FROM policy_limit_history h JOIN policy_limit p ON p.ledger_id = h.ledger_id WHERE h.tenant_id = :tenantId AND p.agent_id = :agentId",
+    })
+    void theSecondPredicateAcceptsOnePredicatePerAgentTable(String sql) {
+        Set<String> agentTables = Set.of("earnings_line", "deferral_item", "policy_limit");
+        assertThat(SqlTenantScanner.scanAgentPredicate("inline", sql, agentTables)).as(sql).isEmpty();
+    }
+
     // ------------------------------------------------------------------ 스캐너 자체의 음성·양성 시험(영구 보존)
 
     private static final Set<String> TABLES = Set.of("tenant", "earnings_line", "deferral_item", "ingest_cursor");
