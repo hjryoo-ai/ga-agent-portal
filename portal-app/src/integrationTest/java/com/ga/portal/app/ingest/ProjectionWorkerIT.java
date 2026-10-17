@@ -38,17 +38,17 @@ class ProjectionWorkerIT {
         TenantId t = TenantId.of(SeedData.uniqueTenant("CLOSED"));
         List<ObjectNode> stream = a1();
         ObjectNode late = stream.get(1).deepCopy();
-        late.put("seq", 11).put("eventId", "5eed0000-0000-4000-8000-0000000000c4");
+        late.put("seq", 12).put("eventId", "5eed0000-0000-4000-8000-0000000000c4");
         ((ObjectNode) late.path("aggregate")).put("id", "99");
         ((ObjectNode) late.path("payload")).put("calcId", "99");   // 202608은 seq 7에서 PAID
         stream.add(late);
         IngestWorker.Round round = rig.worker(ViewRig.feed(t, stream), rig.applier(ViewRig.projector(rig.gateway)), 200).runOnce(t);
-        assertThat(round.applied()).isEqualTo(10);
+        assertThat(round.applied()).isEqualTo(11);
         assertThat(round.stoppedBy()).hasValueSatisfying(r -> assertThat(r.code()).contains(IngestErrorCode.PROJECTOR_ERROR));
         assertThat(rig.cursor(t).state()).isEqualTo(IngestState.FAILED);
-        assertThat(rig.cursor(t).lastSeq()).isEqualTo(10);
-        assertThat(rig.cursor(t).error()).hasValueSatisfying(e -> assertThat(e).startsWith("PROJECTOR_ERROR: CLOSED_MONTH seq 11 eventId "));
-        assertThat(rig.events(t, "FAILED")).singleElement().satisfies(e -> assertThat(e.seq()).isEqualTo(11));
+        assertThat(rig.cursor(t).lastSeq()).isEqualTo(11);
+        assertThat(rig.cursor(t).error()).hasValueSatisfying(e -> assertThat(e).startsWith("PROJECTOR_ERROR: CLOSED_MONTH seq 12 eventId "));
+        assertThat(rig.events(t, "FAILED")).singleElement().satisfies(e -> assertThat(e.seq()).isEqualTo(12));
         GoldenViews.assertMatches("a1", ViewRig.views(t));   // 독 이벤트는 뷰에 흔적이 없다
     }
 
@@ -84,7 +84,7 @@ class ProjectionWorkerIT {
                 ViewRig.projector(rig.gateway), new NoopNotificationDeriver(), IngestRig.CLOCK);
         IngestWorker.Round round = new IngestWorker(ViewRig.feed(t, stream), rig.store, rig.transactions, applier, metrics, IngestRig.CLOCK, 200)
                 .runOnce(t);
-        assertThat(round.applied()).isEqualTo(10);
+        assertThat(round.applied()).isEqualTo(11);
         assertThat(round.stoppedBy()).isEmpty();
         assertThat(rig.cursor(t).state()).isEqualTo(IngestState.RUNNING);
         assertThat(drifts).hasValue(1);

@@ -14,6 +14,7 @@ dependencies {
     testImplementation(libs.json.schema.validator)
     testImplementation(libs.jackson.databind)
     testImplementation(libs.jackson.dataformat.yaml)
+    testImplementation(libs.snakeyaml)   // YAML 1.1 — ContractYamlParsersTest(계약 v1.4 N1)
 
     // 시험 픽스처(Phase 2): 인메모리 뷰 저장소(읽은 행 수 계수)·골든 뷰 비교·Envelope 읽기 — portal-app 통합 시험(ProjectionGoldenIT)도 쓴다
     testFixturesApi(project(":portal-projection"))

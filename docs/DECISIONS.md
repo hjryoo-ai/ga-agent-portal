@@ -155,3 +155,19 @@
 
 - `limit_multiple` → Phase 3 V5에서 `TEXT`(P2-4 해소). `AgentSnapshot.status` 닫기·A-1 둘째 판·엔진 잠정 명세 실 샘플·YAML `'no'` → 계약 v1.4(Phase 3 0단계, 심사 §3 N1~N6 — 선승인). `SYNC_DELAYED` 정의 → Phase 3 지시문(심사 Q7). 재생 중 알림은 파생하지 않는 방향(§14.1 #12), `REINSTATE` 열린 플래그 없음은 no-op 유지(§6.3).
 
+
+## 2026-10-17 — 계약 v1.4 (`docs/phase-02-수용심사.md` §3 — 심사가 선승인, Phase 3 0단계)
+
+### 설계서 결함 (설계서 v1.5.1 변경 이력에도)
+
+| # | 무엇 | 처리 |
+|---|---|---|
+| DD-11 | 계약 YAML이 YAML 1.1 해석기에서 뜻이 바뀌는 키를 썼다 — `fyCommissionByInstallment[].no`가 1.1(SnakeYAML·PyYAML·Jackson 2)에서 불리언 `false`가 되어, 엔진 시험 픽스처에서 모든 신계약 시뮬레이션 응답이 스키마 검증에 실패했다(엔진 E2 §9-6). 포털 시험은 Jackson 3(SnakeYAML Engine, 1.2)로만 읽어 드러나지 않았다. 설계 시 해석기 차이를 보지 않았다 | 키를 `'no'`로(N1). `ContractYamlParsersTest`: 계약 YAML 전부를 1.1·1.2 두 해석기로 읽어 타입까지 같은 트리인지, 따옴표 없는 1.1 불리언 철자(`y/n/yes/no/on/off` 대소문자 — `true`·`false` 밖)가 없는지, 그리고 두 해석기가 그 글자들에서 실제로 갈리는지(비교가 공허하지 않음) |
+
+### 해석
+
+| # | 심사 문구 | 구현 | 이유 |
+|---|---|---|---|
+| V14-1 | N5 "`contract-only/07-StatementEstimated` → 둘째 판 마지막 줄(실 샘플)" | 파일을 **지웠다** — 실 샘플은 `a1/` seq 11 그 자체 | 같은 줄을 `contract-only/`에 복사하면 정규 스트림(`Samples.all()`)에 같은 eventId가 두 seq로 들어가 `EVENT_SEQ_CONFLICT`가 된다. `contract-only/`의 뜻("엔진이 내지 않는 형태")에도 맞지 않는다. 13종 덮기(Phase 0 C7)는 a1 seq 11이 맡는다 |
+| V14-2 | N5 "`golden-streams/engine-e2-estimate-*/`" | 디렉터리 하나 `golden-streams/engine-e2-estimate/`에 엔진 파일 이름 그대로 다섯, 골든 뷰는 `golden-views/engine-e2-estimate/<파일 이름>/` | 출처 경로와 이름이 같아야 바이트 대조·추적이 쉽다 |
+| V14-3 | N4 "골든 뷰 `a1` 재생성(202702 `ESTIMATED` 행 추가)" | 행이 늘지 않고 202702 행이 `PROVISIONAL` → `ESTIMATED`로 바뀐다(세액 0·순액 0·`net_basis ESTIMATE`·`estimate_basis_seq` 10) | 202702 행은 seq 9(환수 라인)에서 이미 있다. 잠정 명세의 `receivableOffset`·`carriedReceivable`(720,000)·`payable`은 지급 런 열에 넣지 않는다(Phase 2 계획 ② `StatementEstimated` — 예상 합계·이월은 쓰지 않음) — 화면에 예상 이월을 보일지는 Phase 4 질문 |

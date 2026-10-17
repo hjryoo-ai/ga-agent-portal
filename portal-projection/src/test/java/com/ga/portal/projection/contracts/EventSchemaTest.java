@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * C7(지시문 v1.2 §5): 포털 계약(contracts/events/v1·api/v1)과 공유 핵심 사본(contracts/shared/ga-disclosure).
  * <ul>
- *   <li>샘플 17건(v1.3 — 엔진 A-1 스트림 10줄 + 단건 7)이 13종을 덮고 전부 통과, 필수 필드를 하나씩 뺀 변형은 전부 실패.</li>
+ *   <li>샘플 17건(v1.4 — 엔진 A-1 스트림 11줄 + 단건 6)이 13종을 덮고 전부 통과, 필수 필드를 하나씩 뺀 변형은 전부 실패.</li>
  *   <li>포털 Envelope ⊇ 핵심: 핵심이 거부하는 변형을 포털 Envelope도 거부하고, 포털 Envelope의 allOf 첫 항이 사본을 가리킨다.</li>
  *   <li>type ↔ payload, type ↔ aggregate.kind 짝(Q4·Q5), 열거 밖 type·version은 거부(else: false), 모르는 필드는 허용(§4.5).</li>
  *   <li>요율·배수는 소수 문자열(Q3) — JSON number는 거부. contracts/ 전 파일 format 0. OpenAPI 피드의 정수 커서 규약.</li>
@@ -109,13 +109,13 @@ class EventSchemaTest {
         return (ObjectNode) JSON.readTree(readString(file));
     }
 
-    /** 샘플 하나 — 이름은 단건 파일 이름 또는 {@code a1#<seq>}(엔진 A-1 스트림 {@code a1/a1_portal_150000.jsonl}의 그 seq 줄). */
+    /** 샘플 하나 — 이름은 단건 파일 이름 또는 {@code a1#<seq>}(엔진 A-1 스트림 {@code a1/a1_portal_150000_e2.jsonl}의 그 seq 줄). */
     record Sample(String name, ObjectNode doc) {
     }
 
-    private static final Path A1_STREAM = CONTRACTS.resolve("events/v1/samples/a1/a1_portal_150000.jsonl");
+    private static final Path A1_STREAM = CONTRACTS.resolve("events/v1/samples/a1/a1_portal_150000_e2.jsonl");
 
-    /** 샘플 전부(v1.3): 엔진 A-1 스트림 10줄(파일 순서) 뒤에 {@code contract-only/}·{@code standalone/}의 단건 7개(파일 이름 순). */
+    /** 샘플 전부(v1.4): 엔진 A-1 스트림 11줄(파일 순서) 뒤에 {@code contract-only/}·{@code standalone/}의 단건 6개(파일 이름 순). */
     static List<Sample> samples() {
         List<Sample> out = new ArrayList<>();
         for (String line : readString(A1_STREAM).split("\n")) {
@@ -190,16 +190,16 @@ class EventSchemaTest {
     }
 
     /**
-     * M5(v1.2)·v1.3: {@code a1/}는 엔진 E2 ⓪a가 낸 A-1 스트림 파일 하나(바이트 그대로 — SHA-256 고정),
-     * {@code contract-only/}는 엔진이 내지 않는 형태(StatementEstimated — E2 뒤 교체, LIMIT_DEFER 스케줄과 그 취소),
+     * M5(v1.2)·v1.3·v1.4: {@code a1/}는 엔진 E2 ⓪가 낸 A-1 스트림 둘째 판 하나(바이트 그대로 — SHA-256 고정, 첫 판이 앞부분),
+     * {@code contract-only/}는 엔진이 내지 않는 형태(LIMIT_DEFER 스케줄과 그 취소 — StatementEstimated는 v1.4에서 a1 seq 11의 실 샘플로),
      * {@code standalone/}은 엔진이 내지만 A-1 밖인 단건 예시.
      */
     @Test
     void samplesAreSplitIntoTheEngineA1TheContractOnlyAndTheStandaloneDirectories() {
-        assertThat(namesIn("a1")).containsExactly("a1_portal_150000.jsonl");
-        // 엔진 ga-commission-engine@a124621855ee142454b82af02cc066c563e51a7f commission-outbox/src/test/resources/outbox-golden/a1_portal_150000.jsonl
-        assertThat(sha256(A1_STREAM)).isEqualTo("25929e7f9908227cd943f75da02b5e0313483a1e05731d785cbbe66477abe718");
-        assertThat(namesIn("contract-only")).containsExactly("06-DeferralScheduled.json", "07-StatementEstimated.json", "13-DeferralStatusChanged.json");
+        assertThat(namesIn("a1")).containsExactly("a1_portal_150000_e2.jsonl");
+        // 엔진 ga-commission-engine@b6b65df(e2 = 4680ee1) commission-outbox/src/test/resources/outbox-golden/a1_portal_150000_e2.jsonl
+        assertThat(sha256(A1_STREAM)).isEqualTo("e9a03d37c513e591e7623d95bce6bc49ef2269e3c1f1336d369be2cc1eeb751a");
+        assertThat(namesIn("contract-only")).containsExactly("06-DeferralScheduled.json", "13-DeferralStatusChanged.json");
         assertThat(namesIn("standalone")).containsExactly("14-ClawbackReceivableUpdated.json", "15-AdjustmentPosted.json",
                 "16-AgentSnapshot.json", "17-LimitLedgerRebased.json");
         try (Stream<Path> top = Files.list(CONTRACTS.resolve("events/v1/samples"))) {
@@ -225,6 +225,23 @@ class EventSchemaTest {
         JsonNode agent = sample("16-AgentSnapshot.json").path("payload");
         assertThat(agent.has("role")).isFalse();
         assertThat(agent.has("nameMasked")).isFalse();
+    }
+
+    /** N6(v1.4 — 좁힘): {@code AgentSnapshot.status}는 엔진 어휘({@code AgentSnapshotPublisher}) {@code ACTIVE}/{@code DISMISSED}로 닫힌 열거. */
+    @Test
+    void agentSnapshotStatusIsTheEnginesClosedVocabulary() {
+        assertThat(payloadSchema("AgentSnapshot").path("properties").path("status").path("enum")).extracting(JsonNode::asString)
+                .containsExactly("ACTIVE", "DISMISSED");
+        for (String status : List.of("ACTIVE", "DISMISSED")) {
+            ObjectNode doc = sample("16-AgentSnapshot.json");
+            ((ObjectNode) doc.path("payload")).put("status", status);
+            assertThat(schema(ENVELOPE).validate(doc)).as(status).isEmpty();
+        }
+        for (String status : List.of("RETIRED", "active", "")) {
+            ObjectNode doc = sample("16-AgentSnapshot.json");
+            ((ObjectNode) doc.path("payload")).put("status", status);
+            assertThat(schema(ENVELOPE).validate(doc)).as("status %s", status).isNotEmpty();
+        }
     }
 
     /** M2·M3(v1.2 — 좁힘): 분급 전이 사유·채권 상태는 엔진 어휘로 닫힌 열거, 채권 금액은 0 이상. */
@@ -397,7 +414,7 @@ class EventSchemaTest {
 
     @Test
     void statementAndPayoutAggregateIdsAreAgentColonYm() {
-        for (String file : List.of("07-StatementEstimated.json", "a1#6", "a1#7")) {
+        for (String file : List.of("a1#11", "a1#6", "a1#7")) {
             ObjectNode doc = sample(file);
             String agent = doc.path("payload").path("agentId").asString();
             assertThat(doc.path("aggregate").path("id").asString()).isEqualTo(agent + ":" + doc.path("payload").path("closeYm").asString());
@@ -596,7 +613,7 @@ class EventSchemaTest {
                 .contains("shared/ga-disclosure/events/v1/envelope-core.schema.json", "events/v1/envelope.schema.json",
                         "events/v1/defs.schema.json", "events/v1/payloads/CommissionCalculated.v1.schema.json",
                         "api/v1/engine-internal.openapi.yaml")
-                .hasSize(1 + 2 + 13 + (1 + 7) + 1);   // 샘플: A-1 스트림 하나 + 단건 7(v1.3)
+                .hasSize(1 + 2 + 13 + (1 + 6) + 1);   // 샘플: A-1 스트림 하나 + 단건 6(v1.4 — 07은 a1 seq 11의 실 샘플로)
         assertThat(found).isEmpty();
     }
 

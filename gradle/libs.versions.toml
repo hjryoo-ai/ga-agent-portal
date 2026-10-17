@@ -32,6 +32,8 @@ junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher
 assertj-core = { module = "org.assertj:assertj-core" }
 jackson-databind = { module = "tools.jackson.core:jackson-databind" }
 jackson-dataformat-yaml = { module = "tools.jackson.dataformat:jackson-dataformat-yaml" }
+# YAML 1.1 해석기(BOM 관리) — 계약 YAML을 1.1·1.2 두 해석기로 읽어 같은지 보는 시험만(계약 v1.4 N1)
+snakeyaml = { module = "org.yaml:snakeyaml" }
 postgresql = { module = "org.postgresql:postgresql" }
 flyway-core = { module = "org.flywaydb:flyway-core" }
 flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql" }

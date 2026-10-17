@@ -56,7 +56,7 @@ class RebuildIT {
         return commands(t, feed, projector(), 50_000);
     }
 
-    /** 스트림을 끝까지 적용한 테넌트(커서 RUNNING·last_seq 10). */
+    /** 스트림을 끝까지 적용한 테넌트(커서 RUNNING·last_seq 11). */
     private TenantId ingested(String prefix, List<ObjectNode> stream) {
         TenantId t = TenantId.of(SeedData.uniqueTenant(prefix));
         IngestWorker.Round round = rig.worker(ViewRig.feed(t, stream), projector(), 200).runOnce(t);
@@ -80,17 +80,17 @@ class RebuildIT {
         IngestCommands.Outcome outcome = cli.rebuild(t, ACTOR);
 
         assertThat(outcome.exitCode()).isZero();
-        assertThat(outcome.lines()).containsExactly(t.value() + " RUNNING at seq 10 (rebuilt 10 events)");
+        assertThat(outcome.lines()).containsExactly(t.value() + " RUNNING at seq 11 (rebuilt 11 events)");
         assertThat(rig.cursor(t).state()).isEqualTo(IngestState.RUNNING);
-        assertThat(rig.cursor(t).lastSeq()).isEqualTo(10);
+        assertThat(rig.cursor(t).lastSeq()).isEqualTo(11);
         assertThat(rig.cursor(t).lastEventId()).contains(stream.getLast().path("eventId").asString());
         assertThat(rig.cursor(t).error()).isEmpty();
         assertThat(rig.eventRows(t)).as("ingest_event is matched, not rewritten").isEqualTo(events);
         GoldenViews.assertMatches("a1", ViewRig.views(t));
         assertThat(audits(t)).extracting(AuditAccessRepository.AuditRow::action, AuditAccessRepository.AuditRow::target).containsExactly(
-                tuple(IngestCommands.PAUSE, "cursor:" + t.value() + "@10"),
-                tuple(IngestCommands.REBUILD, "cursor:" + t.value() + "@10"),
-                tuple(IngestCommands.REBUILD_SUCCEEDED, "cursor:" + t.value() + "@10"));
+                tuple(IngestCommands.PAUSE, "cursor:" + t.value() + "@11"),
+                tuple(IngestCommands.REBUILD, "cursor:" + t.value() + "@11"),
+                tuple(IngestCommands.REBUILD_SUCCEEDED, "cursor:" + t.value() + "@11"));
     }
 
     @Test
@@ -108,7 +108,7 @@ class RebuildIT {
         assertThat(outcome.exitCode()).isEqualTo(1);
         assertThat(outcome.lines().getFirst()).contains("REBUILD_FAILED: HASH_MISMATCH: seq 8 eventId ").endsWith("views unchanged");
         assertThat(rig.cursor(t).state()).isEqualTo(IngestState.FAILED);
-        assertThat(rig.cursor(t).lastSeq()).isEqualTo(10);
+        assertThat(rig.cursor(t).lastSeq()).isEqualTo(11);
         assertThat(rig.cursor(t).error()).hasValueSatisfying(e -> assertThat(e).startsWith("REBUILD_FAILED: HASH_MISMATCH: seq 8 eventId "));
         assertThat(ViewRig.views(t)).as("views are the rows from before the rebuild").isEqualTo(before);
         assertThat(rig.eventRows(t)).isEqualTo(events);
@@ -126,10 +126,10 @@ class RebuildIT {
         List<ObjectNode> stream = a1();
         TenantId t = ingested("RB_POISON", stream);
         Map<String, List<String>> before = ViewRig.views(t);
-        // 피드 끝에 새 이벤트 하나 — 마감월(202608은 seq 7에서 PAID)의 라인. 재생 끝에서 독, 그 전 10건은 이미 다시 썼다
+        // 피드 끝에 새 이벤트 하나 — 마감월(202608은 seq 7에서 PAID)의 라인. 재생 끝에서 독, 그 전 11건은 이미 다시 썼다
         List<ObjectNode> longer = a1();
         ObjectNode late = longer.get(1).deepCopy();
-        late.put("seq", 11).put("eventId", "5eed0000-0000-4000-8000-0000000000b1");
+        late.put("seq", 12).put("eventId", "5eed0000-0000-4000-8000-0000000000b1");
         ((ObjectNode) late.path("aggregate")).put("id", "99");
         ((ObjectNode) late.path("payload")).put("calcId", "99");
         longer.add(late);
@@ -138,9 +138,9 @@ class RebuildIT {
 
         assertThat(outcome.exitCode()).isEqualTo(1);
         assertThat(rig.cursor(t).error()).hasValueSatisfying(e ->
-                assertThat(e).startsWith("REBUILD_FAILED: PROJECTOR_ERROR: CLOSED_MONTH seq 11 eventId 5eed0000-0000-4000-8000-0000000000b1"));
+                assertThat(e).startsWith("REBUILD_FAILED: PROJECTOR_ERROR: CLOSED_MONTH seq 12 eventId 5eed0000-0000-4000-8000-0000000000b1"));
         assertThat(ViewRig.views(t)).isEqualTo(before);
-        assertThat(rig.events(t, "APPLIED")).hasSize(10);
+        assertThat(rig.events(t, "APPLIED")).hasSize(11);
         assertThat(rig.events(t, "FAILED")).as("a replay leaves no FAILED row — the transaction rolled back").isEmpty();
     }
 
@@ -155,10 +155,10 @@ class RebuildIT {
             return projector().apply(tenant, e);
         };
 
-        IngestCommands.Outcome outcome = commands(t, ViewRig.feed(t, stream), watching, 9).rebuild(t, ACTOR);
+        IngestCommands.Outcome outcome = commands(t, ViewRig.feed(t, stream), watching, 10).rebuild(t, ACTOR);
 
         assertThat(outcome.exitCode()).isEqualTo(1);
-        assertThat(rig.cursor(t).error()).contains("REBUILD_FAILED: headSeq 10 is above the limit 9");
+        assertThat(rig.cursor(t).error()).contains("REBUILD_FAILED: headSeq 11 is above the limit 10");
         assertThat(rig.cursor(t).state()).isEqualTo(IngestState.FAILED);
         assertThat(projected).as("nothing was replayed").isFalse();
         assertThat(ViewRig.views(t)).isEqualTo(before);
@@ -219,7 +219,7 @@ class RebuildIT {
         assertThat(outcome.exitCode()).isEqualTo(2);
         assertThat(outcome.lines().getFirst()).contains("is REBUILDING — only RUNNING, PAUSED or FAILED rebuilds");
         assertThat(audits(t)).extracting(AuditAccessRepository.AuditRow::action, AuditAccessRepository.AuditRow::target)
-                .containsExactly(tuple(IngestCommands.REBUILD_REJECTED, "cursor:" + t.value() + "@10"));
+                .containsExactly(tuple(IngestCommands.REBUILD_REJECTED, "cursor:" + t.value() + "@11"));
     }
 
     /** 승인 Q2: {@code recon_result}는 지우지 않고 {@code ON CONFLICT DO NOTHING} — DRIFT 스트림을 두 번 재구축해도 한 행, 뷰 같음. */

@@ -27,9 +27,9 @@ public final class Envelopes {
         return Path.of(root);
     }
 
-    /** 계약의 A-1 정본(엔진 E2 ⓪a). */
+    /** 계약의 A-1 정본(v1.4 — 엔진 E2 ⓪의 둘째 판, 첫 판 10건 + 202702 잠정 명세). */
     public static Path a1() {
-        return repoRoot().resolve("contracts/events/v1/samples/a1/a1_portal_150000.jsonl");
+        return repoRoot().resolve("contracts/events/v1/samples/a1/a1_portal_150000_e2.jsonl");
     }
 
     /** {@code portal-projection} 시험 자원의 골든 스트림. */

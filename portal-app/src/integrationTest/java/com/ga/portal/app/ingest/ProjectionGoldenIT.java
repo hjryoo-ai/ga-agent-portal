@@ -33,7 +33,7 @@ class ProjectionGoldenIT {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"a1", "engine-e1-cycle", "a1-estimated"})
+    @ValueSource(strings = {"a1", "engine-e1-cycle", "engine-e2-estimate/estimate_cycle_01_기본", "engine-e2-estimate/estimate_cycle_02_채권_상계", "engine-e2-estimate/estimate_cycle_03_정정_포함", "engine-e2-estimate/estimate_cycle_04_음수_순액_채권화", "engine-e2-estimate/estimate_cycle_05_분급_도래"})
     void c1TheDatabaseViewsEqualTheGoldenFiles(String stream) {
         Path file = stream.equals("a1") ? Envelopes.a1() : Envelopes.stream(stream + ".jsonl");
         GoldenViews.assertMatches(stream, ingest("GOLD", file, Envelopes.nodes(file).size()));
@@ -42,7 +42,7 @@ class ProjectionGoldenIT {
     @ParameterizedTest
     @ValueSource(strings = {"a1-interleaved", "a1-posted-first"})
     void c3LineOrdersGiveTheSameDatabaseViews(String stream) {
-        assertThat(GoldenViews.withoutSeqs(ingest("ORDER", Envelopes.stream(stream + ".jsonl"), 10)))
-                .isEqualTo(GoldenViews.withoutSeqs(ingest("ORDER", Envelopes.a1(), 10)));
+        assertThat(GoldenViews.withoutSeqs(ingest("ORDER", Envelopes.stream(stream + ".jsonl"), 11)))
+                .isEqualTo(GoldenViews.withoutSeqs(ingest("ORDER", Envelopes.a1(), 11)));
     }
 }

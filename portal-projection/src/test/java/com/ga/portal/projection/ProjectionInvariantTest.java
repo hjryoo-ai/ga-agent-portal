@@ -75,7 +75,9 @@ class ProjectionInvariantTest {
         Rig rig = after(a1(), 7);
         assertRejected(rig, a1().get(5), ViolationReason.CLOSED_MONTH);   // 두 번째 확정
         assertRejected(rig, a1().get(6), ViolationReason.CLOSED_MONTH);   // 두 번째 지급
-        ObjectNode estimate = Envelopes.nodes(Envelopes.stream("a1-estimated.jsonl")).get(5);
+        ObjectNode estimate = a1().get(10);   // A-1 seq 11(202702 잠정 명세)을 마감된 202608로
+        ((ObjectNode) estimate.path("payload")).put("closeYm", "202608");
+        ((ObjectNode) estimate.path("aggregate")).put("id", "A-1001:202608");
         assertRejected(rig, estimate, ViolationReason.CLOSED_MONTH);
     }
 

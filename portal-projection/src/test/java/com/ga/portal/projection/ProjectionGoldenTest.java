@@ -38,10 +38,14 @@ class ProjectionGoldenTest {
         assertThat(views.get("earnings_line")).hasSize(3);
         assertThat(views.get("policy_limit")).singleElement().asString()
                 .contains("\"accum_paid\":1080000").contains("\"deferred_total\":145000").contains("\"cut_total\":0");
+        // v1.4 둘째 판 seq 11: 202702 잠정 명세(환수만 있는 달 — 세액 0·순액 0, 채권 이월 720,000은 지급 런 열에 넣지 않는다)
+        assertThat(views.get("earnings_month")).filteredOn(r -> r.contains("\"close_ym\":\"202702\"")).singleElement().asString()
+                .contains("\"status\":\"ESTIMATED\"").contains("\"net_basis\":\"ESTIMATE\"").contains("\"estimate_basis_seq\":10")
+                .contains("\"net\":0").contains("\"carried_receivable\":null");
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"engine-e1-cycle", "a1-estimated"})
+    @ValueSource(strings = {"engine-e1-cycle", "engine-e2-estimate/estimate_cycle_01_기본", "engine-e2-estimate/estimate_cycle_02_채권_상계", "engine-e2-estimate/estimate_cycle_03_정정_포함", "engine-e2-estimate/estimate_cycle_04_음수_순액_채권화", "engine-e2-estimate/estimate_cycle_05_분급_도래"})
     void c1OtherGoldenStreams(String stream) {
         GoldenViews.assertMatches(stream, project(Envelopes.stream(stream + ".jsonl")));
     }
@@ -58,30 +62,30 @@ class ProjectionGoldenTest {
     void c6TheAfterTaxFollowsEstimateConfirmPayout() {
         InMemoryViewStore store = new InMemoryViewStore();
         ViewProjector projector = new ViewProjector(store);
-        List<com.ga.portal.projection.Envelope> events = Envelopes.read(Envelopes.stream("a1-estimated.jsonl"));
+        List<com.ga.portal.projection.Envelope> events = Envelopes.read(Envelopes.stream("engine-e2-estimate/estimate_cycle_01_기본.jsonl"));
         for (com.ga.portal.projection.Envelope e : events) {
             projector.apply(T, e);
             var month = store.months().stream().filter(m -> m.closeYm().equals("202608")).findFirst();
             switch (e.type()) {
                 case "StatementEstimated" -> assertThat(month).hasValueSatisfying(m -> {
                     assertThat(m.status().name()).isEqualTo("ESTIMATED");
-                    assertThat(m.withholdingTax()).contains(59_400L);
+                    assertThat(m.withholdingTax()).contains(62_370L);
                     assertThat(m.netBasis().map(Enum::name)).contains("ESTIMATE");
-                    assertThat(m.estimateBasisSeq()).contains(5L);
+                    assertThat(m.estimateBasisSeq()).contains(3L);
                 });
                 case "StatementConfirmed" -> assertThat(month).hasValueSatisfying(m -> {
                     assertThat(m.status().name()).isEqualTo("CONFIRMED");
-                    assertThat(m.net()).as("kept from the estimate").contains(1_740_600L);
+                    assertThat(m.net()).as("kept from the estimate").contains(1_827_630L);
                     assertThat(m.netBasis().map(Enum::name)).as("label: confirmed (after-tax estimated)").contains("ESTIMATE");
                     assertThat(m.payable()).isEmpty();
                 });
                 case "PayoutCompleted" -> assertThat(month).hasValueSatisfying(m -> {
                     assertThat(m.status().name()).isEqualTo("PAID");
                     assertThat(m.netBasis().map(Enum::name)).contains("PAYOUT");
-                    assertThat(m.paidAmount()).contains(1_740_600L);
+                    assertThat(m.paidAmount()).contains(1_827_630L);
                     assertThat(m.receivableOffset()).contains(0L);
                     assertThat(m.carriedReceivable()).contains(0L);
-                    assertThat(m.payable()).contains(1_800_000L);
+                    assertThat(m.payable()).contains(1_890_000L);
                     assertThat(m.runSeq()).contains(1L);
                 });
                 default -> {
