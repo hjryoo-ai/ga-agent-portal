@@ -44,6 +44,10 @@ jobs:
       - name: C7 — shared contract copy equals ga-disclosure at the UPSTREAM merge commit (network)
         run: ./gradlew verifyUpstreamContract --console=plain
 
+      # 포털 Phase 4 지시문 ①·C12: 화면 의존성 취약점 기록(결과로 실패하지 않는다 — 올림 없음). build/web/audit.json을 아티팩트로.
+      - name: Web — pnpm audit record
+        run: ./gradlew :web:webAudit --console=plain
+
       # 아티팩트는 GitHub의 비밀 가림을 거치지 않는다 — 올리기 전에 토큰 값이 없음을 센다(Phase 0 수용 심사 B2). 있으면 올리지 않는다.
       - name: Token absent from the report artifact
         id: token-check
@@ -51,7 +55,8 @@ jobs:
         shell: bash
         run: |
           test -n "$GHP_READ_TOKEN" || { echo 'GHP_READ_TOKEN is empty'; exit 1; }
-          hits=$( { find . -type f \( -path '*/build/test-results/*.xml' -o -path '*/build/reports/tests/*' \) -print0 \
+          hits=$( { find . -type f \( -path '*/build/test-results/*.xml' -o -path '*/build/reports/tests/*' -o -path './web/build/reports/vitest/*' \
+                    -o -path './web/build/web/*.json' \) -print0 \
                     | xargs -0 -r grep -l -F -- "$GHP_READ_TOKEN" || true; } | wc -l)
           echo "files containing the token: $hits"
           test "$hits" -eq 0
@@ -64,6 +69,10 @@ jobs:
           path: |
             **/build/reports/tests/**
             **/build/test-results/**/*.xml
+            web/build/reports/vitest/junit.xml
+            web/build/web/bundle-size.json
+            web/build/web/bundle-modules.json
+            web/build/web/audit.json
 
   no-docker:
     # CLAUDE.md: Docker가 없으면 통합 테스트는 스킵이 아니라 실패해야 한다. 이 잡은 "실패해야 성공"이다(지시문 v1.2 §7·C8).
