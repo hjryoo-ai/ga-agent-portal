@@ -140,7 +140,7 @@ class RebuilderTest {
     /** 재생 중 엔진이 더 발행해도(머리 10 → 17) 재생은 첫 페이지의 머리까지 — 상한이 txB 길이를 묶는다. 나머지는 워커가 이어 받는다. */
     @Test
     void theReplayStopsAtTheFirstPagesHeadEvenIfTheHeadMovesOn() {
-        ingest(200);
+        ingest(3);
         FeedClient growing = new FeedClient() {
             private boolean first = true;
 
@@ -157,7 +157,37 @@ class RebuilderTest {
         Rebuilder rebuilder = new Rebuilder(new EnvelopeValidator(ContractSchemas.get()), db, db, db, recorder, views, growing, CLOCK, 4, 10);
 
         assertThat(rebuilder.rebuild(T, audit)).isEqualTo(new Rebuilder.Result.Rebuilt(10, 10));
-        assertThat(recorder.applied(T)).hasSize(27);   // 적용 17 + 재생 10(셋째 페이지의 11·12는 재생하지 않는다)
+        assertThat(recorder.applied(T)).hasSize(13);   // 적용 3 + 재생 10(셋째 페이지의 11·12는 재생하지 않는다)
         assertThat(db.cursorOf(T).orElseThrow().lastSeq()).isEqualTo(10);
+    }
+
+    /** 피드가 이미 적용한 seq보다 짧으면(머리가 뒤로 갔거나 잘렸다) 실패 — 커서가 APPLIED 행 아래에 서면 워커가 그것들을 건너뛰어 뷰에서 빠진다. */
+    @Test
+    void aFeedShorterThanTheAppliedSeqFailsBeforeTheViewsAreTouched() {
+        ingest(200);
+        FeedClient behind = (tenant, afterSeq, limit) -> {
+            FeedPage page = A1.fetch(tenant, afterSeq, Math.min(limit, (int) Math.max(1, 10 - afterSeq)));
+            return new FeedPage(page.tenantId(), page.events(), page.nextSeq(), 10, page.schemaVersion());
+        };
+        Rebuilder rebuilder = new Rebuilder(new EnvelopeValidator(ContractSchemas.get()), db, db, db, recorder, views, behind, CLOCK, 4, 50_000);
+
+        assertThat(rebuilder.rebuild(T, audit)).isEqualTo(new Rebuilder.Result.Failed("REBUILD_FAILED: headSeq 10 is below the applied seq 17"));
+        assertThat(views.deletes).isZero();
+        assertThat(db.cursorOf(T).orElseThrow().state()).isEqualTo(IngestState.FAILED);
+        assertThat(db.cursorOf(T).orElseThrow().lastSeq()).isEqualTo(17);
+    }
+
+    /** 머리는 맞는데 피드가 중간에 빈 페이지를 내면 — 재생 끝에서 같은 검사. */
+    @Test
+    void aFeedThatEndsEarlyFailsTheReplay() {
+        ingest(200);
+        FeedClient truncated = (tenant, afterSeq, limit) -> {
+            FeedPage page = A1.fetch(tenant, afterSeq, limit);
+            return afterSeq >= 8 ? new FeedPage(page.tenantId(), List.of(), afterSeq, page.headSeq(), page.schemaVersion()) : page;
+        };
+        Rebuilder rebuilder = new Rebuilder(new EnvelopeValidator(ContractSchemas.get()), db, db, db, recorder, views, truncated, CLOCK, 4, 50_000);
+
+        assertThat(rebuilder.rebuild(T, audit)).isEqualTo(new Rebuilder.Result.Failed("REBUILD_FAILED: feed ended at seq 8 below the applied seq 17"));
+        assertThat(db.cursorOf(T).orElseThrow().lastSeq()).isEqualTo(17);
     }
 }

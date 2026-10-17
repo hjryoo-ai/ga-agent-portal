@@ -138,6 +138,12 @@ public final class Rebuilder {
         if (!acquire()) {
             throw new ReplayFailure("lock held by another worker");
         }
+        // 이미 APPLIED인 이벤트는 재생이 덮어야 한다 — 커서가 그 아래에 서면 워커가 그것들을 "아는 이벤트"로 건너뛰어 뷰에서 영영 빠진다
+        // (피드가 뒤로 갔거나 잘린 경우). 지우기 전에 한 번, 재생 끝에서 한 번.
+        long applied = store.maxAppliedSeq().orElse(0);
+        if (first.headSeq() < applied) {
+            throw new ReplayFailure("headSeq " + first.headSeq() + " is below the applied seq " + applied);
+        }
         views.deleteViews();
         // 재생 범위는 첫 페이지의 headSeq까지로 고정한다 — 재생 중 엔진이 더 발행해도 따라가지 않는다(상한이 txB 길이를 묶는 전제).
         // 그 뒤의 이벤트는 RUNNING이 된 커서에서 워커가 이어 받는다.
@@ -167,6 +173,9 @@ public final class Rebuilder {
             } catch (FeedException ex) {
                 throw new ReplayFailure("feed " + ex.getMessage());
             }
+        }
+        if (lastSeq < applied) {
+            throw new ReplayFailure("feed ended at seq " + lastSeq + " below the applied seq " + applied);
         }
         List<String> broken = views.verifyAll();
         if (!broken.isEmpty()) {
