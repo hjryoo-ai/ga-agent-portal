@@ -18,6 +18,10 @@ public interface IngestMetrics {
 
     void state(TenantId tenant, IngestState state);
 
+    /** 마감·지급 이벤트의 합계가 포털 합산과 달랐다(Phase 2 지시문 D-3). */
+    default void drift(TenantId tenant) {
+    }
+
     IngestMetrics NONE = new IngestMetrics() {
         @Override
         public void event(TenantId tenant, String result) {

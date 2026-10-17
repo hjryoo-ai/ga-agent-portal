@@ -1,4 +1,4 @@
-package com.ga.portal.projection.view;
+package com.ga.portal.domain.view;
 
 /**
  * 한 설계사·한 달의 라인 합(설계서 §5 집계 정의): {@code gross} = Σ comm_type ∉ {CLAWBACK, ADJUSTMENT}, {@code clawbackOffset} = Σ CLAWBACK,

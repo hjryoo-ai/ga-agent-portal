@@ -1,5 +1,16 @@
 package com.ga.portal.projection.view;
 
+import com.ga.portal.domain.view.AgentRow;
+import com.ga.portal.domain.view.DeferralRow;
+import com.ga.portal.domain.view.FlagRow;
+import com.ga.portal.domain.view.HistoryRow;
+import com.ga.portal.domain.view.LedgerRow;
+import com.ga.portal.domain.view.LineRow;
+import com.ga.portal.domain.view.MonthRow;
+import com.ga.portal.domain.view.MonthSums;
+import com.ga.portal.domain.view.ReceivableRow;
+import com.ga.portal.domain.view.ReconRow;
+
 import java.util.List;
 import java.util.Optional;
 

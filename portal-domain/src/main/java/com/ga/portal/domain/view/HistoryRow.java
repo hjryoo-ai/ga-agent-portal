@@ -1,4 +1,4 @@
-package com.ga.portal.projection.view;
+package com.ga.portal.domain.view;
 
 import java.time.Instant;
 import java.util.Objects;

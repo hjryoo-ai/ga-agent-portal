@@ -36,7 +36,8 @@ record Payload(JsonNode node) {
         return OffsetDateTime.parse(str(field)).toInstant();
     }
 
-    JsonNode tree(String field) {
-        return node.path(field).deepCopy();
+    /** 하위 객체의 JSON 텍스트(원문 그대로 — 모르는 필드 포함). */
+    String json(String field) {
+        return node.path(field).toString();
     }
 }

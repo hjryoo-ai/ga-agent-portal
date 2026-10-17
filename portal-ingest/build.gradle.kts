@@ -13,6 +13,7 @@ dependencies {
 
     testImplementation(platform(libs.spring.boot.bom))
     testImplementation(testFixtures(libs.platform.core))
+    testImplementation(testFixtures(project(":portal-projection")))
     // 시험 픽스처: 피드 계약 스위트(FeedClientContract)·스텁 피드 서버(JDK HttpServer)·샘플 읽기 — portal-app 통합 시험도 쓴다
     testFixturesApi(project(":portal-projection"))
     testFixturesApi(platform(libs.spring.boot.bom))
@@ -33,4 +34,7 @@ tasks.processResources {
 // 시험 스트림(src/test/resources/streams)은 샘플에서 만든 것이라 StreamFilesTest도 contracts/를 읽는다.
 tasks.test {
     inputs.dir(rootProject.layout.projectDirectory.dir("contracts")).withPathSensitivity(PathSensitivity.RELATIVE)
+    // 클래스패스에 오른 portal-projection 시험 픽스처(골든 뷰·스트림 경로)가 읽을 수 있는 파일 — verifyTestInputs는 픽스처의 경로도 본다
+    inputs.dir(rootProject.layout.projectDirectory.dir("portal-projection/src/test/resources/golden-streams")).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(rootProject.layout.projectDirectory.dir("portal-projection/src/test/resources/golden-views")).withPathSensitivity(PathSensitivity.RELATIVE)
 }

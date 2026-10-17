@@ -2,7 +2,7 @@ package com.ga.portal.projection;
 
 import com.ga.portal.domain.FlagType;
 import com.ga.portal.domain.ViolationReason;
-import com.ga.portal.projection.view.FlagRow;
+import com.ga.portal.domain.view.FlagRow;
 import com.ga.portal.projection.view.ViewStore;
 
 import java.time.Instant;

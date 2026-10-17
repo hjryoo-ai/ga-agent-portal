@@ -2,7 +2,7 @@ package com.ga.portal.projection;
 
 import com.ga.portal.domain.AgentStatus;
 import com.ga.portal.domain.ViolationReason;
-import com.ga.portal.projection.view.AgentRow;
+import com.ga.portal.domain.view.AgentRow;
 import com.ga.portal.projection.view.ViewStore;
 
 import java.util.Arrays;

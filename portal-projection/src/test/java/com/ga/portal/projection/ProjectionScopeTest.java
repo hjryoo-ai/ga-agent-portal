@@ -3,9 +3,8 @@ package com.ga.portal.projection;
 import com.ga.platform.core.tenant.TenantId;
 import com.ga.portal.projection.testing.Envelopes;
 import com.ga.portal.projection.testing.InMemoryViewStore;
-import com.ga.portal.projection.view.LineRow;
+import com.ga.portal.domain.view.LineRow;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.util.List;
@@ -26,7 +25,7 @@ class ProjectionScopeTest {
         ViewProjector projector = new ViewProjector(store);
         List<ObjectNode> a1 = Envelopes.nodes(Envelopes.a1());
         projector.apply(T, Envelopes.of(a1.get(0)));
-        ObjectNode empty = JsonNodeFactory.instance.objectNode();
+        String empty = "{}";
         for (int i = 0; i < otherLines; i++) {
             store.insertLine(new LineRow("other-" + i, "A-" + (2000 + i % 50), "POL-X", Optional.empty(), "FY_COMM", 1, "2026" + String.format("%02d", 1 + i % 12),
                     Optional.empty(), 0, Optional.empty(), empty, empty, 100 + i));

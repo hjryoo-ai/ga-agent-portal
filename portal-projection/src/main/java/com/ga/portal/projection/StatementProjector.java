@@ -6,8 +6,8 @@ import com.ga.portal.domain.MonthStatus;
 import com.ga.portal.domain.MonthTransitions;
 import com.ga.portal.domain.NetBasis;
 import com.ga.portal.domain.ReconSource;
-import com.ga.portal.projection.view.MonthRow;
-import com.ga.portal.projection.view.ReconRow;
+import com.ga.portal.domain.view.MonthRow;
+import com.ga.portal.domain.view.ReconRow;
 import com.ga.portal.projection.view.ViewStore;
 
 import java.util.Optional;

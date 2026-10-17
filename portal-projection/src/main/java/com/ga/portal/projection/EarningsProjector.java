@@ -5,10 +5,10 @@ import com.ga.portal.domain.MonthEvent;
 import com.ga.portal.domain.MonthStatus;
 import com.ga.portal.domain.MonthTransitions;
 import com.ga.portal.domain.ViolationReason;
-import com.ga.portal.projection.view.LedgerRow;
-import com.ga.portal.projection.view.LineRow;
-import com.ga.portal.projection.view.MonthRow;
-import com.ga.portal.projection.view.MonthSums;
+import com.ga.portal.domain.view.LedgerRow;
+import com.ga.portal.domain.view.LineRow;
+import com.ga.portal.domain.view.MonthRow;
+import com.ga.portal.domain.view.MonthSums;
 import com.ga.portal.projection.view.ViewStore;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
@@ -34,8 +34,8 @@ final class EarningsProjector {
             throw Projection.violation(ViolationReason.DUPLICATE_KEY, e, "calcId");
         }
         LineRow line = new LineRow(calcId, p.str("agentId"), p.str("policyNo"), p.optStr("productKey"), p.str("commType"), p.lng("amount"),
-                p.str("closeYm"), p.optStr("reversalOfCalcId"), p.lng("limitCutAmt"), p.optStr("limitCutPolicy"), p.tree("basis"),
-                p.tree("policySummary"), e.seq());
+                p.str("closeYm"), p.optStr("reversalOfCalcId"), p.lng("limitCutAmt"), p.optStr("limitCutPolicy"), p.json("basis"),
+                p.json("policySummary"), e.seq());
         addLine(store, e, line);
         if (line.limitCutAmt() > 0) {
             LedgerRow ledger = store.ledgerOf(line.policyNo(), line.agentId())
@@ -64,7 +64,7 @@ final class EarningsProjector {
         basis.put("targetCalcId", p.str("targetCalcId"));
         basis.put("reason", p.str("reason"));   // 엔진 자유 문자열(정정 사유) — 로그·예외에는 쓰지 않는다
         addLine(store, e, new LineRow(calcId, p.str("agentId"), target.policyNo(), target.productKey(), CommType.ADJUSTMENT.value(),
-                p.lng("amount"), p.str("closeYm"), Optional.empty(), 0, Optional.empty(), basis, target.policySummary().deepCopy(), e.seq()));
+                p.lng("amount"), p.str("closeYm"), Optional.empty(), 0, Optional.empty(), basis.toString(), target.policySummary(), e.seq()));
     }
 
     private static void addLine(ViewStore store, Envelope e, LineRow line) {

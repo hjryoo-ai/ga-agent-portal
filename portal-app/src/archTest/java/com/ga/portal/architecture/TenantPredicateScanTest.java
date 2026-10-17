@@ -87,7 +87,8 @@ class TenantPredicateScanTest {
         assertThat(knownTables).hasSize(17).contains("tenant", "earnings_line", "ingest_cursor", "audit_access");
         long javaSqlCount = javaFiles.stream().mapToLong(p -> SqlTenantScanner.sqlLiteralsInJava(read(p)).size()).sum();
         assertThat(javaSqlCount).as("repository SQL literals found (TenantRepository 1, IngestCursorRepository 3, IngestEventRepository 4, "
-                + "IngestLockRepository 1, AuditAccessRepository 2)").isEqualTo(11);
+                + "IngestLockRepository 1, AuditAccessRepository 2; Phase 2: AgentProfile 2, EarningsLine 3, EarningsMonth 2, PolicyLimit 5, "
+                + "DeferralItem 3, ClawbackItem 2, PolicyFlag 2, ReconResult 1)").isEqualTo(11 + 20);
     }
 
     @Test

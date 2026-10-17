@@ -1,16 +1,16 @@
 package com.ga.portal.projection.testing;
 
 import com.ga.portal.domain.CommType;
-import com.ga.portal.projection.view.AgentRow;
-import com.ga.portal.projection.view.DeferralRow;
-import com.ga.portal.projection.view.FlagRow;
-import com.ga.portal.projection.view.HistoryRow;
-import com.ga.portal.projection.view.LedgerRow;
-import com.ga.portal.projection.view.LineRow;
-import com.ga.portal.projection.view.MonthRow;
-import com.ga.portal.projection.view.MonthSums;
-import com.ga.portal.projection.view.ReceivableRow;
-import com.ga.portal.projection.view.ReconRow;
+import com.ga.portal.domain.view.AgentRow;
+import com.ga.portal.domain.view.DeferralRow;
+import com.ga.portal.domain.view.FlagRow;
+import com.ga.portal.domain.view.HistoryRow;
+import com.ga.portal.domain.view.LedgerRow;
+import com.ga.portal.domain.view.LineRow;
+import com.ga.portal.domain.view.MonthRow;
+import com.ga.portal.domain.view.MonthSums;
+import com.ga.portal.domain.view.ReceivableRow;
+import com.ga.portal.domain.view.ReconRow;
 import com.ga.portal.projection.view.ViewStore;
 
 import java.util.ArrayList;

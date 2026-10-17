@@ -12,6 +12,10 @@ import com.ga.portal.ingest.EnvelopeValidator;
 import com.ga.portal.ingest.EnvelopeVerdict;
 import com.ga.portal.ingest.PayloadHasher;
 import com.ga.portal.projection.Envelope;
+import com.ga.portal.projection.NoopNotificationDeriver;
+import com.ga.portal.projection.NotificationDeriver;
+import com.ga.portal.projection.ProjectionResult;
+import com.ga.portal.projection.ProjectionViolation;
 import com.ga.portal.projection.Projector;
 import tools.jackson.databind.JsonNode;
 
@@ -40,7 +44,14 @@ public final class IngestApplier {
         NOT_RUNNING
     }
 
-    public record Result(Outcome outcome, Optional<IngestErrorCode> code) {
+    /**
+     * @param drift 적용한 마감·지급 이벤트의 합계가 포털 합산과 달랐다(Phase 2 지시문 D-3 — 독이 아니다, 지표 {@code projection_drift_total})
+     */
+    public record Result(Outcome outcome, Optional<IngestErrorCode> code, boolean drift) {
+        public Result(Outcome outcome, Optional<IngestErrorCode> code) {
+            this(outcome, code, false);
+        }
+
         static Result of(Outcome o) {
             return new Result(o, Optional.empty());
         }
@@ -65,15 +76,23 @@ public final class IngestApplier {
     private final TenantTransactions transactions;
     private final IngestLock lock;
     private final Projector projector;
+    private final NotificationDeriver notifications;
     private final Clock clock;
 
     public IngestApplier(EnvelopeValidator validator, IngestStore store, TenantTransactions transactions, IngestLock lock,
                          Projector projector, Clock clock) {
+        this(validator, store, transactions, lock, projector, new NoopNotificationDeriver(), clock);
+    }
+
+    /** {@code notifications}는 프로젝터 다음, 같은 트랜잭션에서 불린다(Phase 2 지시문 D-15 — 규칙은 Phase 6). */
+    public IngestApplier(EnvelopeValidator validator, IngestStore store, TenantTransactions transactions, IngestLock lock,
+                         Projector projector, NotificationDeriver notifications, Clock clock) {
         this.validator = Objects.requireNonNull(validator, "validator");
         this.store = Objects.requireNonNull(store, "store");
         this.transactions = Objects.requireNonNull(transactions, "transactions");
         this.lock = Objects.requireNonNull(lock, "lock");
         this.projector = Objects.requireNonNull(projector, "projector");
+        this.notifications = Objects.requireNonNull(notifications, "notifications");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -156,15 +175,22 @@ public final class IngestApplier {
 
         store.markApplied(new IngestEventRecord(tenant, envelope.eventId(), envelope.seq(), envelope.type(), clock.instant(),
                 IngestEventStatus.APPLIED, Optional.empty(), hash));
+        ProjectionResult projected;
         try {
-            projector.apply(tenant, envelope);
+            projected = projector.apply(tenant, envelope);
+            notifications.derive(tenant, envelope, projected);
+        } catch (ProjectionViolation v) {
+            // 사유가 먼저: "CLOSED_MONTH seq n eventId … month" — 키·필드 이름만(값 없음)
+            String detail = v.getMessage();
+            throw new Stop(IngestErrorCode.PROJECTOR_ERROR, detail,
+                    Optional.of(failedRow(tenant, envelope, hash, IngestErrorCode.PROJECTOR_ERROR, detail)));
         } catch (RuntimeException e) {
             String detail = keys + " " + e.getClass().getSimpleName();
             throw new Stop(IngestErrorCode.PROJECTOR_ERROR, detail,
                     Optional.of(failedRow(tenant, envelope, hash, IngestErrorCode.PROJECTOR_ERROR, detail)));
         }
         store.saveCursor(envelope.seq(), Optional.of(envelope.eventId()), IngestState.RUNNING, Optional.empty(), clock.instant());
-        return Result.of(Outcome.APPLIED);
+        return new Result(Outcome.APPLIED, Optional.empty(), projected.drift());
     }
 
     private IngestEventRecord failedRow(TenantId tenant, Envelope e, String hash, IngestErrorCode code, String detail) {

@@ -12,7 +12,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 인제스트 지표(지시문 D-9, 설계서 §10) — 태그 {@code tenant}: {@code ingest_lag_seq}, {@code ingest_lag_seconds}, {@code ingest_state}
- * (상태별 0/1), {@code ingest_events_total{result}}, {@code ingest_feed_errors_total}. 대시보드·알림은 Phase 7.
+ * (상태별 0/1), {@code ingest_events_total{result}}, {@code ingest_feed_errors_total}, {@code projection_drift_total}(Phase 2 D-3).
+ * 대시보드·알림은 Phase 7.
  */
 final class MicrometerIngestMetrics implements IngestMetrics {
 
@@ -31,6 +32,11 @@ final class MicrometerIngestMetrics implements IngestMetrics {
     @Override
     public void feedError(TenantId tenant) {
         registry.counter("ingest_feed_errors_total", "tenant", tenant.value()).increment();
+    }
+
+    @Override
+    public void drift(TenantId tenant) {
+        registry.counter("projection_drift_total", "tenant", tenant.value()).increment();
     }
 
     @Override

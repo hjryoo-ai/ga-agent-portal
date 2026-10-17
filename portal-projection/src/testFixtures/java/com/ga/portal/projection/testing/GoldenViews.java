@@ -49,7 +49,8 @@ public final class GoldenViews {
         rows.put("earnings_line", map(s.lines(), r -> obj("calc_id", r.calcId(), "agent_id", r.agentId(), "policy_no", r.policyNo(),
                 "product_key", r.productKey(), "comm_type", r.commType(), "amount", r.amount(), "close_ym", r.closeYm(),
                 "reversal_of_calc_id", r.reversalOfCalcId(), "limit_cut_amt", r.limitCutAmt(), "limit_cut_policy", r.limitCutPolicy(),
-                "basis", r.basis(), "policy_summary", r.policySummary(), "source_seq", r.sourceSeq())));
+                "basis", Envelopes.JSON.readTree(r.basis()), "policy_summary", Envelopes.JSON.readTree(r.policySummary()),
+                "source_seq", r.sourceSeq())));
         rows.put("earnings_month", map(s.months(), r -> obj("agent_id", r.agentId(), "close_ym", r.closeYm(), "gross", r.gross(),
                 "clawback_offset", r.clawbackOffset(), "adjustment", r.adjustment(), "withholding_tax", r.withholdingTax(), "net", r.net(),
                 "status", r.status().name(), "data_status", r.dataStatus().name(), "estimate_as_of", r.estimateAsOf(),

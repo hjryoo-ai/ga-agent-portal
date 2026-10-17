@@ -4,7 +4,7 @@ import com.ga.platform.core.tenant.TenantId;
 import com.ga.portal.domain.FlagType;
 import com.ga.portal.projection.testing.Envelopes;
 import com.ga.portal.projection.testing.InMemoryViewStore;
-import com.ga.portal.projection.view.FlagRow;
+import com.ga.portal.domain.view.FlagRow;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;

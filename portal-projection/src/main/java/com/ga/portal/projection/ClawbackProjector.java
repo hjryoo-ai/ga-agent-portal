@@ -2,7 +2,7 @@ package com.ga.portal.projection;
 
 import com.ga.portal.domain.ReceivableStatus;
 import com.ga.portal.domain.ReceivableTransitions;
-import com.ga.portal.projection.view.ReceivableRow;
+import com.ga.portal.domain.view.ReceivableRow;
 import com.ga.portal.projection.view.ViewStore;
 
 /** 환수 채권(Phase 2 계획 ②, ① E-6): {@code clawback_item} upsert — 엔진 채권 불변식을 어기는 갱신은 독. */

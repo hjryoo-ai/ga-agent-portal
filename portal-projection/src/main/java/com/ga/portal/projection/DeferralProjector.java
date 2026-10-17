@@ -3,7 +3,7 @@ package com.ga.portal.projection;
 import com.ga.portal.domain.DeferralStatus;
 import com.ga.portal.domain.DeferralTransitions;
 import com.ga.portal.domain.ViolationReason;
-import com.ga.portal.projection.view.DeferralRow;
+import com.ga.portal.domain.view.DeferralRow;
 import com.ga.portal.projection.view.ViewStore;
 
 import java.util.Optional;

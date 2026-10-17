@@ -1,8 +1,8 @@
 package com.ga.portal.projection;
 
 import com.ga.portal.domain.ViolationReason;
-import com.ga.portal.projection.view.HistoryRow;
-import com.ga.portal.projection.view.LedgerRow;
+import com.ga.portal.domain.view.HistoryRow;
+import com.ga.portal.domain.view.LedgerRow;
 import com.ga.portal.projection.view.ViewStore;
 
 import java.util.Optional;
