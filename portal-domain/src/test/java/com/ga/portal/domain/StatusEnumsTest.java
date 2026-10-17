@@ -17,6 +17,7 @@ class StatusEnumsTest {
         assertThat(names(DataStatus.values())).containsExactly("OK", "DRIFT", "REBUILDING");
         assertThat(names(DeferralStatus.values())).containsExactly("SCHEDULED", "RELEASED", "HELD", "CANCELLED");
         assertThat(names(IngestState.values())).containsExactly("RUNNING", "PAUSED", "FAILED", "REBUILDING");
+        assertThat(names(IngestEventStatus.values())).containsExactly("APPLIED", "SKIPPED", "FAILED");
     }
 
     @Test

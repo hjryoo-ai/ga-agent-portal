@@ -53,3 +53,25 @@
 
 - **O-1**: `agent_profile.role`은 V1에서 `NOT NULL`인데 계약 v1.1에서 `AgentSnapshot.role`은 선택이다. V1은 고치지 않는다. Phase 2(프로젝터)가 `role` 없는 스냅샷을 받을 때의 값(새 V로 `NOT NULL` 해제 또는 고정 값)을 계획에서 정한다 — 역할의 정본은 어차피 `identity_link`(Phase 3).
 - **O-2**(엔진 E1에 전달): 엔진 `PayoutService.settleOne`의 `gross_net`은 `NetAmountCalculator.netOf(records)` — 그 달 미정산 레코드 **전부**(CLAWBACK 포함)의 순합이다. E1 지시문 D-6 "`gross`(= `gross_net`)"는 위 `gross` 정의(CLAWBACK 제외)와 다르다. 또 엔진 `COMM_CALC`에 `comm_type = ADJUSTMENT` 레코드가 있으면 E1 D-5 "`gross` = Σ `comm_type ≠ CLAWBACK`"이 정정을 `gross`에 넣는다. E1 계획에서 엔진 코드로 확정한다.
+
+## 2026-10-17 — Phase 1 계획 승인 (`docs/phase-01-계획승인.md`)
+
+### 지시문 오류 (승인 §5)
+
+| # | 지시문 문구 | 무엇이 틀렸나 | 정한 것 |
+|---|---|---|---|
+| DE-7 | Phase 1 지시문 §0 K7 "`gross` = Σ `commType ≠ CLAWBACK` 라인" | ADJUSTMENT를 빼지 않았다 — 포털은 `AdjustmentPosted`를 ADJUSTMENT 라인으로 저장하므로 정정이 `gross`와 `adjustment`에 두 번 들어간다. 엔진 E1 지시문 D-6 "`gross`(= `gross_net`)"도 같은 오류(엔진 쪽 기록) | CI-1 확인: Σ `CommissionCalculated` 라인 중 commType ∉ {CLAWBACK, ADJUSTMENT} |
+| DE-8 | Phase 1 지시문 D-2·D-4 | "아는 `eventId`가 다른 `seq`로 오는 경우"가 빠졌다 | 독 `EVENT_SEQ_CONFLICT`(Q5) |
+
+### 기록
+
+- 계약 v1.1.1(L1~L3 — PR #3, `f54d008`)이 v1.1 지시문 §0에 없었던 것은 엔진 E1 계획이 코드를 읽기 전이라 알 수 없었다 — 오류가 아니라 순서. 다만 §0 K-목록을 쓸 때 엔진의 `LIMIT_LEDGER_HIST`(아무도 쓰지 않음)·`paid_at`(없음)을 확인하지 않은 것은 기록한다.
+
+## 2026-10-17 — Phase 1 구현에서 계획과 다르게 한 것 (보고서 §5)
+
+| # | 계획 | 한 것 | 이유 |
+|---|---|---|---|
+| P1-1 | 독 분류 표 #1~#8 | **#9 `APPLY_ERROR`**(FAILED) 추가 — 분류하지 못한 적용 트랜잭션 오류(DB 제약 위반 등) | 승인된 J9 분석("잠금이 없으면 두 번째 워커의 고유 위반이 멀쩡한 테넌트를 멈춘다")은 그런 오류가 재시도가 아니라 정지여야 성립한다. 정지가 규약(지시문 D-10)과도 맞다. detail은 예외 이름만 |
+| P1-2 | 감사 동작 `INGEST_STATUS`·`INGEST_RESUME`·`INGEST_RESUME_REJECTED`·`INGEST_PAUSE` | `INGEST_PAUSE_REJECTED` 추가 | "전 건 감사"(D-8) — 거부된 pause도 남긴다 |
+| P1-3 | 스케줄 | `tenant.status`가 `ACTIVE`가 아닌 테넌트는 폴링하지 않는다 | §5 `tenant.status`(ACTIVE/PAUSED)의 뜻. 계획에 없던 조건 |
+| P1-4 | 행위자 없는 CLI | DB에 닿기 전에 거부(감사 행 없음) | 감사할 행위자가 없다 |

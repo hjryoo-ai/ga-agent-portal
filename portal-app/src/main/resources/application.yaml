@@ -24,3 +24,16 @@ management:
     # 포털 Phase 8에서 전용 롤(portal_health)로 복원한다(설계서 §9 롤 표).
     db:
       enabled: false
+
+# 인제스트(포털 Phase 1 — 설계서 §6.1). 폴링은 enabled=true일 때만(배포 구성이 켠다). 테넌트 목록은 전용 롤 portal_directory(V3),
+# 서비스 토큰은 token-dir/<TENANT_ID> 파일(값은 저장소·로그에 0 — 계획 승인 Q7).
+portal:
+  ingest:
+    enabled: ${PORTAL_INGEST_ENABLED:false}
+    limit: 200
+    default-poll-interval: 10s
+    http-timeout: 10s
+    tick: 1s
+    token-dir: ${PORTAL_ENGINE_TOKEN_DIR:/run/secrets/portal-engine-tokens}
+    directory-username: ${PORTAL_DIRECTORY_USER:portal_directory}
+    directory-password: ${PORTAL_DIRECTORY_PASSWORD:directory_local_only}

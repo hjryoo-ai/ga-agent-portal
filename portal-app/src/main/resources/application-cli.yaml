@@ -1,0 +1,9 @@
+# 운영 명령 프로파일(포털 Phase 1 — 설계서 §6.1): 웹 서버·폴링 없이 명령 하나를 실행하고 종료 코드로 끝난다.
+# 예: java -jar portal-app.jar --spring.profiles.active=cli ingest resume --tenant=GA01 --from-seq=120 --actor=ops-kim
+spring:
+  main:
+    web-application-type: none
+    banner-mode: off
+portal:
+  ingest:
+    enabled: false

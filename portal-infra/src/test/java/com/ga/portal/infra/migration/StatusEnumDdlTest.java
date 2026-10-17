@@ -2,6 +2,7 @@ package com.ga.portal.infra.migration;
 
 import com.ga.portal.domain.DataStatus;
 import com.ga.portal.domain.DeferralStatus;
+import com.ga.portal.domain.IngestEventStatus;
 import com.ga.portal.domain.IngestState;
 import com.ga.portal.domain.MonthStatus;
 import org.junit.jupiter.api.Test;
@@ -24,8 +25,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 계획 승인 Q9: 닫힌 값 컬럼의 {@code CHECK (… IN …)} 목록이 그 값의 정본과 같다 — 두 정본이 어긋나지 않게(C10과 같은 방식).
  * <ul>
- *   <li>Java 열거가 있는 컬럼 4개: 열거 값 집합 = V1 CHECK 목록.</li>
- *   <li>열거가 없는 컬럼 8개: V1 CHECK 목록이 정본이고 설계서 §5 DDL 주석({@code -- A/B/C})과 대조.</li>
+ *   <li>Java 열거가 있는 컬럼 5개: 열거 값 집합 = V1 CHECK 목록({@code ingest_event.status}는 Phase 1부터 — {@code SKIPPED}는 열거에
+ *       남아 있으나 쓰지 않는다, Phase 1 승인 Q2).</li>
+ *   <li>열거가 없는 컬럼 7개: V1 CHECK 목록이 정본이고 설계서 §5 DDL 주석({@code -- A/B/C})과 대조.</li>
  *   <li>CHECK가 걸린 컬럼 집합 = 승인 문서의 12개 = 설계서 §5에서 닫힌 목록 주석이 달린 컬럼 집합({@code /...}로 끝나는 열린 목록은 제외 —
  *       예: {@code comm_type}·{@code role}).</li>
  * </ul>
@@ -39,7 +41,8 @@ class StatusEnumDdlTest {
             "earnings_month.status", MonthStatus.class,
             "earnings_month.data_status", DataStatus.class,
             "deferral_item.status", DeferralStatus.class,
-            "ingest_cursor.state", IngestState.class);
+            "ingest_cursor.state", IngestState.class,
+            "ingest_event.status", IngestEventStatus.class);
 
     private static final Set<String> APPROVED_COLUMNS = Set.of(
             "earnings_month.status", "earnings_month.data_status", "deferral_item.status", "ingest_cursor.state",

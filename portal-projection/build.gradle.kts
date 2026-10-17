@@ -1,6 +1,9 @@
 // 프로젝터(이벤트 → 뷰) 순수 로직 + 알림 파생 규칙(Phase 2·6). Spring·DB 무의존. Phase 0은 계약 스키마 시험만(지시문 v1.2 §5).
 dependencies {
     api(project(":portal-domain"))
+    // Envelope의 payload는 JSON 트리다(모르는 필드 보존 — 설계서 §4.5). Jackson은 Spring이 아니다(verifySpringFree).
+    api(platform(libs.spring.boot.bom))
+    api(libs.jackson.databind)
 
     // EventSchemaTest: contracts/의 JSON Schema 2020-12·OpenAPI를 그대로 읽어 샘플을 검증한다
     testImplementation(platform(libs.spring.boot.bom))

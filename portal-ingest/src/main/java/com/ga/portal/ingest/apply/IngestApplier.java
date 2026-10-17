@@ -1,0 +1,188 @@
+package com.ga.portal.ingest.apply;
+
+import com.ga.platform.canonical.CanonicalizationException;
+import com.ga.platform.core.tenant.TenantId;
+import com.ga.portal.domain.CursorRecord;
+import com.ga.portal.domain.IngestErrorCode;
+import com.ga.portal.domain.IngestEventRecord;
+import com.ga.portal.domain.IngestEventStatus;
+import com.ga.portal.domain.IngestState;
+import com.ga.portal.domain.IngestTransitions;
+import com.ga.portal.ingest.EnvelopeValidator;
+import com.ga.portal.ingest.EnvelopeVerdict;
+import com.ga.portal.ingest.PayloadHasher;
+import com.ga.portal.projection.Envelope;
+import com.ga.portal.projection.Projector;
+import tools.jackson.databind.JsonNode;
+
+import java.time.Clock;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * 이벤트 하나의 멱등 적용(설계서 §6.1, Phase 1 지시문 D-1~D-5). 이벤트마다 트랜잭션 하나:
+ * 잠금 → 커서(그 트랜잭션 안의 값으로만 판정) → 수신 검증 → 해시 → 기존 행 대조 → seq 규칙 → {@code ingest_event} → {@link Projector}
+ * → {@code ingest_cursor}. 독이면 그 트랜잭션은 롤백되고, <b>별도 트랜잭션</b>에서 {@code FAILED} 행(키를 믿을 수 있을 때)과 커서 정지를
+ * 쓴다({@link #stop}). 판정 순서와 기록 여부는 설계서 §6.1 독 이벤트 분류 표 그대로.
+ */
+public final class IngestApplier {
+
+    /** 이벤트 하나의 결과. */
+    public enum Outcome {
+        APPLIED,
+        /** 이미 적용한 이벤트(같은 eventId·해시·seq) — 행·커서 불변(승인 Q2). */
+        SKIPPED,
+        /** 이 이벤트에서 테넌트가 멈췄다(FAILED 또는 PAUSED). */
+        STOPPED,
+        /** 다른 워커가 그 테넌트를 잡고 있다 — 이번 회차는 끝. */
+        LOCK_BUSY,
+        /** 커서가 RUNNING이 아니다(다른 워커·운영자가 멈췄다). */
+        NOT_RUNNING
+    }
+
+    public record Result(Outcome outcome, Optional<IngestErrorCode> code) {
+        static Result of(Outcome o) {
+            return new Result(o, Optional.empty());
+        }
+    }
+
+    /** 이 이벤트에서 멈춘다 — 본 트랜잭션을 롤백시키기 위한 예외. */
+    static final class Stop extends RuntimeException {
+        final IngestErrorCode code;
+        final String detail;
+        final Optional<IngestEventRecord> failedRow;
+
+        Stop(IngestErrorCode code, String detail, Optional<IngestEventRecord> failedRow) {
+            super(code.format(detail), null, false, false);
+            this.code = code;
+            this.detail = detail;
+            this.failedRow = failedRow;
+        }
+    }
+
+    private final EnvelopeValidator validator;
+    private final IngestStore store;
+    private final TenantTransactions transactions;
+    private final IngestLock lock;
+    private final Projector projector;
+    private final Clock clock;
+
+    public IngestApplier(EnvelopeValidator validator, IngestStore store, TenantTransactions transactions, IngestLock lock,
+                         Projector projector, Clock clock) {
+        this.validator = Objects.requireNonNull(validator, "validator");
+        this.store = Objects.requireNonNull(store, "store");
+        this.transactions = Objects.requireNonNull(transactions, "transactions");
+        this.lock = Objects.requireNonNull(lock, "lock");
+        this.projector = Objects.requireNonNull(projector, "projector");
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
+    public Result apply(TenantId tenant, JsonNode event) {
+        try {
+            return transactions.inTransaction(tenant, () -> applyInTransaction(tenant, event));
+        } catch (Stop stop) {
+            return stop(tenant, stop.code, stop.detail, stop.failedRow);
+        } catch (RuntimeException e) {
+            // 분류하지 못한 오류(DB 제약 위반 등) — 멈춘다. 메시지는 값을 담을 수 있어 예외 이름만 쓴다.
+            String keys = keysOf(event);
+            return stop(tenant, IngestErrorCode.APPLY_ERROR, keys + " " + e.getClass().getSimpleName(), Optional.empty());
+        }
+    }
+
+    /**
+     * 별도 트랜잭션에서 테넌트를 멈춘다: 잠금을 잡고(못 잡으면 그 테넌트를 처리 중인 다른 워커에 맡긴다) 커서 상태가 그 사유의 전이를 받을 때만
+     * {@code FAILED} 행과 커서 정지를 쓴다. 이미 멈춘 커서는 그대로 둔다.
+     */
+    public Result stop(TenantId tenant, IngestErrorCode code, String detail, Optional<IngestEventRecord> failedRow) {
+        return transactions.inTransaction(tenant, () -> {
+            if (!lock.tryLock()) {
+                return Result.of(Outcome.LOCK_BUSY);
+            }
+            CursorRecord cursor = store.ensureCursor(clock.instant());
+            Optional<IngestState> next = IngestTransitions.next(cursor.state(), code.trigger());
+            if (next.isEmpty()) {
+                return Result.of(Outcome.NOT_RUNNING);
+            }
+            failedRow.ifPresent(row -> {
+                Optional<IngestEventRecord> existing = store.event(row.eventId());
+                if (existing.isEmpty() || existing.get().status() == IngestEventStatus.FAILED) {
+                    store.markFailed(row);
+                }
+            });
+            store.saveCursor(cursor.lastSeq(), cursor.lastEventId(), next.get(), Optional.of(code.format(detail)), clock.instant());
+            return new Result(Outcome.STOPPED, Optional.of(code));
+        });
+    }
+
+    private Result applyInTransaction(TenantId tenant, JsonNode event) {
+        if (!lock.tryLock()) {
+            return Result.of(Outcome.LOCK_BUSY);
+        }
+        CursorRecord cursor = store.cursor().orElseThrow(() -> new IllegalStateException("cursor not created for " + tenant.value()));
+        if (!IngestTransitions.polls(cursor.state())) {
+            return Result.of(Outcome.NOT_RUNNING);
+        }
+        EnvelopeVerdict verdict = validator.validate(event);
+        if (verdict instanceof EnvelopeVerdict.Rejected r) {
+            Optional<IngestEventRecord> row = r.code() == IngestErrorCode.UNSUPPORTED_VERSION
+                    ? Optional.empty()
+                    : r.envelope().flatMap(e -> hashOf(event).map(h -> failedRow(tenant, e, h, r.code(), r.detail())));
+            throw new Stop(r.code(), r.detail(), row);
+        }
+        Envelope envelope = ((EnvelopeVerdict.Valid) verdict).envelope();
+        String keys = "seq " + envelope.seq() + " eventId " + envelope.eventId();
+        String hash = hashOf(event).orElseThrow(() -> new Stop(IngestErrorCode.SCHEMA_VIOLATION, keys + " not canonicalizable", Optional.empty()));
+
+        Optional<IngestEventRecord> existing = store.event(envelope.eventId());
+        if (existing.isPresent() && existing.get().status() == IngestEventStatus.APPLIED) {
+            IngestEventRecord known = existing.get();
+            if (!known.payloadHash().equals(hash)) {
+                throw new Stop(IngestErrorCode.HASH_MISMATCH, keys + " differs from the applied event", Optional.empty());
+            }
+            if (known.seq() != envelope.seq()) {
+                throw new Stop(IngestErrorCode.EVENT_SEQ_CONFLICT, keys + " was applied at seq " + known.seq(), Optional.empty());
+            }
+            return Result.of(Outcome.SKIPPED);
+        }
+        long expected = cursor.lastSeq() + 1;
+        if (envelope.seq() < expected) {
+            String detail = keys + " is new but expected seq " + expected;
+            throw new Stop(IngestErrorCode.PAST_SEQ_NEW_EVENT, detail,
+                    Optional.of(failedRow(tenant, envelope, hash, IngestErrorCode.PAST_SEQ_NEW_EVENT, detail)));
+        }
+        if (envelope.seq() > expected) {
+            throw new Stop(IngestErrorCode.SEQ_GAP, "expected seq " + expected + ", got " + keys, Optional.empty());
+        }
+
+        store.markApplied(new IngestEventRecord(tenant, envelope.eventId(), envelope.seq(), envelope.type(), clock.instant(),
+                IngestEventStatus.APPLIED, Optional.empty(), hash));
+        try {
+            projector.apply(tenant, envelope);
+        } catch (RuntimeException e) {
+            String detail = keys + " " + e.getClass().getSimpleName();
+            throw new Stop(IngestErrorCode.PROJECTOR_ERROR, detail,
+                    Optional.of(failedRow(tenant, envelope, hash, IngestErrorCode.PROJECTOR_ERROR, detail)));
+        }
+        store.saveCursor(envelope.seq(), Optional.of(envelope.eventId()), IngestState.RUNNING, Optional.empty(), clock.instant());
+        return Result.of(Outcome.APPLIED);
+    }
+
+    private IngestEventRecord failedRow(TenantId tenant, Envelope e, String hash, IngestErrorCode code, String detail) {
+        return new IngestEventRecord(tenant, e.eventId(), e.seq(), e.type(), clock.instant(), IngestEventStatus.FAILED,
+                Optional.of(code.format(detail)), hash);
+    }
+
+    private static Optional<String> hashOf(JsonNode event) {
+        try {
+            return Optional.of(PayloadHasher.hash(event));
+        } catch (CanonicalizationException | IllegalArgumentException e) {
+            return Optional.empty();
+        }
+    }
+
+    /** 검증 전에 실패했을 때 쓸 키(형식을 보장하지 않으므로 숫자·짧은 문자열만). */
+    private static String keysOf(JsonNode event) {
+        String id = event.path("eventId").asString("");
+        return "seq " + event.path("seq").asLong(-1) + " eventId " + (id.length() <= 36 ? id : id.substring(0, 36));
+    }
+}

@@ -35,7 +35,7 @@ public final class SeedData {
         rows.put("inquiry", "INSERT INTO inquiry (tenant_id, inquiry_id, agent_id, category, message, status, created_at) VALUES (?, '" + UUID.nameUUIDFromBytes(new byte[] {2}) + "', 'A0001', 'LINE', 'm', 'OPEN', TIMESTAMPTZ '2026-08-20T10:00:00+09:00')");
         rows.put("simulation_log", "INSERT INTO simulation_log (tenant_id, sim_id, agent_id, kind, request, status, created_at) VALUES (?, '" + UUID.nameUUIDFromBytes(new byte[] {3}) + "', 'A0001', 'NEW_CONTRACT', '{}', 'REQUESTED', TIMESTAMPTZ '2026-08-20T10:00:00+09:00')");
         rows.put("ingest_cursor", "INSERT INTO ingest_cursor (tenant_id, last_seq, state, updated_at) VALUES (?, 0, 'RUNNING', TIMESTAMPTZ '2026-08-20T10:00:00+09:00')");
-        rows.put("ingest_event", "INSERT INTO ingest_event (tenant_id, event_id, seq, event_type, received_at, status) VALUES (?, '" + UUID.nameUUIDFromBytes(new byte[] {4}) + "', 1, 'LimitLedgerOpened', TIMESTAMPTZ '2026-08-20T10:00:00+09:00', 'APPLIED')");
+        rows.put("ingest_event", "INSERT INTO ingest_event (tenant_id, event_id, seq, event_type, received_at, status, payload_hash) VALUES (?, '" + UUID.nameUUIDFromBytes(new byte[] {4}) + "', 1, 'LimitLedgerOpened', TIMESTAMPTZ '2026-08-20T10:00:00+09:00', 'APPLIED', '" + "b".repeat(64) + "')");
         rows.put("recon_result", "INSERT INTO recon_result (tenant_id, agent_id, close_ym, run_at, status) VALUES (?, 'A0001', '202608', TIMESTAMPTZ '2026-08-21T02:00:00+09:00', 'MATCH')");
         rows.put("audit_access", "INSERT INTO audit_access (tenant_id, actor_subject, action, target, at) VALUES (?, 'ops', 'REBUILD', 'tenant', TIMESTAMPTZ '2026-08-21T02:00:00+09:00')");
         ROWS = Map.copyOf(rows);

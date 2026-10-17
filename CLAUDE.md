@@ -27,6 +27,13 @@
 - 의존 방향 `app → query/ingest/sim/recon → projection → domain`, `infra`는 `app`만. `portal-domain`·`portal-projection`은 Spring·DB 의존성을 갖지 않는다(`platform-core`만 가능). `platform-spring`은 `infra`·`app`에서만. 플랫폼 타입과 단순 이름이 같은 포털 클래스를 만들지 않는다.
 - 소스셋 밖의 파일을 읽는 테스트는 그 파일(디렉터리)을 Gradle 입력으로 선언한다. 주입이 첫 시도에 실패하지 않으면 테스트보다 입력 선언을 먼저 본다(`verifyTestInputs`가 테스트 원천의 저장소 경로를 그 태스크의 입력과 대조한다).
 
+## 인제스트 규약 (포털 Phase 1 — 설계서 §6.1)
+- **이벤트마다 트랜잭션 하나**: 잠금(`pg_try_advisory_xact_lock`) → 커서 → 수신 검증 → 해시 → 기존 행 대조 → seq 규칙 → `ingest_event` → 프로젝터 → `ingest_cursor`. 커서는 적용과 **같은 트랜잭션**에서만 전진한다 — 적용 전에 따로 커밋하지 않는다. 판정은 잠금을 쥔 뒤 그 트랜잭션에서 읽은 커서로만.
+- **독 이벤트는 그 테넌트만 멈춘다**(FAILED·PAUSED). 본 트랜잭션은 롤백하고 `FAILED` 행·커서 정지는 별도 트랜잭션에. 워커 전체 상태(전역 플래그)를 두지 않는다. 분류하지 못한 적용 오류도 멈춘다(`APPLY_ERROR`) — 재시도·백오프로 덮지 않는다.
+- **해시 범위**: `payload_hash` = JCS SHA-256(`{type, version, occurredAt, aggregate, payload}`) — `seq`·`eventId`·모르는 최상위 필드는 넣지 않는다. 같은 eventId에 다른 해시·다른 seq는 독이다.
+- 갭은 건너뛰지 않는다(건너뛰기는 재구축으로만). `ingest_cursor.error`와 로그에 payload 값·서비스 토큰·DB 오류 메시지를 쓰지 않는다(seq·eventId·스키마 위치·키워드·예외 이름만).
+- 계약 스키마는 클래스패스 사본에서만 읽는다(원격 조회 0) — type ↔ kind 짝·지원 최대 version은 스키마에서 읽고 코드에 적지 않는다.
+
 ## 작업 방식
 - Phase 단위: 계획 → 승인 → 단계 커밋(테스트와 같은 커밋) → 보고서 → 태그 → PR. 지시문의 완료 기준(C-n)을 전부 테스트로 증명해야 다음 Phase로 간다.
 - 테스트 없는 기능 코드 커밋 금지. 통합 테스트는 Testcontainers(PostgreSQL, digest 고정). Docker가 없으면 통합 테스트는 **실패**해야 한다(스킵 금지).

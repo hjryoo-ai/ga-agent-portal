@@ -1,0 +1,44 @@
+package com.ga.portal.app.ingest;
+
+import com.ga.platform.core.tenant.TenantId;
+import com.ga.portal.infra.testing.SeedData;
+import com.ga.portal.ingest.feed.FileFeedAdapter;
+import com.ga.portal.projection.RecordingProjector;
+import org.junit.jupiter.api.Test;
+
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * C13 결정론: 같은 스트림(A-1 17건)을 ① 한 번에 ② 9건 뒤 워커 재시작(새 부품)으로 넣은 두 테넌트의 {@code ingest_event}·{@code ingest_cursor}가
+ * 같다(테넌트 컬럼 제외, 고정 시계라 시각까지). 같은 스트림을 다시 넣어도 바뀌지 않는다. 뷰 바이트 비교는 Phase 2.
+ */
+class IngestDeterminismIT {
+
+    @Test
+    void c13TheSameStreamGivesTheSameRowsWithOrWithoutARestart() {
+        IngestRig rig = new IngestRig();
+        TenantId once = TenantId.of(SeedData.uniqueTenant("DET_1"));
+        TenantId restarted = TenantId.of(SeedData.uniqueTenant("DET_2"));
+        FileFeedAdapter feed = IngestRig.feed("a1-golden.jsonl");
+
+        rig.worker(feed, new RecordingProjector(), 200).runOnce(once);
+
+        rig.worker(feed, new RecordingProjector(), 9).runOnce(restarted);
+        assertThat(rig.cursor(restarted).lastSeq()).isEqualTo(9);
+        IngestRig afterRestart = new IngestRig();
+        afterRestart.worker(feed, new RecordingProjector(), 200).runOnce(restarted);
+
+        assertThat(rig.eventRows(restarted)).hasSize(17).containsExactlyElementsOf(rig.eventRows(once));
+        assertThat(rig.cursor(restarted)).isEqualTo(rig.cursor(once));
+
+        // 같은 스트림을 다시: 아무것도 바뀌지 않는다
+        var before = rig.eventRows(once);
+        var cursorBefore = rig.cursor(once);
+        assertThat(rig.worker(feed, new RecordingProjector(), 200).runOnce(once).applied()).isZero();
+        assertThat(rig.eventRows(once)).isEqualTo(before);
+        assertThat(rig.cursor(once)).isEqualTo(cursorBefore);
+        assertThat(cursorBefore.error()).isEqualTo(Optional.empty());
+    }
+}

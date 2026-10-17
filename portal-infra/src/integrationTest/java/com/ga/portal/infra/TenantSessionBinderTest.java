@@ -16,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.Clock;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -32,7 +31,7 @@ class TenantSessionBinderTest {
 
     private final RecordingDataSource recording = new RecordingDataSource(DB.appDataSource());
     private final TenantRepository tenants = new TenantRepository(new TenantJdbcGateway(recording));
-    private final IngestCursorRepository cursors = new IngestCursorRepository(new TenantJdbcGateway(recording), Clock.systemUTC());
+    private final IngestCursorRepository cursors = new IngestCursorRepository(new TenantJdbcGateway(recording));
 
     @Test
     void repositoryCallOutsideATransactionIsRejectedBeforeTheDatabase() {

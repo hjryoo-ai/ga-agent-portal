@@ -56,6 +56,10 @@ testing {
             dependencies {
                 implementation(project())
                 implementation(testFixtures(project(":portal-infra")))
+                implementation(testFixtures(project(":portal-ingest")))
+                implementation(project(":portal-ingest"))
+                implementation(project(":portal-infra"))
+                implementation(project(":portal-domain"))
                 implementation(libs.platform.spring)
                 implementation(platform(libs.spring.boot.bom))
                 implementation(libs.spring.boot.starter.test)
@@ -70,6 +74,9 @@ testing {
                     // 소스셋 밖에서 읽는 파일(verifyTestInputs): 하네스가 읽는 롤 초기화 스크립트·버전 카탈로그(이미지 digest)
                     inputs.file(rootProject.layout.projectDirectory.file("docker/postgres/init-roles.sql")).withPathSensitivity(PathSensitivity.RELATIVE)
                     inputs.file(rootProject.layout.projectDirectory.file("gradle/libs.versions.toml")).withPathSensitivity(PathSensitivity.RELATIVE)
+                    // 인제스트 IT: 계약 샘플과 시험 스트림(portal-ingest 시험 자원)을 읽는다
+                    inputs.dir(rootProject.layout.projectDirectory.dir("contracts/events/v1/samples")).withPathSensitivity(PathSensitivity.RELATIVE)
+                    inputs.dir(rootProject.layout.projectDirectory.dir("portal-ingest/src/test/resources/streams")).withPathSensitivity(PathSensitivity.RELATIVE)
                 }
             }
         }

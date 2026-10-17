@@ -33,9 +33,11 @@ public final class PostgresHarness {
     public static final String DATABASE = "portal";
     public static final String MIGRATOR = "portal_migrator";
     public static final String APP = "portal_app";
+    public static final String DIRECTORY = "portal_directory";
     // init-roles.sql과 짝을 이루는 로컬 전용 자격 증명
     public static final String MIGRATOR_PASSWORD = "migrator_local_only";
     public static final String APP_PASSWORD = "app_local_only";
+    public static final String DIRECTORY_PASSWORD = "directory_local_only";
 
     private static final Pattern IMAGE_LINE = Pattern.compile("(?m)^postgres-image\\s*=\\s*\"([^\"]+)\"");
 
@@ -45,6 +47,7 @@ public final class PostgresHarness {
     private final DataSource app;
     private final DataSource migrator;
     private final DataSource superuser;
+    private final DataSource directory;
 
     private PostgresHarness() {
         Path initRoles = repoRoot().resolve("docker/postgres/init-roles.sql");
@@ -61,6 +64,7 @@ public final class PostgresHarness {
         superuser = dataSource("postgres", "postgres");
         migrator = dataSource(MIGRATOR, MIGRATOR_PASSWORD);
         app = dataSource(APP, APP_PASSWORD);
+        directory = dataSource(DIRECTORY, DIRECTORY_PASSWORD);
 
         Flyway.configure()
                 .dataSource(migrator)
@@ -95,6 +99,11 @@ public final class PostgresHarness {
 
     public DataSource migratorDataSource() {
         return migrator;
+    }
+
+    /** {@code portal_directory}(테넌트 목록 전용 — V3). */
+    public DataSource directoryDataSource() {
+        return directory;
     }
 
     public DataSource superuserDataSource() {

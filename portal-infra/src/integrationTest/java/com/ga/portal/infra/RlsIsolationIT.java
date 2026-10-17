@@ -156,7 +156,10 @@ class RlsIsolationIT {
             }
             return rows;
         });
-        assertThat(policies).containsExactlyInAnyOrderElementsOf(TABLES.stream().map(t -> t + ":tenant_isolation:ALL:public").toList());
+        // 모든 테넌트 표에 tenant_isolation 하나 + tenant에만 테넌트 목록 전용 롤의 SELECT 정책(V3, Phase 1 승인 Q3) — 그 밖은 없다.
+        List<String> expected = new ArrayList<>(TABLES.stream().map(t -> t + ":tenant_isolation:ALL:public").toList());
+        expected.add("tenant:tenant_directory:SELECT:portal_directory");
+        assertThat(policies).containsExactlyInAnyOrderElementsOf(expected);
     }
 
     // ------------------------------------------------------------------ B3 (WITH CHECK)
@@ -238,11 +241,11 @@ class RlsIsolationIT {
                     assertThat(rs.getBoolean(3)).as("%s bypassrls", role).isFalse();
                     assertThat(rs.getBoolean(4)).as("%s createrole", role).isFalse();
                     assertThat(rs.getBoolean(5)).as("%s createdb", role).isFalse();
-                    if (role.equals("portal_app")) {
-                        assertThat(rs.getBoolean(6)).as("portal_app inherit").isFalse();
+                    if (role.equals("portal_app") || role.equals("portal_directory")) {
+                        assertThat(rs.getBoolean(6)).as("%s inherit", role).isFalse();
                     }
                 }
-                assertThat(roles).containsExactly("portal_app", "portal_migrator");
+                assertThat(roles).containsExactly("portal_app", "portal_directory", "portal_migrator");
             }
             try (Statement s = c.createStatement(); ResultSet rs = s.executeQuery("""
                     SELECT count(*) FROM information_schema.role_table_grants
