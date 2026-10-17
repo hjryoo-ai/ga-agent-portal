@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -26,11 +27,12 @@ public final class Samples {
         return Path.of(root);
     }
 
-    /** 샘플 01~17(seq 순). */
+    /** 샘플 01~17(seq 순 — v1.2부터 {@code a1/}·{@code contract-only/}·{@code standalone/} 세 디렉터리를 합친 것). */
     public static List<ObjectNode> all() {
         Path dir = repoRoot().resolve("contracts/events/v1/samples");
-        try (Stream<Path> files = Files.list(dir)) {
-            return files.filter(p -> p.toString().endsWith(".json")).sorted().map(Samples::read).toList();
+        try (Stream<Path> files = Files.walk(dir)) {
+            return files.filter(p -> p.toString().endsWith(".json"))
+                    .sorted(Comparator.comparing(p -> p.getFileName().toString())).map(Samples::read).toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

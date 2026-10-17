@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -24,7 +25,17 @@ class EnvelopeValidatorTest {
 
     static ObjectNode sample(String name) {
         try {
-            return (ObjectNode) JSON.readTree(Files.readString(SAMPLES.resolve(name)));
+            return (ObjectNode) JSON.readTree(Files.readString(samplePaths().stream()
+                    .filter(p -> p.getFileName().toString().equals(name)).findFirst().orElseThrow()));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** 샘플 전부 — v1.2부터 a1/·contract-only/·standalone/ 세 디렉터리. */
+    static List<Path> samplePaths() {
+        try (Stream<Path> s = Files.walk(SAMPLES)) {
+            return s.filter(p -> p.toString().endsWith(".json")).sorted(Comparator.comparing(p -> p.getFileName().toString())).toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -32,10 +43,7 @@ class EnvelopeValidatorTest {
 
     @Test
     void all17SamplesAreValid() throws IOException {
-        List<Path> files;
-        try (Stream<Path> s = Files.list(SAMPLES)) {
-            files = s.sorted().toList();
-        }
+        List<Path> files = samplePaths();
         assertThat(files).hasSize(17);
         for (Path f : files) {
             JsonNode node = JSON.readTree(Files.readString(f));
