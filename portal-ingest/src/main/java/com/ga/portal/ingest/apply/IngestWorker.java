@@ -86,6 +86,7 @@ public final class IngestWorker {
                 break;
             }
         }
+        applier.markCaughtUp(tenant, page.headSeq());
         finish(tenant, Optional.of(page.headSeq()));
         return new Round(tenant, applied, skipped, stopped, false, true);
     }

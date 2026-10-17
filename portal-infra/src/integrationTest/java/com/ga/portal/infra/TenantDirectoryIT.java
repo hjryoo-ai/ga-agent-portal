@@ -46,6 +46,8 @@ class TenantDirectoryIT {
             "SELECT name FROM tenant",
             "SELECT engine_base_url FROM tenant",
             "SELECT params FROM tenant",
+            "SELECT oidc_issuer FROM tenant",      // V5 발급자 열은 portal_issuer만(Phase 3 지시문 D-1)
+            "SELECT oidc_audience FROM tenant",
             "SELECT * FROM tenant",
             "SELECT count(*) FROM ingest_cursor",
             "SELECT count(*) FROM earnings_line",

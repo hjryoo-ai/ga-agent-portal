@@ -73,7 +73,7 @@ class TenantContextGuardTest {
     @Test
     void theGuardedMethodsAreAllPublicMethodsOfTheRepositories() {
         assertThat(publicMethods(TenantRepository.class)).containsExactly("current");
-        assertThat(publicMethods(IngestCursorRepository.class)).containsExactly("ensure", "find", "save");
+        assertThat(publicMethods(IngestCursorRepository.class)).containsExactly("caughtUpAt", "ensure", "find", "markCaughtUp", "save");
         assertThat(publicMethods(IngestEventRepository.class)).containsExactly("find", "markApplied", "markFailed", "maxAppliedSeq");
         assertThat(publicMethods(IngestLockRepository.class)).containsExactly("tryLock");
         assertThat(publicMethods(AuditAccessRepository.class)).containsExactly("recent", "record");
@@ -94,6 +94,8 @@ class TenantContextGuardTest {
         assertThatThrownBy(() -> cursors.save(1, Optional.empty(), IngestState.RUNNING, Optional.empty(), NOW))
                 .isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> cursors.ensure(NOW)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> cursors.markCaughtUp(7, NOW)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(cursors::caughtUpAt).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> events.find(ROW.eventId())).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> events.markApplied(ROW)).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> events.markFailed(new IngestEventRecord(ROW.tenantId(), ROW.eventId(), 1, "AgentSnapshot", NOW,

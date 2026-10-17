@@ -25,9 +25,13 @@ import java.util.function.Supplier;
  */
 public final class InMemoryIngest implements IngestStore, TenantTransactions, IngestLock {
 
-    private record State(Optional<CursorRecord> cursor, Map<String, IngestEventRecord> events) {
+    private record State(Optional<CursorRecord> cursor, Map<String, IngestEventRecord> events, Optional<Instant> caughtUpAt) {
+        State(Optional<CursorRecord> cursor, Map<String, IngestEventRecord> events) {
+            this(cursor, events, Optional.empty());
+        }
+
         State copy() {
-            return new State(cursor, new LinkedHashMap<>(events));
+            return new State(cursor, new LinkedHashMap<>(events), caughtUpAt);
         }
     }
 
@@ -89,7 +93,7 @@ public final class InMemoryIngest implements IngestStore, TenantTransactions, In
         State s = bound();
         if (s.cursor().isEmpty()) {
             CursorRecord created = new CursorRecord(0, Optional.empty(), IngestState.RUNNING, now, Optional.empty());
-            tenants.put(TenantContext.current(), new State(Optional.of(created), s.events()));
+            tenants.put(TenantContext.current(), new State(Optional.of(created), s.events(), s.caughtUpAt()));
             return created;
         }
         return s.cursor().get();
@@ -97,7 +101,8 @@ public final class InMemoryIngest implements IngestStore, TenantTransactions, In
 
     @Override
     public void saveCursor(long lastSeq, Optional<String> lastEventId, IngestState state, Optional<String> error, Instant now) {
-        tenants.put(TenantContext.current(), new State(Optional.of(new CursorRecord(lastSeq, lastEventId, state, now, error)), bound().events()));
+        tenants.put(TenantContext.current(), new State(Optional.of(new CursorRecord(lastSeq, lastEventId, state, now, error)), bound().events(),
+                bound().caughtUpAt()));
     }
 
     @Override
@@ -126,6 +131,26 @@ public final class InMemoryIngest implements IngestStore, TenantTransactions, In
             throw new IllegalStateException("an APPLIED row is never overwritten: " + record.eventId());
         }
         bound().events().put(record.eventId(), record);
+    }
+
+    @Override
+    public boolean markCaughtUp(long headSeq, Instant at) {
+        State s = bound();
+        boolean ok = s.cursor().filter(c -> c.state() == IngestState.RUNNING && c.lastSeq() == headSeq).isPresent();
+        if (ok) {
+            tenants.put(TenantContext.current(), new State(s.cursor(), s.events(), Optional.of(at)));
+        }
+        return ok;
+    }
+
+    @Override
+    public Optional<Instant> caughtUpAt() {
+        return bound().caughtUpAt();
+    }
+
+    /** 시험이 보는 따라잡은 시각. */
+    public Optional<Instant> caughtUpAtOf(TenantId tenant) {
+        return state(tenant).caughtUpAt();
     }
 
     @Override

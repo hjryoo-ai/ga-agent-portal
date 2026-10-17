@@ -130,6 +130,14 @@ public final class IngestApplier {
         });
     }
 
+    /**
+     * 회차가 피드를 받은 뒤(Phase 3 계획 승인 Q3): 잠금 안 짧은 트랜잭션에서 커서가 {@code RUNNING}이고 {@code last_seq = headSeq}이면 따라잡은 시각을
+     * 쓴다. 잠금을 못 잡으면 다른 워커가 처리 중이다 — 그 워커가 쓴다. 피드 실패·정지 상태에서는 부르지 않거나 조건이 막는다.
+     */
+    public boolean markCaughtUp(TenantId tenant, long headSeq) {
+        return transactions.inTransaction(tenant, () -> lock.tryLock() && store.markCaughtUp(headSeq, clock.instant()));
+    }
+
     private Result applyInTransaction(TenantId tenant, JsonNode event) {
         if (!lock.tryLock()) {
             return Result.of(Outcome.LOCK_BUSY);

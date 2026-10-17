@@ -53,6 +53,16 @@ final class JdbcIngestStore implements IngestStore {
     }
 
     @Override
+    public boolean markCaughtUp(long headSeq, Instant at) {
+        return cursors.markCaughtUp(headSeq, at) == 1;
+    }
+
+    @Override
+    public Optional<Instant> caughtUpAt() {
+        return cursors.caughtUpAt();
+    }
+
+    @Override
     public OptionalLong maxAppliedSeq() {
         return events.maxAppliedSeq();
     }

@@ -11,8 +11,8 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * 바인딩된 테넌트의 {@code policy_limit}·{@code policy_limit_history}(설계서 §5 v1.5). {@code limit_multiple}은 엔진의 불투명 소수 문자열을
- * SQL이 {@code NUMERIC}으로 받고 {@code trim_scale(…)::text}로 돌려준다 — 포털 코드는 숫자로 바꾸지 않는다(규약 1).
+ * 바인딩된 테넌트의 {@code policy_limit}·{@code policy_limit_history}(설계서 §5 v1.6). {@code limit_multiple}은 엔진의 불투명 소수 문자열이고
+ * V5부터 {@code TEXT}로 원문 그대로 저장·반환한다(Phase 3 지시문 D-10) — 포털 코드는 숫자로 바꾸지 않는다(규약 1).
  */
 @Repository
 public class PolicyLimitRepository extends ViewRepository {
@@ -29,7 +29,7 @@ public class PolicyLimitRepository extends ViewRepository {
     public Optional<LedgerRow> find(String ledgerId) {
         return queryAtMostOne("""
                 SELECT ledger_id, agent_id, policy_no, contract_date, fy_start, fy_end, monthly_premium,
-                       trim_scale(limit_multiple)::text AS limit_multiple, limit_amount, accum_paid, cut_total, deferred_total, last_posting_seq,
+                       limit_multiple, limit_amount, accum_paid, cut_total, deferred_total, last_posting_seq,
                        rule_version_id
                   FROM policy_limit WHERE tenant_id = :tenantId AND ledger_id = :ledgerId
                 """, Map.of("ledgerId", ledgerId), MAPPER);
@@ -38,7 +38,7 @@ public class PolicyLimitRepository extends ViewRepository {
     public Optional<LedgerRow> findByPolicy(String policyNo, String agentId) {
         return queryAtMostOne("""
                 SELECT ledger_id, agent_id, policy_no, contract_date, fy_start, fy_end, monthly_premium,
-                       trim_scale(limit_multiple)::text AS limit_multiple, limit_amount, accum_paid, cut_total, deferred_total, last_posting_seq,
+                       limit_multiple, limit_amount, accum_paid, cut_total, deferred_total, last_posting_seq,
                        rule_version_id
                   FROM policy_limit WHERE tenant_id = :tenantId AND policy_no = :policyNo AND agent_id = :agentId
                 """, Map.of("policyNo", policyNo, "agentId", agentId), MAPPER);
@@ -48,7 +48,7 @@ public class PolicyLimitRepository extends ViewRepository {
         update("""
                 INSERT INTO policy_limit (tenant_id, ledger_id, agent_id, policy_no, contract_date, fy_start, fy_end, monthly_premium, limit_multiple,
                                           limit_amount, accum_paid, cut_total, deferred_total, last_posting_seq, rule_version_id)
-                VALUES (:tenantId, :ledgerId, :agentId, :policyNo, :contractDate, :fyStart, :fyEnd, :monthlyPremium, CAST(:limitMultiple AS NUMERIC),
+                VALUES (:tenantId, :ledgerId, :agentId, :policyNo, :contractDate, :fyStart, :fyEnd, :monthlyPremium, :limitMultiple,
                         :limitAmount, :accumPaid, :cutTotal, :deferredTotal, :lastPostingSeq, :ruleVersionId)
                 """, params(r));
     }

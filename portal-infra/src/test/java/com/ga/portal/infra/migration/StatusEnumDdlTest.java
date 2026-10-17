@@ -6,10 +6,12 @@ import com.ga.portal.domain.DeferralStatus;
 import com.ga.portal.domain.FlagType;
 import com.ga.portal.domain.IngestEventStatus;
 import com.ga.portal.domain.IngestState;
+import com.ga.portal.domain.LinkStatus;
 import com.ga.portal.domain.MonthStatus;
 import com.ga.portal.domain.NetBasis;
 import com.ga.portal.domain.ReceivableStatus;
 import com.ga.portal.domain.ReconSource;
+import com.ga.portal.domain.Role;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -36,29 +38,31 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 계획 승인 Q9: 닫힌 값 컬럼의 {@code CHECK (… IN …)} 목록이 그 값의 정본과 같다 — 두 정본이 어긋나지 않게(C10과 같은 방식).
  * 마이그레이션은 V1부터 마지막 V까지 전부 읽는다(V4가 닫힌 값 7개를 더했다 — Phase 2 계획 ⑧).
  * <ul>
- *   <li>Java 열거가 있는 컬럼 10개: 열거 값 집합 = CHECK 목록({@code ingest_event.status}의 {@code SKIPPED}·{@code earnings_month.data_status}의
+ *   <li>Java 열거가 있는 컬럼 12개(V5 {@code identity_link.role}·{@code status}): 열거 값 집합 = CHECK 목록({@code ingest_event.status}의 {@code SKIPPED}·{@code earnings_month.data_status}의
  *       {@code REBUILDING}은 열거에 남아 있으나 쓰지 않는다 — Phase 1 승인 Q2, Phase 2 승인 Q9).</li>
  *   <li>열거가 없는 컬럼 9개: CHECK 목록이 정본이고 설계서 §5 DDL 주석({@code -- A/B/C})과 대조.</li>
- *   <li>CHECK가 걸린 컬럼 집합 = 승인된 19개(Phase 0의 12 + V4의 7) = 설계서 §5에서 닫힌 목록 주석이 달린 컬럼 집합({@code /...}로 끝나는
+ *   <li>CHECK가 걸린 컬럼 집합 = 승인된 21개(Phase 0의 12 + V4의 7 + V5의 2) = 설계서 §5에서 닫힌 목록 주석이 달린 컬럼 집합({@code /...}로 끝나는
  *       열린 목록은 제외 — 예: {@code comm_type}·{@code role}).</li>
  * </ul>
  */
 class StatusEnumDdlTest {
 
     private static final Pattern CHECK_IN = Pattern.compile(
-            "CONSTRAINT ck_([a-z_]+?)_(status_reason|data_status|net_basis|status|state|kind|flag_type|severity|reason|source) CHECK \\(\\2 IN \\(([^)]*)\\)\\)");
+            "CONSTRAINT ck_([a-z_]+?)_(status_reason|data_status|net_basis|status|state|kind|flag_type|severity|reason|source|role) CHECK \\(\\2 IN \\(([^)]*)\\)\\)");
 
-    private static final Map<String, Class<? extends Enum<?>>> ENUMS = Map.of(
-            "earnings_month.status", MonthStatus.class,
-            "earnings_month.data_status", DataStatus.class,
-            "deferral_item.status", DeferralStatus.class,
-            "ingest_cursor.state", IngestState.class,
-            "ingest_event.status", IngestEventStatus.class,
-            "agent_profile.status", AgentStatus.class,
-            "clawback_item.status", ReceivableStatus.class,
-            "earnings_month.net_basis", NetBasis.class,
-            "recon_result.source", ReconSource.class,
-            "policy_flag.flag_type", FlagType.class);
+    private static final Map<String, Class<? extends Enum<?>>> ENUMS = Map.ofEntries(
+            Map.entry("earnings_month.status", MonthStatus.class),
+            Map.entry("earnings_month.data_status", DataStatus.class),
+            Map.entry("deferral_item.status", DeferralStatus.class),
+            Map.entry("ingest_cursor.state", IngestState.class),
+            Map.entry("ingest_event.status", IngestEventStatus.class),
+            Map.entry("agent_profile.status", AgentStatus.class),
+            Map.entry("clawback_item.status", ReceivableStatus.class),
+            Map.entry("earnings_month.net_basis", NetBasis.class),
+            Map.entry("recon_result.source", ReconSource.class),
+            Map.entry("policy_flag.flag_type", FlagType.class),
+            Map.entry("identity_link.role", Role.class),
+            Map.entry("identity_link.status", LinkStatus.class));
 
     private static final Set<String> APPROVED_COLUMNS = Set.of(
             "earnings_month.status", "earnings_month.data_status", "deferral_item.status", "ingest_cursor.state",
@@ -66,11 +70,13 @@ class StatusEnumDdlTest {
             "policy_limit_history.kind", "policy_flag.flag_type", "notification.severity",
             // V4(Phase 2 계획 ⑧)
             "agent_profile.status", "earnings_month.net_basis", "policy_flag.reason", "clawback_item.status", "deferral_item.reason",
-            "deferral_item.status_reason", "recon_result.source");
+            "deferral_item.status_reason", "recon_result.source",
+            // V5(Phase 3 계획 ⑥)
+            "identity_link.role", "identity_link.status");
 
     @Test
-    void checkedColumnsAreExactlyTheApprovedNineteen() {
-        assertThat(APPROVED_COLUMNS).hasSize(19);
+    void checkedColumnsAreExactlyTheApprovedTwentyOne() {
+        assertThat(APPROVED_COLUMNS).hasSize(21);
         assertThat(ddlChecks().keySet()).containsExactlyInAnyOrderElementsOf(APPROVED_COLUMNS);
     }
 

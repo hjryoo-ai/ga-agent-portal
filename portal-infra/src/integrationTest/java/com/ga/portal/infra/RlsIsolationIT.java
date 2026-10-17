@@ -159,6 +159,7 @@ class RlsIsolationIT {
         // 모든 테넌트 표에 tenant_isolation 하나 + tenant에만 테넌트 목록 전용 롤의 SELECT 정책(V3, Phase 1 승인 Q3) — 그 밖은 없다.
         List<String> expected = new ArrayList<>(TABLES.stream().map(t -> t + ":tenant_isolation:ALL:public").toList());
         expected.add("tenant:tenant_directory:SELECT:portal_directory");
+        expected.add("tenant:tenant_issuer:SELECT:portal_issuer");   // V5(Phase 3 계획 승인 Q1)
         assertThat(policies).containsExactlyInAnyOrderElementsOf(expected);
     }
 
@@ -167,7 +168,7 @@ class RlsIsolationIT {
     @Test
     void cannotWriteRowsOfAnotherTenant() {
         assertThatThrownBy(() -> DB.asApp(A, c -> SeedData.exec(c,
-                "INSERT INTO identity_link (tenant_id, subject, agent_id) VALUES (?, 'sub-x', 'A0002')", B)))
+                "INSERT INTO identity_link (tenant_id, subject, agent_id, role, status, org_path, linked_at) VALUES (?, 'sub-x', 'A0002', 'AGENT', 'ACTIVE', '/HQ1', TIMESTAMPTZ '2026-10-17 00:00:00+00')", B)))
                 .isInstanceOf(PostgresHarness.UncheckedSqlException.class)
                 .satisfies(e -> assertThat(((PostgresHarness.UncheckedSqlException) e).sqlState()).isEqualTo("42501"));
         assertThat(DB.<Integer>asApp(A, c -> SeedData.exec(c, "UPDATE identity_link SET agent_id = 'A0002' WHERE tenant_id = ?", B))).isZero();
@@ -241,11 +242,11 @@ class RlsIsolationIT {
                     assertThat(rs.getBoolean(3)).as("%s bypassrls", role).isFalse();
                     assertThat(rs.getBoolean(4)).as("%s createrole", role).isFalse();
                     assertThat(rs.getBoolean(5)).as("%s createdb", role).isFalse();
-                    if (role.equals("portal_app") || role.equals("portal_directory")) {
+                    if (role.equals("portal_app") || role.equals("portal_directory") || role.equals("portal_issuer")) {
                         assertThat(rs.getBoolean(6)).as("%s inherit", role).isFalse();
                     }
                 }
-                assertThat(roles).containsExactly("portal_app", "portal_directory", "portal_migrator");
+                assertThat(roles).containsExactly("portal_app", "portal_directory", "portal_issuer", "portal_migrator");
             }
             try (Statement s = c.createStatement(); ResultSet rs = s.executeQuery("""
                     SELECT count(*) FROM information_schema.role_table_grants
