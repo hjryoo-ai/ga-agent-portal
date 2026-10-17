@@ -100,6 +100,8 @@ testing {
                     inputs.file(rootProject.layout.projectDirectory.file("contracts/api/v1/portal-api.openapi.yaml")).withPathSensitivity(PathSensitivity.RELATIVE)
                     // 화면 서빙 IT(Phase 4): 화면 경로 목록(WebScreensIT가 서버 목록과 대조)
                     inputs.file(rootProject.layout.projectDirectory.file("web/src/routes.ts")).withPathSensitivity(PathSensitivity.RELATIVE)
+                    // 화면 E2E 하네스(WebE2eHarness — 같은 소스셋)가 읽는 포털 손 스트림
+                    inputs.dir(rootProject.layout.projectDirectory.dir("web/e2e/streams")).withPathSensitivity(PathSensitivity.RELATIVE)
                 }
             }
         }
@@ -154,6 +156,17 @@ tasks.register<JavaExec>("runTestIssuer") {
     description = "Runs the in-process test OIDC issuer for e2e/engine-feed (writes token and issuer URL to the given state dir)."
     classpath = integrationTestSourceSet.get().runtimeClasspath
     mainClass = "com.ga.portal.app.web.TestIssuerMain"
+}
+// 화면 E2E(포털 Phase 4 계획 ⑨): web/e2e/run.mjs가 하네스(WebE2eHarness — 통합 시험 소스셋)를 java -cp로 띄운다. 그 클래스패스를 파일로 넘긴다
+// (명령 인자에 긴 경로 목록·비밀 없음). :web:e2e가 부른다 — check 밖.
+tasks.register("webE2eHarnessClasspath") {
+    group = "e2e"
+    description = "Writes the integrationTest runtime classpath for the web E2E harness."
+    val classpath = integrationTestSourceSet.map { it.runtimeClasspath }
+    val out = layout.buildDirectory.file("web-e2e/harness.classpath")
+    inputs.files(classpath)
+    outputs.file(out)
+    doLast { out.get().asFile.writeText(classpath.get().files.joinToString(File.pathSeparator)) }
 }
 tasks.register<JavaExec>("e2eCheck") {
     group = "e2e"

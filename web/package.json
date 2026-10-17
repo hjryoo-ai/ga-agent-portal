@@ -15,7 +15,9 @@
     "test": "vitest run",
     "build": "vite build && node scripts/scan-dist.mjs && node scripts/bundle-size.mjs",
     "licenses": "node scripts/licenses.mjs",
-    "audit:record": "node scripts/audit-record.mjs"
+    "audit:record": "node scripts/audit-record.mjs",
+    "e2e:install": "playwright install chromium webkit",
+    "e2e": "node e2e/run.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.3",
@@ -25,7 +27,9 @@
     "react-router": "8.4.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.1",
     "@testing-library/dom": "10.4.2",
     "@testing-library/react": "16.3.3",
     "@types/node": "24.19.2",

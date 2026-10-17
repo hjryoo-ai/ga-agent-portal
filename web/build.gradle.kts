@@ -23,7 +23,8 @@ tasks.named<PnpmInstallTask>("pnpmInstall") {
 
 val contract = rootProject.layout.projectDirectory.file("contracts/api/v1/portal-api.openapi.yaml")
 val webSources = fileTree("src") { exclude("__lint__/**") }
-val webConfig = files("package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.json", "vite.config.ts", "eslint.config.js", "contracts-client.lock.json")
+val webConfig = files("package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.json", "vite.config.ts", "eslint.config.js", "contracts-client.lock.json",
+    "playwright.config.ts")
 
 fun PnpmTask.webInputs() {
     dependsOn(tasks.named("pnpmInstall"))
@@ -31,6 +32,7 @@ fun PnpmTask.webInputs() {
     inputs.files(webSources).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir("scripts").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir("eslint").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir("e2e").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(contract).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
@@ -115,6 +117,32 @@ tasks.register<PnpmTask>("webAudit") {
     description = "Records pnpm audit --json in build/web/audit.json (never fails on findings)."
     webInputs()
     args.set(listOf("run", "audit:record"))
+    outputs.upToDateWhen { false }
+}
+
+// 화면 E2E(계획 ⑨ — Q10·Q14): 하네스(Java — PostgreSQL·발급기·피드 스텁) + 포털 bootJar + Playwright(Chromium·WebKit).
+// check에 넣지 않는다 — CI는 별도 잡 web-e2e. Docker가 없으면 하네스가 실패한다(스킵 없음). 브라우저는 @playwright/test가 고정한 판을 받는다.
+val e2eInstall = tasks.register<PnpmTask>("e2eInstall") {
+    description = "Downloads the Chromium and WebKit builds pinned by @playwright/test."
+    dependsOn(tasks.named("pnpmInstall"))
+    val withDeps = providers.environmentVariable("CI").orNull == "true"
+    args.set(listOf("exec", "playwright", "install", "chromium", "webkit") + (if (withDeps) listOf("--with-deps") else emptyList()))
+    outputs.upToDateWhen { false }
+}
+
+tasks.register<PnpmTask>("e2e") {
+    group = "verification"
+    description = "Runs the Playwright E2E suite against the boot jar with an isolated harness (PostgreSQL, issuers, feed stubs)."
+    webInputs()
+    dependsOn(clientCheck, e2eInstall, ":portal-app:bootJar", ":portal-app:webE2eHarnessClasspath")
+    inputs.dir("e2e").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file("playwright.config.ts").withPathSensitivity(PathSensitivity.RELATIVE)
+    val bootJar = project(":portal-app").tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar").flatMap { it.archiveFile }
+    val launcher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(libs.versions.java.get()) }
+    environment.put("PORTAL_E2E_JAR", bootJar.map { it.asFile.absolutePath })
+    environment.put("PORTAL_E2E_JAVA", launcher.map { it.executablePath.asFile.absolutePath })
+    environment.put("PORTAL_E2E_HARNESS_CP", project(":portal-app").layout.buildDirectory.file("web-e2e/harness.classpath").map { it.asFile.absolutePath })
+    args.set(listOf("run", "e2e"))
     outputs.upToDateWhen { false }
 }
 

@@ -1,13 +1,14 @@
 # web — 서드파티 패키지
 
 설치되는 모든 패키지(개발용 포함). `scripts/licenses.mjs`가 설치본과 이 표를 대조한다 — 의존성을 바꾼 커밋에서 `node scripts/licenses.mjs write`로 다시 쓴다.
-허용 라이선스: MIT, ISC, Apache-2.0, BSD-2-Clause, BSD-3-Clause, 0BSD, BlueOak-1.0.0, MIT-0. 개발 도구 전용 예외(번들 밖): `lightningcss` MPL-2.0, `lightningcss-<platform>` MPL-2.0, `mdn-data` CC0-1.0, `argparse` Python-2.0, `type-fest` (MIT OR CC0-1.0), `caniuse-lite` CC-BY-4.0.
+허용 라이선스: MIT, ISC, Apache-2.0, BSD-2-Clause, BSD-3-Clause, 0BSD, BlueOak-1.0.0, MIT-0. 개발 도구 전용 예외(번들 밖): `lightningcss` MPL-2.0, `lightningcss-<platform>` MPL-2.0, `mdn-data` CC0-1.0, `argparse` Python-2.0, `type-fest` (MIT OR CC0-1.0), `caniuse-lite` CC-BY-4.0, `axe-core` MPL-2.0, `@axe-core/playwright` MPL-2.0.
 플랫폼 바이너리는 `<platform>`으로 적는다. "번들"은 배포 산출물에 실제로 묶인 패키지다.
 
 | 패키지 | 판 | 라이선스 | 번들 |
 |---|---|---|---|
 | `@asamuzakjp/css-color` | 7.1.5 | MIT |  |
 | `@asamuzakjp/dom-selector` | 10.0.3 | MIT |  |
+| `@axe-core/playwright` | 4.14.0 | MPL-2.0 |  |
 | `@babel/code-frame` | 7.29.7 | MIT |  |
 | `@babel/compat-data` | 7.29.7 | MIT |  |
 | `@babel/core` | 7.29.7 | MIT |  |
@@ -56,6 +57,7 @@
 | `@keyv/bigmap` | 1.3.1 | MIT |  |
 | `@keyv/serialize` | 1.1.1 | MIT |  |
 | `@oxc-project/types` | 0.154.0 | MIT |  |
+| `@playwright/test` | 1.64.1 | Apache-2.0 |  |
 | `@redocly/ajv` | 8.11.2 | MIT |  |
 | `@redocly/config` | 0.22.0 | MIT |  |
 | `@redocly/openapi-core` | 1.34.21 | MIT |  |
@@ -98,6 +100,7 @@
 | `argparse` | 2.0.1 | Python-2.0 |  |
 | `aria-query` | 5.3.0 | Apache-2.0 |  |
 | `assertion-error` | 2.0.1 | MIT |  |
+| `axe-core` | 4.14.0 | MPL-2.0 |  |
 | `balanced-match` | 1.0.2 | MIT |  |
 | `balanced-match` | 4.0.4 | MIT |  |
 | `baseline-browser-mapping` | 2.11.29 | Apache-2.0 |  |
@@ -204,6 +207,8 @@
 | `path-key` | 3.1.1 | MIT |  |
 | `picocolors` | 1.1.1 | ISC |  |
 | `picomatch` | 4.0.7 | MIT |  |
+| `playwright` | 1.64.1 | Apache-2.0 |  |
+| `playwright-core` | 1.64.1 | Apache-2.0 |  |
 | `pluralize` | 8.0.0 | MIT |  |
 | `postcss` | 8.5.30 | MIT |  |
 | `prelude-ls` | 1.2.1 | MIT |  |

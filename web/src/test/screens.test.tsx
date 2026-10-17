@@ -92,9 +92,14 @@ describe('MonthCard', () => {
     expect(screen.queryByTestId('row-tax')).toBeNull();
   });
 
-  it('adjustment-only confirmed month: "정정 N원 — 지급 반영은 정산팀 확인"', () => {
-    render(<MonthCard month={month({ status: 'CONFIRMED', gross: won(0), byType: {}, adjustment: won(-45000) })} heading="h" nowMs={Date.now()} />);
-    expect(screen.getByTestId('adjustment-only').textContent).toBe('정정 -45,000원확정 — 지급 반영은 정산팀 확인');
+  it('adjustment-only confirmed month: "정정 N원 — 지급 반영은 정산팀 확인" (no lines, or ADJUSTMENT lines only)', () => {
+    for (const byType of [{}, { ADJUSTMENT: won(-45000) }]) {
+      render(<MonthCard month={month({ status: 'CONFIRMED', gross: won(0), byType, adjustment: won(-45000) })} heading="h" nowMs={Date.now()} />);
+      expect(screen.getByTestId('adjustment-only').textContent).toBe('정정 -45,000원확정 — 지급 반영은 정산팀 확인');
+      cleanup();
+    }
+    render(<MonthCard month={month({ status: 'CONFIRMED', adjustment: won(-45000) })} heading="h" nowMs={Date.now()} />);
+    expect(screen.queryByTestId('adjustment-only')).toBeNull();
   });
 
   it('PAID shows the payout day, not the expected day; payout expected shows D-n', () => {

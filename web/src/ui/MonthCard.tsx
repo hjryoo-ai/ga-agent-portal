@@ -21,9 +21,9 @@ export function isUncertain(month: Pick<MonthResponse, 'monthDataStatus'>): bool
   }
 }
 
-/** 정정만 있는 확정 달(라인 없음 · 정정 0 아님) — Q3. */
+/** 정정만 있는 확정 달(Q3): 라인이 정정(ADJUSTMENT — AdjustmentPosted가 만드는 라인)뿐이거나 없고, 정정 합이 0이 아니다. */
 export function isAdjustmentOnly(month: Pick<MonthResponse, 'status' | 'byType' | 'adjustment'>): boolean {
-  return month.status === 'CONFIRMED' && Object.keys(month.byType).length === 0 && !isZero(month.adjustment);
+  return month.status === 'CONFIRMED' && Object.keys(month.byType).every((t) => t === 'ADJUSTMENT') && !isZero(month.adjustment);
 }
 
 function Row({ name, children, testId }: { name: string; children: ReactNode; testId: string }) {

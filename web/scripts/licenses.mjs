@@ -19,6 +19,9 @@ const DEV_ONLY = new Map([
   ['argparse', 'Python-2.0'],
   ['type-fest', '(MIT OR CC0-1.0)'],
   ['caniuse-lite', 'CC-BY-4.0'],
+  // E2E 접근성 검사(Playwright + axe — 지시문 ⑦). 번들 밖.
+  ['axe-core', 'MPL-2.0'],
+  ['@axe-core/playwright', 'MPL-2.0'],
 ]);
 const PLATFORM_OPTIONAL = new Set(['fsevents']);
 

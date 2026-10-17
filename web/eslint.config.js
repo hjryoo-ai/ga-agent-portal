@@ -35,8 +35,13 @@ export default tseslint.config(
     },
   },
   {
-    files: ['eslint.config.js', 'eslint/**/*.js', 'scripts/**/*.mjs'],
+    files: ['eslint.config.js', 'eslint/**/*.js', 'scripts/**/*.mjs', 'e2e/**/*.mjs'],
     extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    // E2E(Node 쪽 Playwright 시험): 브라우저 금지 규칙 밖 — 하네스 제어·토큰 파일은 Node에서 읽는다. 금액 규칙은 화면 코드(src)의 것이다.
+    files: ['e2e/**/*.ts', 'playwright.config.ts'],
     languageOptions: { globals: globals.node },
   },
   {
