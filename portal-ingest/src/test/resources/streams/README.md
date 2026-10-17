@@ -1,8 +1,12 @@
 # 시험 스트림 (포털 Phase 1 계획 ⑧)
 
 JSONL — 첫 줄 머리 `{"tenantId", "schemaVersion"}`, 다음 줄부터 Envelope 한 줄씩(`FileFeedAdapter` 형식). 전부 계약 샘플
-`contracts/events/v1/samples/01~17`(허구 데이터)에서 만들었고, `StreamFilesTest`가 아래 표의 규칙으로 다시 계산해 파일과 대조한다 — 샘플이
-바뀌면 그 시험이 실패한다.
+`contracts/events/v1/samples/01~17`(허구 데이터 — 계약 v1.2부터 `a1/`·`contract-only/`·`standalone/` 세 디렉터리, seq로 합친다)에서 만들었고,
+`StreamFilesTest`가 아래 표의 규칙으로 다시 계산해 파일과 대조한다 — 샘플이 바뀌면 그 시험이 실패한다.
+
+**파일 순서는 시험용 어댑터의 성질이다.** `FileFeedAdapter`는 첫 `seq > afterSeq` 줄부터 파일 순서 그대로 돌려준다(뒤의 작은 seq 포함 —
+중복·역순 스트림을 싣기 위해). 엔진 피드 규약(seq 오름차순, `seq > afterSeq`만, 갭 없음)이 아니므로 데모 파일(Phase 8)은 이 성질에 기대지 않는다
+(Phase 1 수용 심사 F8).
 
 | 파일 | 테넌트 | 내용 | 쓰는 시험 |
 |---|---|---|---|

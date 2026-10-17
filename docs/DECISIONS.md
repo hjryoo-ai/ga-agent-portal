@@ -75,3 +75,21 @@
 | P1-2 | 감사 동작 `INGEST_STATUS`·`INGEST_RESUME`·`INGEST_RESUME_REJECTED`·`INGEST_PAUSE` | `INGEST_PAUSE_REJECTED` 추가 | "전 건 감사"(D-8) — 거부된 pause도 남긴다 |
 | P1-3 | 스케줄 | `tenant.status`가 `ACTIVE`가 아닌 테넌트는 폴링하지 않는다 | §5 `tenant.status`(ACTIVE/PAUSED)의 뜻. 계획에 없던 조건 |
 | P1-4 | 행위자 없는 CLI | DB에 닿기 전에 거부(감사 행 없음) | 감사할 행위자가 없다 |
+
+## 2026-10-17 — Phase 1 수용 심사·계약 v1.2 (`docs/phase-01-수용심사.md`, `docs/phase-02-지시문.md` §0)
+
+### 설계서 결함 (설계서 v1.4.1 변경 이력에도)
+
+| # | 결함 | 처리 |
+|---|---|---|
+| DD-5 | §5 `policy_limit_history` PK `(tenant_id, ledger_id, posting_seq)` — `LimitLedgerRebased`는 전기 순번이 없을 수 있고(v1.1.1 L1) 있으면 직전 전기와 같은 값이라 키가 충돌한다 | Phase 2 V4에서 키를 이벤트 `seq`(`source_seq`)로, `posting_seq` NULL 허용(Phase 2 지시문 D-7) |
+| DD-6 | §5 `tenant.status`가 `ACTIVE/PAUSED`만 적고 뜻을 적지 않았다 — Phase 1 지시문이 `tenant.status`와 커서 상태의 관계를 정하지 않았다(수용 심사 Q1) | `PAUSED` = 관리 상태(폴링·조회 모두 중지), 커서 상태와 독립 — 두 문이 다 있어야 한다. §5 주석(v1.4.1). Phase 3 조회 거부는 같은 상수 |
+| DD-7 | 부록 A-1 예시값(월납 300,000, FY 2,800,000)은 엔진 시드로 재현되지 않는다 — 설계 시 엔진 요율을 보지 않았다 | 정본은 엔진 E2 0단계가 월납 150,000으로 낸 스트림(Phase 2 D-1). 그때까지 샘플을 `a1/`·`contract-only/`로 나눈다(M5) |
+
+### 해석 (지시문 문구와 다르게 적은 곳)
+
+| # | 지시문 | 한 것 | 이유 |
+|---|---|---|---|
+| V12-1 | M5 "샘플 디렉터리 분리: `samples/a1/`와 `samples/contract-only/`" | 세 번째 디렉터리 **`samples/standalone/`**(14 `ClawbackReceivableUpdated`·15 `AdjustmentPosted`·16 `AgentSnapshot`·17 `LimitLedgerRebased`) | 넷은 엔진이 **내는** 형태라 `contract-only/`(엔진이 내지 않는 형태)의 정의에 맞지 않고, A-1 시나리오 밖이라 `a1/`(엔진 스트림으로 바뀔 자리)에도 맞지 않는다. 13종 전부를 덮는 샘플(Phase 0 C7)은 세 디렉터리를 합쳐 유지 |
+| V12-2 | M4 "14 금액 양수·상태 `OFFSET`" | `amount` 1,200,000, `remaining` 350,000(그대로 크기만), `OFFSET` | 엔진 `ReceivableStatus.OFFSET` = 일부 상계(잔액 > 0) — 원래 샘플의 `PARTIALLY_OFFSET`과 같은 뜻 |
+
