@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 조립 전체(폴링 켬): 스케줄러가 전용 롤 {@code portal_directory}로 테넌트를 읽고, 테넌트 행의 {@code engine_base_url}(스텁 엔진)에 토큰 파일의
- * 서비스 토큰으로 피드를 불러 엔진 A-1 10건을 적용한다(Phase 2부터 조립된 프로젝터가 뷰를 쓴다 — 정규 스트림의 단건 예시는 서로 맞물리지 않아
+ * 서비스 토큰으로 피드를 불러 엔진 A-1 11건을 적용한다(Phase 2부터 조립된 프로젝터가 뷰를 쓴다 — 정규 스트림의 단건 예시는 서로 맞물리지 않아
  * 독이 되므로 엔진이 실제로 낸 스트림을 쓴다). 지표({@code ingest_lag_seq} = 0)와 뷰 행까지. 컨텍스트는 이 클래스 뒤에 닫는다(스케줄러가 다른
  * 시험의 테넌트를 계속 돌지 않게).
  */
@@ -76,12 +76,12 @@ class IngestPollingIT {
     void theSchedulerPullsTheFeedOfATenantFromItsEngineAndAppliesIt() throws InterruptedException {
         IngestRig rig = new IngestRig();
         long deadline = System.nanoTime() + 30_000_000_000L;
-        while (System.nanoTime() < deadline && lastSeq(rig) < 10) {
+        while (System.nanoTime() < deadline && lastSeq(rig) < 11) {
             Thread.sleep(100);
         }
-        assertThat(lastSeq(rig)).isEqualTo(10);
+        assertThat(lastSeq(rig)).isEqualTo(11);
         assertThat(rig.cursor(T).state()).isEqualTo(IngestState.RUNNING);
-        assertThat(rig.events(T, "APPLIED")).hasSize(10);
+        assertThat(rig.events(T, "APPLIED")).hasSize(11);
         // 조립된 뷰 프로젝터: 8월 PAID·2월 PROVISIONAL, 원장 누적 1,080,000(A-1)
         java.util.List<String> months = DB.asApp(T.value(), c -> {
             try (var ps = c.prepareStatement("SELECT close_ym || ':' || status FROM earnings_month ORDER BY close_ym"); var rs = ps.executeQuery()) {
@@ -92,7 +92,7 @@ class IngestPollingIT {
                 return out;
             }
         });
-        assertThat(months).containsExactly("202608:PAID", "202702:PROVISIONAL");
+        assertThat(months).containsExactly("202608:PAID", "202702:ESTIMATED");
         assertThat(ENGINE.authorizations()).isNotEmpty().allMatch(a -> a.equals("Bearer " + TOKEN));
         long waitMetric = System.nanoTime() + 5_000_000_000L;
         while (System.nanoTime() < waitMetric && meters.find("ingest_lag_seq").tag("tenant", T.value()).gauge() == null) {
@@ -101,7 +101,7 @@ class IngestPollingIT {
         assertThat(meters.find("ingest_lag_seq").tag("tenant", T.value()).gauge()).isNotNull()
                 .satisfies(g -> assertThat(g.value()).isZero());
         assertThat(meters.find("ingest_events_total").tag("tenant", T.value()).tag("result", "applied").counter())
-                .isNotNull().satisfies(c -> assertThat(c.count()).isEqualTo(10.0));
+                .isNotNull().satisfies(c -> assertThat(c.count()).isEqualTo(11.0));
     }
 
     private static long lastSeq(IngestRig rig) {

@@ -1,8 +1,8 @@
 # 시험 스트림 (포털 Phase 1 계획 ⑧)
 
 JSONL — 첫 줄 머리 `{"tenantId", "schemaVersion"}`, 다음 줄부터 Envelope 한 줄씩(`FileFeedAdapter` 형식). 전부 계약 샘플
-계약 샘플의 **정규 스트림 17건**(허구 데이터 — 계약 v1.3: 엔진 A-1 `a1/a1_portal_150000.jsonl`의 seq 1~10 뒤에 `contract-only/`·`standalone/`의
-단건 예시 7개를 파일 이름 순으로 이어 seq 11~17로 다시 매긴 것, `Samples.all()`)에서 만들었고,
+계약 샘플의 **정규 스트림 17건**(허구 데이터 — 계약 v1.4: 엔진 A-1 둘째 판 `a1/a1_portal_150000_e2.jsonl`의 seq 1~11 뒤에 `contract-only/`·`standalone/`의
+단건 예시 6개를 파일 이름 순으로 이어 seq 12~17로 다시 매긴 것, `Samples.all()`)에서 만들었고,
 `StreamFilesTest`가 아래 표의 규칙으로 다시 계산해 파일과 대조한다 — 샘플이 바뀌면 그 시험이 실패한다.
 
 **파일 순서는 시험용 어댑터의 성질이다.** `FileFeedAdapter`는 첫 `seq > afterSeq` 줄부터 파일 순서 그대로 돌려준다(뒤의 작은 seq 포함 —
