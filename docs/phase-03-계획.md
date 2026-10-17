@@ -4,6 +4,18 @@
 > 읽은 것: 지시문 전문, 설계서 v1.5.1 §5·§7·§9·§10·§14.1, `CLAUDE.md`, V1~V4, `ArchitectureRulesTest`·`TenantPredicateScanTest`, `IngestWorker`(커서 갱신 경로),
 > 플랫폼 0.2.0 소스(`IdentityResolver`·`Ratio`·`TenantDirectoryReader`), ga-disclosure 6A의 `ApiSecurityConfiguration`·`AuthorizationCoverageTest`·`AuthzMatrixTest`.
 
+## 승인 반영 (2026-10-17, `docs/phase-03-계획승인.md`) — 아래 본문보다 우선한다
+
+- **Q1~Q12 전부 권장안.** 지시문 오류 DE-12~18, 설계서 결함 DD-13(§7 `/me` "마스킹된 이름").
+- **Q1**: 허용 목록 첫 항목 = `com.ga.portal.infra.directory.IssuerDirectoryReader`, 사유 "발급자 표는 테넌트 설정 — 테넌트 바인딩 전에 읽어야 한다". 발급자 URL은 로그에 **해시**(D-14 확장 — `LogIds.issuer`). `IssuerDirectoryIT`(세 열 밖·다른 표 권한 오류, M15).
+- **Q2**: `agent_profile.org_path`(엔진 사실 — 표시용)와 `identity_link.org_path`(포털 사실 — 인가용, v2)는 다른 출처 — 설계서 §9에 한 줄, 둘이 달라도 어느 쪽도 고치지 않는다(v2 결정).
+- **Q3**: `caught_up_at` 갱신은 피드 호출 성공 **그리고** `last_seq = headSeq` **그리고** 커서 `RUNNING`일 때만, 잠금 안 짧은 트랜잭션. 피드 실패·정지 상태는 건드리지 않는다(M12).
+- **Q4**: `cfg` 입력은 그 요청이 실제로 읽은 설정만 — 엔드포인트별 표(⑤ 아래). 소유 확인 뒤 비교.
+- **Q5**: 비밀 회전 시 모든 `policyKey`가 바뀐다 — `docs/운영.md`, 화면은 키를 저장하지 않는다. 키 → 원문은 요청 안에서 그 설계사의 증권번호 집합으로만(SQL에 키 없음).
+- **Q6**: `detail`은 닫힌 사유 코드만, 지표 `tenant` 태그는 발급자가 등록된 경우만.
+- **F7·F8·F9**: 새 의존성 Boot BOM 셋 — 검증 메타데이터 **재생성 diff를 보고서에**(의도 외 아티팩트 0). `limit 0` → `utilization` 생략.
+- **②-6**: 허용 오차 60초, 주입된 시계(`JwtTimestampValidator.setClock`).
+
 ## 0. 먼저 결정이 필요한 것 (요약)
 
 | # | 질문 | 권장 | 대안 |
@@ -101,6 +113,15 @@ GET /api/v1/me/deferrals,SELF,404,404,404,404
 | `/me/deferrals?from&to` | `months[]{dueYm, expected(Σ SCHEDULED+RELEASED), held(Σ HELD)}`(§6.4 — 정수 합), `items[]{scheduleId, dueYm, amount, status, statusReason?, reason, payCondition, policyMasked, policyKey, sourceCalcId}` |
 
 `stage`: `remaining ≤ 0` → `FULL`; `accum × 10000 ≥ crit_bp × limit` → `CRIT`; `≥ warn_bp × limit` → `WARN`; 아니면 `OK` — 전부 `long` 곱셈 비교(`Math.multiplyExact`), 저장 없음(D-13). `status` 필터는 그 단계와 같은지(`ALL` 기본).
+
+**ETag `cfg` 입력(승인 Q4)** — 그 요청이 실제로 읽은 테넌트 설정만:
+
+| 엔드포인트 | `cfg` 입력 |
+|---|---|
+| `/me` | `name`·`payout_day_rule`·`limit_warn_pct`·`limit_crit_pct`(응답에 싣는 넷) + `sync_delay_seconds` |
+| `/me/earnings`·`/me/earnings/{ym}/lines`·`/me/earnings/lines/{calcId}`·`/me/deferrals` | `sync_delay_seconds` |
+| `/me/earnings/{ym}` | `payout_day_rule` + `sync_delay_seconds` |
+| `/me/limits`·`/me/limits/{ledgerId}` | `limit_warn_pct`·`limit_crit_pct` + `sync_delay_seconds` |
 
 **조회 문장 수 상한(C13)** — 요청 하나(필터 포함): 발급자 1 + 링크 1 + 커서·테넌트 1(조인) + 본문. `/me` 본문 1(`agent_profile`) → **4**. `/earnings/{ym}` 본문 2(월 행·`byType`) → **5**. `/limits?status=WARN` 본문 1(원장 + 열린 플래그 `array_agg` 조인) → **4**. 라인·이벤트 수와 무관(`QueryStatementIT` — 라인 0 vs 1,000, 원장 1 vs 200).
 
