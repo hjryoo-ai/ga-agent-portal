@@ -83,7 +83,7 @@ class TenantPredicateScanTest {
 
     @Test
     void scanCoversMigrationsAndRepositories() {
-        assertThat(sqlFiles).extracting(p -> p.getFileName().toString()).containsExactly("V1__init.sql", "V2__rls.sql", "V3__ingest_payload_hash.sql");
+        assertThat(sqlFiles).extracting(p -> p.getFileName().toString()).containsExactly("V1__init.sql", "V2__rls.sql", "V3__ingest_payload_hash.sql", "V4__projection.sql");
         assertThat(knownTables).hasSize(17).contains("tenant", "earnings_line", "ingest_cursor", "audit_access");
         long javaSqlCount = javaFiles.stream().mapToLong(p -> SqlTenantScanner.sqlLiteralsInJava(read(p)).size()).sum();
         assertThat(javaSqlCount).as("repository SQL literals found (TenantRepository 1, IngestCursorRepository 3, IngestEventRepository 4, "

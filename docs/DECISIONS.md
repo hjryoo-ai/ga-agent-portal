@@ -108,3 +108,20 @@
 | V13-1 | R1 "`insurerCd` 선택" | 없을 때의 뜻을 엔진 E2 계획 P15 그대로 적고, 그 422의 코드를 **`INSURER_AMBIGUOUS`**로 이름 붙였다 | 계획은 "아니면 422"라고만 했고 코드 이름이 없다 — Problem은 `code`가 필수다. 엔진 E2가 다른 이름을 쓰면 엔진 쪽이 계약을 따른다(계약은 포털 것) |
 | V13-2 | Q13 "`samples/a1/` 10개 → 엔진 jsonl 하나" | 시험의 정규 스트림(`Samples.all()`)은 그 10건 뒤에 단건 예시 7개를 seq 11~17로 다시 매겨 붙인다 | 단건 예시의 seq는 예시값이라 a1과 겹친다(6·7). 해시는 seq를 보지 않아(Phase 1 Q1) 다시 매겨도 이벤트 해시는 같다. Phase 1 시험 스트림 10개는 그 정규 스트림에서 다시 만들었다(`StreamFilesTest` 규칙 그대로) |
 
+## 2026-10-17 — Phase 2 계획 승인 (`docs/phase-02-계획승인.md`)
+
+### 지시문 오류 (승인 §4)
+
+| # | 지시문 | 무엇이 틀렸나 | 처리 |
+|---|---|---|---|
+| DE-9 | Phase 2 지시문 D-11 "커서 `REBUILDING` → 한 트랜잭션 안에서" | 같은 트랜잭션 안의 상태는 커밋 전까지 아무도 보지 못한다 — `REBUILDING`이 장식이 된다 | 트랜잭션 셋(txA `REBUILDING` 커밋 → txB 재생, 원자성은 여기 → 실패면 txC `FAILED(REBUILD_FAILED)`) — Q10 |
+| DE-10 | C9 "플래그 매핑 10종" | `eventType`은 6종이다 | 시험 사례 10개로(Q12) |
+| DE-11 | D-2·D-3의 V4 목록 | `earnings_month.net_basis`(확정 월의 세후가 예상인지 확정인지)·`recon_result.source_seq`(같은 시각의 확정·지급 DRIFT, 재구축 재삽입)를 빠뜨렸다 | V4에 둘 다(Q1·Q2) |
+
+### 설계서 결함 (설계서 v1.5 변경 이력에도)
+
+| # | 결함 | 처리 |
+|---|---|---|
+| DD-8 | §5 불변식 "`accum_paid ≤ limit_amount`"가 부록 A-3 감액 재산정(newLimit < accum)과 모순 — 글자대로면 재산정 뒤 첫 전기(음수 환수라도)에서 멀쩡한 테넌트가 멈춘다 | 엔진 `LimitLedger.post` 규칙: 양수 전기 뒤만 상한, 모든 전기 뒤 누적 ≥ 0, 재산정은 검사 없음(Q5). §5 문장 v1.5 |
+| DD-9 | §6.2 분급 상태 그림이 `HELD → RELEASED`를 그렸다 — 엔진 `ScheduleEntry.released`는 `SCHEDULED`에서만 받는다 | 엔진 전이·사유 짝 그대로(Q8, `DeferralTransitions`). §6.2는 해당 단계에서 |
+

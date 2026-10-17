@@ -15,5 +15,11 @@ public enum IngestTrigger {
     /** 운영자 {@code ingest pause}. */
     OPERATOR_PAUSE,
     /** 운영자 {@code ingest resume}. */
-    OPERATOR_RESUME
+    OPERATOR_RESUME,
+    /** 운영자 {@code ingest rebuild}(설계서 §6.7, Phase 2 승인 Q10 — txA). */
+    OPERATOR_REBUILD,
+    /** 재구축 재생이 커밋됐다(txB). */
+    REBUILD_SUCCEEDED,
+    /** 재구축 재생이 실패해 롤백됐다(txC — {@link IngestErrorCode#REBUILD_FAILED}). */
+    REBUILD_FAILED
 }

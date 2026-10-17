@@ -28,6 +28,8 @@ public enum IngestErrorCode {
     PAST_SEQ_NEW_EVENT(IngestState.FAILED),
     /** 프로젝터가 거부했다(Phase 2부터 불변식 위반). */
     PROJECTOR_ERROR(IngestState.FAILED),
+    /** 재구축 재생이 실패해 롤백됐다(설계서 §6.7 — 뷰는 재구축 전 그대로). detail = 원인 사유와 seq. REBUILDING에서만 일어난다. */
+    REBUILD_FAILED(IngestState.FAILED),
     /** 적용 트랜잭션의 예기치 않은 오류(DB 제약 위반 등) — 분류하지 못한 것은 멈춘다(정지가 규약, 지시문 D-10). */
     APPLY_ERROR(IngestState.FAILED),
     /** 지원 최대보다 큰 version(설계서 §4.5) — 해석하지 않고 멈춘다. */
@@ -56,6 +58,9 @@ public enum IngestErrorCode {
     public IngestTrigger trigger() {
         if (this == OPERATOR_PAUSE) {
             return IngestTrigger.OPERATOR_PAUSE;
+        }
+        if (this == REBUILD_FAILED) {
+            return IngestTrigger.REBUILD_FAILED;
         }
         return stopsAs == IngestState.FAILED ? IngestTrigger.STOP_FAILED : IngestTrigger.STOP_PAUSED;
     }
