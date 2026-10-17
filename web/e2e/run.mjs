@@ -25,6 +25,16 @@ const java = need('PORTAL_E2E_JAVA');
 const classpath = readFileSync(need('PORTAL_E2E_HARNESS_CP'), 'utf8').trim();
 export const PROJECTS = { 'mobile-android': 'A', 'mobile-ios': 'B', desktop: 'C' };
 
+// 센티널 두 목록: E2E 검사(sentinels.mjs — 스트림에서 뽑음)의 모든 값이 Gradle 평문 스캔(pii-sentinels.properties)에도 있어야 한다 — 하나가 빠지면
+// 웹 산출물·시험 결과에 그 값이 나와도 scanPlaintextLeaks는 모른다.
+{
+  const { sentinels } = await import('./support/sentinels.mjs');
+  const props = readFileSync(resolve(repo, 'portal-infra/src/testFixtures/resources/pii-sentinels.properties'), 'utf8');
+  const keyed = new Set(props.split('\n').filter((l) => /^(names|secrets|identifiers|e2e)=/.test(l)).flatMap((l) => l.slice(l.indexOf('=') + 1).split(',')));
+  const missing = sentinels().filter((v) => !keyed.has(v));
+  if (missing.length > 0) throw new Error(`${String(missing.length)} E2E sentinel(s) missing from pii-sentinels.properties (key e2e)`);
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(what, ms, check) {
   const end = Date.now() + ms;

@@ -137,6 +137,7 @@ tasks.register<PnpmTask>("e2e") {
     dependsOn(clientCheck, e2eInstall, ":portal-app:bootJar", ":portal-app:webE2eHarnessClasspath")
     inputs.dir("e2e").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file("playwright.config.ts").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(rootProject.layout.projectDirectory.file("portal-infra/src/testFixtures/resources/pii-sentinels.properties"))
     val bootJar = project(":portal-app").tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar").flatMap { it.archiveFile }
     val launcher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(libs.versions.java.get()) }
     environment.put("PORTAL_E2E_JAR", bootJar.map { it.asFile.absolutePath })
