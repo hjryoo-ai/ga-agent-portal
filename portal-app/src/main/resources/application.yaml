@@ -8,6 +8,9 @@ spring:
     username: ${PORTAL_APP_USER:portal_app}
     password: ${PORTAL_APP_PASSWORD:app_local_only}
   # 마이그레이션: portal_migrator (스키마 소유자). 애플리케이션 데이터소스와 분리된 접속.
+  # 조회 API 응답(포털 Phase 3): 비어 있는 선택 필드(Optional.empty)는 응답에서 뺀다 — 계약 portal-api.openapi.yaml의 선택 필드
+  jackson:
+    default-property-inclusion: non_absent
   flyway:
     url: ${PORTAL_DB_URL:jdbc:postgresql://localhost:5432/portal}
     user: ${PORTAL_MIGRATOR_USER:portal_migrator}
@@ -39,3 +42,15 @@ portal:
     directory-password: ${PORTAL_DIRECTORY_PASSWORD:directory_local_only}
     # 재구축(설계서 §6.7) 상한 — 한 트랜잭션 재생의 길이를 묶는다(긴 트랜잭션 비용은 §14.1)
     rebuild-max-events: 50000
+  # 조회 API(포털 Phase 3 — 설계서 §9 v1.6). 토큰의 iss → 테넌트는 전용 롤 portal_issuer(V5: tenant의 세 열만)로 요청마다 조회한다.
+  # 기본 자격 증명은 로컬 개발 전용(docker/postgres/init-roles.sql과 짝) — 운영은 환경으로 준다.
+  api:
+    issuer-username: ${PORTAL_ISSUER_USER:portal_issuer}
+    issuer-password: ${PORTAL_ISSUER_PASSWORD:issuer_local_only}
+    issuer-pool-size: 4
+    jwks-timeout: 5s
+  # 조회 유스케이스(포털 Phase 3): policyKey HMAC 비밀 파일(배포 비밀 — 값은 저장소·로그에 0, 기본 경로에 없으면 웹 애플리케이션이 뜨지 않는다),
+  # tenant.params.sync_delay_seconds가 없을 때의 기본 지연 초(설계서 §5 — 코드 상수가 아니다).
+  query:
+    policy-key-secret-file: ${PORTAL_POLICY_KEY_SECRET_FILE:/run/secrets/portal-policy-key}
+    default-sync-delay-seconds: 300

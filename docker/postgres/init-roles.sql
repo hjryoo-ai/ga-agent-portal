@@ -10,6 +10,7 @@
 \if :{?migrator_password} \else \set migrator_password 'migrator_local_only' \endif
 \if :{?app_password} \else \set app_password 'app_local_only' \endif
 \if :{?directory_password} \else \set directory_password 'directory_local_only' \endif
+\if :{?issuer_password} \else \set issuer_password 'issuer_local_only' \endif
 
 -- 마이그레이션 전용(스키마 소유자). RLS 우회 권한 없음 — FORCE ROW LEVEL SECURITY로 소유자도 정책을 따른다.
 CREATE ROLE portal_migrator LOGIN PASSWORD :'migrator_password'
@@ -24,12 +25,18 @@ CREATE ROLE portal_app LOGIN PASSWORD :'app_password'
 CREATE ROLE portal_directory LOGIN PASSWORD :'directory_password'
     NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
 
+-- 발급자 표 전용(포털 Phase 3, 계획 승인 Q1 — 테넌트를 바인딩하기 전에 토큰의 iss로 테넌트를 찾는다). tenant의 tenant_id·oidc_issuer·
+-- oidc_audience 컬럼 SELECT와 이 롤 전용 정책만(V5). 포털 IssuerDirectoryReader가 이 롤로 접속한다. 테넌트 데이터는 읽지 못한다.
+CREATE ROLE portal_issuer LOGIN PASSWORD :'issuer_password'
+    NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+
 -- (예약) portal_health — DB 헬스 지표 전용 롤. 포털 Phase 8에서 만든다(Phase 0은 DB 헬스 비활성, 설계서 §9).
 
 ALTER DATABASE portal OWNER TO portal_migrator;
 REVOKE ALL ON DATABASE portal FROM PUBLIC;
 GRANT CONNECT ON DATABASE portal TO portal_app;
 GRANT CONNECT ON DATABASE portal TO portal_directory;
+GRANT CONNECT ON DATABASE portal TO portal_issuer;
 
 ALTER SCHEMA public OWNER TO portal_migrator;
 REVOKE ALL ON SCHEMA public FROM PUBLIC;

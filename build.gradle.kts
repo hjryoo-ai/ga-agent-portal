@@ -98,7 +98,7 @@ subprojects {
 // Spring·DB 무의존 모듈(지시문 §1): 컴파일·런타임 클래스패스에 org.springframework 그룹이 없어야 한다.
 // (java.sql / javax.sql 은 JDK 모듈이라 클래스패스로 막을 수 없으므로 ArchUnit이 막는다.)
 // ---------------------------------------------------------------------------------------------
-val springFreeModules = listOf("portal-domain", "portal-projection", "portal-ingest")
+val springFreeModules = listOf("portal-domain", "portal-projection", "portal-ingest", "portal-query")   // portal-query: Phase 3 계획 F7
 
 // Boot BOM(spring-boot-dependencies)은 버전 제약만 담은 POM이라 클래스가 없다 — 검사에서 제외한다.
 val constraintOnlyPlatforms = setOf("org.springframework.boot:spring-boot-dependencies")
@@ -359,8 +359,9 @@ val scanPlaintextLeaks = tasks.register("scanPlaintextLeaks") {
     doLast {
         val props = java.util.Properties()
         sentinels.reader(Charsets.UTF_8).use { props.load(it) }
-        // names: 허구 개인정보(설계사 이름), secrets: 허구 서비스 토큰(포털 Phase 1 — J10). 둘 다 원문·UTF-8 16진으로 찾는다.
-        val plain = listOf("names", "secrets").flatMap { key -> (props.getProperty(key) ?: "").split(",") }
+        // names: 허구 개인정보(설계사 이름), secrets: 허구 서비스 토큰(포털 Phase 1 — J10), identifiers: 허구 subject·설계사 ID·증권번호
+        // (포털 Phase 3 — D-14). 셋 다 원문·UTF-8 16진으로 찾는다.
+        val plain = listOf("names", "secrets", "identifiers").flatMap { key -> (props.getProperty(key) ?: "").split(",") }
             .map { it.trim() }.filter { it.isNotEmpty() }
         if (plain.isEmpty()) throw GradleException("scanPlaintextLeaks: no sentinels in ${sentinels.relativeTo(root)}")
         val forbidden = plain + plain.map { v -> v.toByteArray(Charsets.UTF_8).joinToString("") { "%02x".format(it) } }

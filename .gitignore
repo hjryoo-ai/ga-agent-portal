@@ -7,3 +7,4 @@ out/
 .vscode/
 .DS_Store
 deps.txt
+e2e/engine-feed/.state/

@@ -11,6 +11,8 @@ dependencies {
     implementation(project(":portal-domain"))
     implementation(libs.platform.spring)
     implementation(libs.spring.context)
+    // 발급자 리더(Phase 3 Q1): 전용 롤 portal_issuer 연결 풀
+    implementation(libs.hikaricp)
     runtimeOnly(libs.postgresql)
 
     // PostgresHarness: 컨테이너 1회 기동 → init-roles.sql → portal_migrator로 Flyway → portal_app 데이터소스
@@ -37,6 +39,10 @@ testing {
                 implementation(libs.platform.spring)
                 implementation(platform(libs.spring.boot.bom))
                 implementation(libs.spring.jdbc)
+                // V5UpgradeIT: 빈 데이터베이스를 V4까지 올린 뒤 행을 넣고 V5로 올린다(Phase 3 승인 F6 — USING 절)
+                implementation(libs.flyway.core)
+                implementation(libs.flyway.postgresql)
+                implementation(libs.postgresql)
                 implementation(libs.junit.jupiter)
                 implementation(libs.assertj.core)
                 runtimeOnly(libs.junit.platform.launcher)

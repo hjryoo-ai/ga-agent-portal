@@ -612,8 +612,8 @@ class EventSchemaTest {
         assertThat(files.stream().map(f -> CONTRACTS.relativize(f).toString().replace('\\', '/')).toList()).as("contract files scanned")
                 .contains("shared/ga-disclosure/events/v1/envelope-core.schema.json", "events/v1/envelope.schema.json",
                         "events/v1/defs.schema.json", "events/v1/payloads/CommissionCalculated.v1.schema.json",
-                        "api/v1/engine-internal.openapi.yaml")
-                .hasSize(1 + 2 + 13 + (1 + 6) + 1);   // 샘플: A-1 스트림 하나 + 단건 6(v1.4 — 07은 a1 seq 11의 실 샘플로)
+                        "api/v1/engine-internal.openapi.yaml", "api/v1/portal-api.openapi.yaml")
+                .hasSize(1 + 2 + 13 + (1 + 6) + 2);   // 샘플: A-1 스트림 하나 + 단건 6(v1.4 — 07은 a1 seq 11의 실 샘플로), API 둘(Phase 3 — 포털 조회 API)
         assertThat(found).isEmpty();
     }
 

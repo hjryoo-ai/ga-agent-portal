@@ -62,13 +62,11 @@ final class ViewRig {
         return feed(t, Envelopes.nodes(stream));
     }
 
-    /** 그 테넌트의 뷰 9표를 골든 정규형으로({@link GoldenViews} — 시각은 UTC, {@code limit_multiple}은 원문 문자열 형태, tenant_id 제외). */
+    /** 그 테넌트의 뷰 9표를 골든 정규형으로({@link GoldenViews} — 시각은 UTC, {@code limit_multiple}은 V5부터 원문 TEXT, tenant_id 제외). */
     static Map<String, List<String>> views(TenantId t) {
         Map<String, List<String>> out = new LinkedHashMap<>();
         for (String table : GoldenViews.TABLES) {
-            String select = table.equals("policy_limit")
-                    ? "SELECT (to_jsonb(v) - 'tenant_id' || jsonb_build_object('limit_multiple', trim_scale(v.limit_multiple)::text))::text FROM policy_limit v WHERE tenant_id = ?"
-                    : "SELECT (to_jsonb(v) - 'tenant_id')::text FROM " + table + " v WHERE tenant_id = ?";
+            String select = "SELECT (to_jsonb(v) - 'tenant_id')::text FROM " + table + " v WHERE tenant_id = ?";   // limit_multiple은 V5부터 TEXT 원문
             List<ObjectNode> rows = DB.asApp(t.value(), c -> {
                 List<ObjectNode> list = new ArrayList<>();
                 try (PreparedStatement ps = c.prepareStatement(select)) {

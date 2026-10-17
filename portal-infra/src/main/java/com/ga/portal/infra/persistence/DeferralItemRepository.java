@@ -14,7 +14,7 @@ import java.util.Optional;
 @Repository
 public class DeferralItemRepository extends ViewRepository {
 
-    private static final RowMapper<DeferralRow> MAPPER = (rs, n) -> new DeferralRow(rs.getString("schedule_id"), rs.getString("agent_id"),
+    static final RowMapper<DeferralRow> MAPPER = (rs, n) -> new DeferralRow(rs.getString("schedule_id"), rs.getString("agent_id"),
             rs.getString("policy_no"), rs.getString("source_calc_id"), rs.getString("due_ym"), rs.getLong("amount"), rs.getString("pay_condition"),
             DeferralStatus.valueOf(rs.getString("status")), rs.getString("reason"), rs.getString("curve_version_id"),
             optString(rs, "status_reason"), rs.getLong("last_seq"));

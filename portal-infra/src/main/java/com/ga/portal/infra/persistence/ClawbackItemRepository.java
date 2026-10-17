@@ -14,7 +14,7 @@ import java.util.Optional;
 @Repository
 public class ClawbackItemRepository extends ViewRepository {
 
-    private static final RowMapper<ReceivableRow> MAPPER = (rs, n) -> new ReceivableRow(rs.getString("receivable_id"), rs.getString("agent_id"),
+    static final RowMapper<ReceivableRow> MAPPER = (rs, n) -> new ReceivableRow(rs.getString("receivable_id"), rs.getString("agent_id"),
             rs.getString("origin_calc_id"), rs.getLong("amount"), rs.getLong("remaining"), ReceivableStatus.valueOf(rs.getString("status")),
             rs.getLong("last_seq"));
 

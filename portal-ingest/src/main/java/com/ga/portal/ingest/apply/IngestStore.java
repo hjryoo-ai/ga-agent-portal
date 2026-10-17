@@ -30,6 +30,14 @@ public interface IngestStore {
     /** 새 {@code FAILED} 행을 넣거나 기존 {@code FAILED} 행을 갱신한다. {@code APPLIED} 행은 건드리지 않는다. */
     void markFailed(IngestEventRecord record);
 
+    /**
+     * 따라잡은 시각을 쓴다(V5 {@code caught_up_at}, Phase 3 계획 승인 Q3) — 커서가 {@code RUNNING}이고 {@code last_seq = headSeq}일 때만. 썼으면 참.
+     */
+    boolean markCaughtUp(long headSeq, Instant at);
+
+    /** 마지막으로 따라잡은 시각(없으면 빈 값 — 한 번도 머리에 닿지 않았다). */
+    Optional<Instant> caughtUpAt();
+
     /** 마지막 {@code APPLIED} seq(운영 명령 {@code resume}의 상한). */
     OptionalLong maxAppliedSeq();
 }

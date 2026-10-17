@@ -13,7 +13,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -27,11 +26,23 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class TenantPredicateScanTest {
 
+    /** 허용 항목: 그 파일(저장소 상대 경로)의 그 문장(공백 정규화·소문자화)만 — 같은 문장이 다른 파일에 있으면 허용되지 않는다. */
+    record AllowedStatement(String source, String statement, String reason) {
+    }
+
     /**
-     * 허용 목록: 공백 정규화·소문자화된 문장 → 사유. 비어 있는 상태로 시작한다.
-     * 항목을 추가하려면 사유를 반드시 적는다(빈 사유·쓰이지 않는 항목은 {@link #allowlistEntriesHaveReasonsAndAreUsed()}가 거부).
+     * 허용 목록 — Phase 0~2는 비어 있었다. 항목을 추가하려면 사유를 반드시 적는다(빈 사유·쓰이지 않는 항목은 {@link #allowlistEntriesHaveReasonsAndAreUsed()}가
+     * 거부). 항목은 아키텍처 규칙의 직접 DB 접근 허용 목록(닫힌 FQN)에 있는 클래스의 문장뿐이다.
      */
-    static final Map<String, String> ALLOWLIST = Map.of();
+    static final List<AllowedStatement> ALLOWLIST = List.of(
+            new AllowedStatement("portal-infra/src/main/java/com/ga/portal/infra/directory/IssuerDirectoryReader.java",
+                    "select tenant_id, oidc_issuer, oidc_audience from tenant where oidc_issuer = :issuer",
+                    "발급자 → 테넌트(Phase 3 계획 승인 Q1): 테넌트를 바인딩하기 전의 조회. 전용 롤 portal_issuer가 tenant의 세 열만 읽는다 — "
+                            + "ArchitectureRulesTest.PORTAL_DB_ALLOWLIST의 항목, IssuerDirectoryIT"));
+
+    private static boolean allowed(SqlTenantScanner.Violation v) {
+        return ALLOWLIST.stream().anyMatch(a -> a.source().equals(v.source()) && a.statement().equals(v.statement()));
+    }
 
     static final List<String> MODULES = List.of(
             "portal-domain", "portal-projection", "portal-ingest", "portal-query", "portal-sim", "portal-recon",
@@ -83,29 +94,95 @@ class TenantPredicateScanTest {
 
     @Test
     void scanCoversMigrationsAndRepositories() {
-        assertThat(sqlFiles).extracting(p -> p.getFileName().toString()).containsExactly("V1__init.sql", "V2__rls.sql", "V3__ingest_payload_hash.sql", "V4__projection.sql");
+        assertThat(sqlFiles).extracting(p -> p.getFileName().toString()).containsExactly("V1__init.sql", "V2__rls.sql", "V3__ingest_payload_hash.sql", "V4__projection.sql",
+                "V5__query_api.sql");
         assertThat(knownTables).hasSize(17).contains("tenant", "earnings_line", "ingest_cursor", "audit_access");
         long javaSqlCount = javaFiles.stream().mapToLong(p -> SqlTenantScanner.sqlLiteralsInJava(read(p)).size()).sum();
         assertThat(javaSqlCount).as("repository SQL literals found (TenantRepository 1, IngestCursorRepository 3, IngestEventRepository 4, "
                 + "IngestLockRepository 1, AuditAccessRepository 2; Phase 2: AgentProfile 2, EarningsLine 3, EarningsMonth 2, PolicyLimit 5, "
-                + "DeferralItem 3, ClawbackItem 2, PolicyFlag 2, ReconResult 1, ViewReset 8 DELETE + 3 invariant queries)").isEqualTo(11 + 20 + 11);
+                + "DeferralItem 3, ClawbackItem 2, PolicyFlag 2, ReconResult 1, ViewReset 8 DELETE + 3 invariant queries; Phase 3: IngestCursor +2 caught_up_at, IssuerDirectoryReader 1, IdentityLink 1, "
+                + "AuditAccess +1 denial, AgentQuery 16, SyncStatus 1)").isEqualTo(11 + 20 + 11 + 2 + 3 + 17);
     }
 
     @Test
     void everyTenantTableAccessHasTenantPredicate() {
         List<SqlTenantScanner.Violation> violations = scanAll().stream()
-                .filter(v -> !ALLOWLIST.containsKey(v.statement()))
+                .filter(v -> !allowed(v))
                 .toList();
         assertThat(violations).as("tenant_id 없는 테이블 접근 문장(불변 규약 2)").isEmpty();
     }
 
     @Test
     void allowlistEntriesHaveReasonsAndAreUsed() {
-        List<String> flagged = scanAll().stream().map(SqlTenantScanner.Violation::statement).toList();
-        ALLOWLIST.forEach((statement, reason) -> {
-            assertThat(reason).as("사유 없는 허용 목록 항목: %s", statement).isNotBlank();
-            assertThat(flagged).as("쓰이지 않는 허용 목록 항목(제거할 것): %s", statement).contains(statement);
+        List<SqlTenantScanner.Violation> flagged = scanAll();
+        ALLOWLIST.forEach(a -> {
+            assertThat(a.reason()).as("사유 없는 허용 목록 항목: %s", a.statement()).isNotBlank();
+            assertThat(flagged).as("쓰이지 않는 허용 목록 항목(제거할 것): %s", a.statement())
+                    .anyMatch(v -> v.source().equals(a.source()) && v.statement().equals(a.statement()));
         });
+        assertThat(ALLOWLIST).extracting(AllowedStatement::source).as("Phase 3: the issuer directory reader only")
+                .containsExactly("portal-infra/src/main/java/com/ga/portal/infra/directory/IssuerDirectoryReader.java");
+    }
+
+    // ------------------------------------------------------------------ 두 번째 술어(포털 Phase 3 지시문 D-4)
+
+    /**
+     * 조회 API 저장소 — 닫힌 목록(저장소 상대 경로). 이 파일들의 <b>모든</b> 문장은 설계사 표 참조마다 {@code agent_id = :agentId}를 가진다. 허용 목록은
+     * 비어 있다({@link #AGENT_ALLOWLIST}).
+     */
+    static final List<String> AGENT_SCOPED_SOURCES = List.of("portal-infra/src/main/java/com/ga/portal/infra/persistence/AgentQueryRepository.java");
+
+    /** 두 번째 술어의 허용 목록(파일, 문장, 사유) — 비어 있다. */
+    static final List<AllowedStatement> AGENT_ALLOWLIST = List.of();
+
+    private static Set<String> agentTables() {
+        return SqlTenantScanner.tablesWithColumn(sqlFiles.stream().map(TenantPredicateScanTest::read).toList(), "agent_id");
+    }
+
+    @Test
+    void everyAgentScopedStatementHasAnAgentPredicatePerAgentTable() {
+        Set<String> agentTables = agentTables();
+        assertThat(agentTables).contains("earnings_line", "earnings_month", "policy_limit", "policy_flag", "deferral_item", "clawback_item",
+                "agent_profile").doesNotContain("policy_limit_history", "tenant", "ingest_cursor");
+        List<SqlTenantScanner.Violation> violations = new ArrayList<>();
+        int statements = 0;
+        for (String source : AGENT_SCOPED_SOURCES) {
+            Path file = ROOT.resolve(source);
+            assertThat(file).as("agent-scoped source exists").isRegularFile();
+            for (String literal : SqlTenantScanner.sqlLiteralsInJava(read(file))) {
+                statements++;
+                violations.addAll(SqlTenantScanner.scanAgentPredicate(source, literal, agentTables));
+            }
+        }
+        assertThat(statements).as("AgentQueryRepository statements (not vacuous)").isEqualTo(16);
+        assertThat(violations).as("agent-scoped statements without agent_id = :agentId per agent table (D-4)").isEmpty();
+        assertThat(AGENT_ALLOWLIST).as("second-predicate allowlist (Phase 3: empty)").isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "SELECT * FROM earnings_line WHERE tenant_id = :tenantId AND calc_id = :calcId",
+            "SELECT l.* FROM earnings_line l JOIN deferral_item d ON d.source_calc_id = l.calc_id WHERE l.tenant_id = :tenantId AND l.agent_id = :agentId",
+            "SELECT (SELECT min(r.calc_id) FROM earnings_line r WHERE r.tenant_id = :tenantId) FROM earnings_line l WHERE l.tenant_id = :tenantId AND l.agent_id = :agentId",
+            "SELECT * FROM earnings_line WHERE tenant_id = :tenantId AND agent_id = :other",
+            "SELECT * FROM earnings_line WHERE tenant_id = :tenantId AND agent_id IS NOT NULL",
+            "SELECT h.* FROM policy_limit_history h WHERE h.tenant_id = :tenantId AND h.ledger_id = :ledgerId",
+    })
+    void theSecondPredicateFlagsMissingAgentPredicates(String sql) {
+        Set<String> agentTables = Set.of("earnings_line", "deferral_item", "policy_limit");
+        assertThat(SqlTenantScanner.scanAgentPredicate("inline", sql, agentTables)).as(sql).isNotEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "SELECT * FROM earnings_line WHERE tenant_id = :tenantId AND agent_id = :agentId AND calc_id = :calcId",
+            "SELECT (SELECT min(r.calc_id) FROM earnings_line r WHERE r.tenant_id = :tenantId AND r.agent_id = :agentId) FROM earnings_line l "
+                    + "WHERE l.tenant_id = :tenantId AND l.agent_id = :agentId",
+            "SELECT h.* FROM policy_limit_history h JOIN policy_limit p ON p.ledger_id = h.ledger_id WHERE h.tenant_id = :tenantId AND p.agent_id = :agentId",
+    })
+    void theSecondPredicateAcceptsOnePredicatePerAgentTable(String sql) {
+        Set<String> agentTables = Set.of("earnings_line", "deferral_item", "policy_limit");
+        assertThat(SqlTenantScanner.scanAgentPredicate("inline", sql, agentTables)).as(sql).isEmpty();
     }
 
     // ------------------------------------------------------------------ 스캐너 자체의 음성·양성 시험(영구 보존)

@@ -29,9 +29,15 @@ class IngestCliIT {
     private final IngestRig rig = new IngestRig();
     private final AuditAccessRepository audit = new AuditAccessRepository(rig.gateway);
 
+    /** 명령 조립 — 주체 {@code cli:ops-kim}을 그 테넌트의 OPERATOR로 등록한다(Phase 3 D-9). */
     private IngestCommands commands(TenantId only) {
-        return new IngestCommands(rig.transactions, rig.store, rig.lock, audit, () -> List.of(only),
-                rig.rebuilder(IngestRig.feed("dup.jsonl"), new RecordingProjector(), 200, 50_000), IngestMetrics.NONE, IngestRig.CLOCK);
+        IngestRig.operator(only, ACTOR);
+        return unlinked(List.of(only));
+    }
+
+    private IngestCommands unlinked(List<TenantId> tenants) {
+        return new IngestCommands(rig.transactions, rig.store, rig.lock, audit, () -> tenants,
+                rig.rebuilder(IngestRig.feed("dup.jsonl"), new RecordingProjector(), 200, 50_000), IngestMetrics.NONE, IngestRig.CLOCK, rig.links);
     }
 
     private List<AuditAccessRepository.AuditRow> audits(TenantId t) {
@@ -127,5 +133,61 @@ class IngestCliIT {
         assertThat(rig.cursor(t).errorCode()).contains(IngestErrorCode.SCHEMA_VIOLATION);
         assertThat(rig.events(t, "FAILED")).singleElement().satisfies(f -> assertThat(f.seq()).isEqualTo(5));
         assertThat(p.applied(t)).hasSize(4);
+    }
+
+    // ------------------------------------------------------------------ Phase 3 C10: OS 사용자 → 그 테넌트의 OPERATOR 링크
+
+    @Test
+    void c10AnOsUserWithoutAnActiveOperatorLinkIsRefusedAndAudited() {
+        TenantId t = TenantId.of(SeedData.uniqueTenant("CLIAUTH"));
+        IngestRig.link(t, "cli:ops-revoked", "OPERATOR", "REVOKED");
+        IngestRig.link(t, "cli:ops-agent", "AGENT", "ACTIVE");
+        TenantId other = TenantId.of(SeedData.uniqueTenant("CLIAUTH_O"));
+        IngestRig.operator(other, "cli:ops-elsewhere");
+        IngestCommands cli = unlinked(List.of(t));
+        rig.worker(IngestRig.feed("gap.jsonl"), new RecordingProjector(), 200).runOnce(t);
+        IngestState before = rig.cursor(t).state();
+
+        for (String subject : List.of("cli:nobody", "cli:ops-revoked", "cli:ops-agent", "cli:ops-elsewhere")) {
+            assertThat(cli.status(Optional.of(t), subject)).as(subject).isEqualTo(new IngestCommands.Outcome(2, List.of(t.value() + " not authorized")));
+            assertThat(cli.resume(t, 2, subject).lines()).as(subject).containsExactly(t.value() + " not authorized");
+            assertThat(cli.pause(t, subject).exitCode()).as(subject).isEqualTo(2);
+            assertThat(cli.rebuild(t, subject).exitCode()).as(subject).isEqualTo(2);
+        }
+        assertThat(rig.cursor(t).state()).as("nothing ran").isEqualTo(before);
+        assertThat(audits(t)).extracting(AuditAccessRepository.AuditRow::actorSubject, AuditAccessRepository.AuditRow::action,
+                AuditAccessRepository.AuditRow::target, AuditAccessRepository.AuditRow::detail).containsExactly(
+                tuple("cli:nobody", "AUTHZ_DENIED", "cli:ingest status", "NO_LINK"),
+                tuple("cli:nobody", "AUTHZ_DENIED", "cli:ingest resume", "NO_LINK"),
+                tuple("cli:nobody", "AUTHZ_DENIED", "cli:ingest pause", "NO_LINK"),
+                tuple("cli:nobody", "AUTHZ_DENIED", "cli:ingest rebuild", "NO_LINK"),
+                tuple("cli:ops-revoked", "AUTHZ_DENIED", "cli:ingest status", "REVOKED"),
+                tuple("cli:ops-revoked", "AUTHZ_DENIED", "cli:ingest resume", "REVOKED"),
+                tuple("cli:ops-revoked", "AUTHZ_DENIED", "cli:ingest pause", "REVOKED"),
+                tuple("cli:ops-revoked", "AUTHZ_DENIED", "cli:ingest rebuild", "REVOKED"),
+                tuple("cli:ops-agent", "AUTHZ_DENIED", "cli:ingest status", "ROLE"),
+                tuple("cli:ops-agent", "AUTHZ_DENIED", "cli:ingest resume", "ROLE"),
+                tuple("cli:ops-agent", "AUTHZ_DENIED", "cli:ingest pause", "ROLE"),
+                tuple("cli:ops-agent", "AUTHZ_DENIED", "cli:ingest rebuild", "ROLE"),
+                tuple("cli:ops-elsewhere", "AUTHZ_DENIED", "cli:ingest status", "NO_LINK"),
+                tuple("cli:ops-elsewhere", "AUTHZ_DENIED", "cli:ingest resume", "NO_LINK"),
+                tuple("cli:ops-elsewhere", "AUTHZ_DENIED", "cli:ingest pause", "NO_LINK"),
+                tuple("cli:ops-elsewhere", "AUTHZ_DENIED", "cli:ingest rebuild", "NO_LINK"));
+    }
+
+    @Test
+    void c10StatusOverSeveralTenantsReportsEachAndExitsTwoIfAnyIsRefused() {
+        TenantId mine = TenantId.of(SeedData.uniqueTenant("CLIST_A"));
+        TenantId notMine = TenantId.of(SeedData.uniqueTenant("CLIST_B"));
+        IngestRig.operator(mine, "cli:ops-lee");
+        IngestCommands cli = unlinked(List.of(mine, notMine));
+        IngestCommands.Outcome all = cli.status(Optional.empty(), "cli:ops-lee");
+        assertThat(all.exitCode()).isEqualTo(2);
+        assertThat(all.lines()).containsExactly(mine.value() + " no cursor", notMine.value() + " not authorized");
+        assertThat(audits(mine)).extracting(AuditAccessRepository.AuditRow::action).containsExactly(IngestCommands.STATUS);
+        assertThat(audits(notMine)).extracting(AuditAccessRepository.AuditRow::action, AuditAccessRepository.AuditRow::detail)
+                .containsExactly(tuple("AUTHZ_DENIED", "NO_LINK"));
+        IngestRig.operator(notMine, "cli:ops-lee");
+        assertThat(cli.status(Optional.empty(), "cli:ops-lee").exitCode()).as("registered in both").isZero();
     }
 }

@@ -18,6 +18,9 @@ dependencies {
     implementation(libs.spring.boot.starter.actuator)
     implementation(libs.spring.boot.starter.jdbc)
     implementation(libs.spring.boot.starter.flyway)
+    // 조회 API(Phase 3): /api/** 리소스 서버 — 발급자별 디코더, 같은 바이트 거부(계획 ②·③)
+    implementation(libs.spring.boot.starter.security)
+    implementation(libs.spring.boot.starter.security.oauth2.resource.server)
     runtimeOnly(libs.flyway.postgresql)
     runtimeOnly(libs.postgresql)
 }
@@ -61,10 +64,17 @@ testing {
                 implementation(project(":portal-ingest"))
                 implementation(project(":portal-infra"))
                 implementation(project(":portal-domain"))
+                implementation(project(":portal-query"))
                 implementation(libs.platform.spring)
                 implementation(platform(libs.spring.boot.bom))
                 implementation(libs.spring.boot.starter.test)
                 implementation(libs.spring.boot.starter.actuator)
+                // 시험 발급기(TestIssuer): RSA 키·JWKS·서명(계획 ⑦ — Keycloak 컨테이너는 Phase 8)
+                implementation(libs.nimbus.jose.jwt)
+                implementation(libs.spring.boot.starter.security.oauth2.resource.server)
+                // 조회 API 응답 계약 검증(ApiContract — portal-api.openapi.yaml, C11): 계약 사본은 portal-ingest 자원(contracts/api/v1/**)
+                implementation(libs.json.schema.validator)
+                implementation(libs.jackson.dataformat.yaml)
                 implementation(libs.junit.jupiter)
                 implementation(libs.assertj.core)
                 runtimeOnly(libs.junit.platform.launcher)
@@ -81,6 +91,8 @@ testing {
                     // 프로젝션 IT(Phase 2): 골든 스트림·골든 뷰(portal-projection 시험 자원 — 시험 픽스처 GoldenViews·Envelopes가 읽는다)
                     inputs.dir(rootProject.layout.projectDirectory.dir("portal-projection/src/test/resources/golden-streams")).withPathSensitivity(PathSensitivity.RELATIVE)
                     inputs.dir(rootProject.layout.projectDirectory.dir("portal-projection/src/test/resources/golden-views")).withPathSensitivity(PathSensitivity.RELATIVE)
+                    // 조회 API IT(Phase 3): 응답 계약(ApiContract — 클래스패스 사본의 원천)
+                    inputs.file(rootProject.layout.projectDirectory.file("contracts/api/v1/portal-api.openapi.yaml")).withPathSensitivity(PathSensitivity.RELATIVE)
                 }
             }
         }
@@ -89,4 +101,29 @@ testing {
 
 tasks.named("check") {
     dependsOn(testing.suites.named("archTest"), testing.suites.named("integrationTest"))
+}
+
+// AuthzMatrixTest(Phase 3 C5)가 인가 매트릭스 정본을 읽는다(verifyTestInputs)
+tasks.test {
+    inputs.file(rootProject.layout.projectDirectory.file("docs/authz-matrix.md")).withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+// ---------------------------------------------------------------------------------------------
+// 실 엔진 E2E(포털 Phase 3 지시문 D-16) — 정규 빌드(check) 밖. e2e/engine-feed/run.sh가 부른다(사용자가 손으로 실행).
+//  runTestIssuer: 인프로세스 시험 발급기(TestIssuer)를 띄워 토큰·발급자 URL을 상태 디렉터리에 쓴다(종료될 때까지 JWKS를 낸다)
+//  e2eCheck     : 뷰 9표 = 골든 a1, GET /api/v1/me/earnings/202608 계약 통과 → RESULT.md
+// ---------------------------------------------------------------------------------------------
+val integrationTestSourceSet = sourceSets.named("integrationTest")
+tasks.register<JavaExec>("runTestIssuer") {
+    group = "e2e"
+    description = "Runs the in-process test OIDC issuer for e2e/engine-feed (writes token and issuer URL to the given state dir)."
+    classpath = integrationTestSourceSet.get().runtimeClasspath
+    mainClass = "com.ga.portal.app.web.TestIssuerMain"
+}
+tasks.register<JavaExec>("e2eCheck") {
+    group = "e2e"
+    description = "Checks the e2e/engine-feed run: 9 views = golden a1 and one /api/v1/me response against the contract; writes RESULT.md."
+    classpath = integrationTestSourceSet.get().runtimeClasspath
+    mainClass = "com.ga.portal.app.web.EngineFeedE2eCheck"
+    systemProperty("ga.repoRoot", rootDir.absolutePath)
 }

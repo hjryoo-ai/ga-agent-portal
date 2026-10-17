@@ -16,7 +16,7 @@ import java.util.Optional;
 @Repository
 public class EarningsMonthRepository extends ViewRepository {
 
-    private static final RowMapper<MonthRow> MAPPER = (rs, n) -> new MonthRow(rs.getString("agent_id"), rs.getString("close_ym"),
+    static final RowMapper<MonthRow> MAPPER = (rs, n) -> new MonthRow(rs.getString("agent_id"), rs.getString("close_ym"),
             rs.getLong("gross"), rs.getLong("clawback_offset"), rs.getLong("adjustment"), optLong(rs, "withholding_tax"),
             optLong(rs, "net"), MonthStatus.valueOf(rs.getString("status")), DataStatus.valueOf(rs.getString("data_status")),
             optInstant(rs, "estimate_as_of"), optLong(rs, "estimate_basis_seq"), optInstant(rs, "confirmed_at"),

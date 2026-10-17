@@ -50,6 +50,23 @@ public class IngestCursorRepository extends TenantScopedRepository {
         return find().orElseThrow();
     }
 
+    /**
+     * 따라잡은 시각(V5, Phase 3 계획 승인 Q3): 커서가 {@code RUNNING}이고 {@code last_seq}가 그 회차의 {@code headSeq}일 때만 쓴다 — 조건은 문장
+     * 안에서 본다(같은 행을 쓰는 적용 트랜잭션과 행 잠금으로 순서가 정해진다). 쓴 행 수(0 또는 1).
+     */
+    public int markCaughtUp(long headSeq, Instant at) {
+        return update("""
+                UPDATE ingest_cursor SET caught_up_at = :at
+                 WHERE tenant_id = :tenantId AND state = 'RUNNING' AND last_seq = :headSeq
+                """, Map.of("headSeq", headSeq, "at", OffsetDateTime.ofInstant(at, ZoneOffset.UTC)));
+    }
+
+    public Optional<Instant> caughtUpAt() {
+        return queryAtMostOne("""
+                SELECT caught_up_at FROM ingest_cursor WHERE tenant_id = :tenantId AND caught_up_at IS NOT NULL
+                """, Map.of(), (rs, n) -> rs.getObject("caught_up_at", OffsetDateTime.class).toInstant());
+    }
+
     /** 커서를 쓴다(없으면 만든다). {@code lastEventId}·{@code error}는 없을 수 있다. */
     public void save(long lastSeq, Optional<String> lastEventId, IngestState state, Optional<String> error, Instant now) {
         Map<String, Object> params = new HashMap<>();

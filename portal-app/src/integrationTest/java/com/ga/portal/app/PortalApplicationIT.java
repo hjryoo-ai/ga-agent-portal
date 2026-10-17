@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 부팅 스모크: 애플리케이션이 portal_app 데이터소스와 portal_migrator Flyway로 뜨고, /actuator/health가 UP이며 DB 헬스 지표가 없고,
- * 트랜잭션 매니저가 TenantSessionBinder다. 컨트롤러는 없다. Phase 1: 인제스트 부품이 조립되고 폴링은 기본으로 꺼져 있다.
+ * 트랜잭션 매니저가 TenantSessionBinder다. Phase 1: 인제스트 부품이 조립되고 폴링은 기본으로 꺼져 있다. Phase 3: 컨트롤러는 조회 API 하나.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class PortalApplicationIT {
@@ -40,6 +40,21 @@ class PortalApplicationIT {
     static void datasource(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", DB::jdbcUrl);
         registry.add("spring.flyway.url", DB::jdbcUrl);
+        registry.add("portal.query.policy-key-secret-file", () -> SECRET.toString());
+    }
+
+    /** policyKey 비밀(허구 — 실행마다 무작위). 웹 애플리케이션은 이 파일 없이 뜨지 않는다(Phase 3). */
+    static final java.nio.file.Path SECRET = secret();
+
+    private static java.nio.file.Path secret() {
+        try {
+            java.nio.file.Path f = java.nio.file.Files.createTempFile("portal-policy-key", ".bin");
+            byte[] b = new byte[32];
+            new java.security.SecureRandom().nextBytes(b);
+            return java.nio.file.Files.write(f, b);
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
     }
 
     @Value("${local.server.port}")
@@ -76,9 +91,11 @@ class PortalApplicationIT {
         assertThat(context.getBeanNamesForType(FeedClient.class)).isEmpty();
     }
 
+    /** Phase 3: 애플리케이션 컨트롤러는 조회 API 하나뿐이다(인제스트·운영 명령은 HTTP가 없다). */
     @Test
-    void noApplicationControllersExist() {
+    void theOnlyApplicationControllerIsTheQueryApi() {
         assertThat(context.getBeansWithAnnotation(org.springframework.stereotype.Controller.class).values())
-                .noneMatch(bean -> bean.getClass().getName().startsWith("com.ga."));
+                .filteredOn(bean -> bean.getClass().getName().startsWith("com.ga."))
+                .extracting(bean -> bean.getClass().getName()).containsExactly("com.ga.portal.app.web.MeController");
     }
 }

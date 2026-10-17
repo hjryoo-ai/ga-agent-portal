@@ -22,11 +22,11 @@ public final class SeedData {
     static {
         Map<String, String> rows = new LinkedHashMap<>();
         rows.put("tenant", "INSERT INTO tenant (tenant_id, name, engine_base_url, status, payout_day_rule) VALUES (?, 'Fictional GA', 'http://engine.invalid', 'ACTIVE', 'NEXT_MONTH_D10')");
-        rows.put("identity_link", "INSERT INTO identity_link (tenant_id, subject, agent_id) VALUES (?, 'sub-1', 'A0001')");
+        rows.put("identity_link", "INSERT INTO identity_link (tenant_id, subject, agent_id, role, status, org_path, linked_at) VALUES (?, 'sub-1', 'A0001', 'AGENT', 'ACTIVE', '/HQ1/BR01/TM01', TIMESTAMPTZ '2026-10-17 00:00:00+00')");
         rows.put("agent_profile", "INSERT INTO agent_profile (tenant_id, agent_id, name, org_path, role, status, valid_from, last_seq) VALUES (?, 'A0001', 'Agent One', '/HQ1/BR01/TM01', 'AGENT', 'ACTIVE', DATE '2026-08-01', 1)");
         rows.put("earnings_line", "INSERT INTO earnings_line (tenant_id, calc_id, agent_id, policy_no, comm_type, amount, close_ym, basis, policy_summary, source_seq) VALUES (?, 'C1', 'A0001', 'P1', 'FY_COMM', 2800000, '202608', '{}', '{}', 2)");
         rows.put("earnings_month", "INSERT INTO earnings_month (tenant_id, agent_id, close_ym, gross, status, last_seq) VALUES (?, 'A0001', '202608', 2800000, 'PROVISIONAL', 2)");
-        rows.put("policy_limit", "INSERT INTO policy_limit (tenant_id, ledger_id, agent_id, policy_no, contract_date, fy_start, fy_end, monthly_premium, limit_multiple, limit_amount, rule_version_id) VALUES (?, 'L1', 'A0001', 'P1', DATE '2026-08-01', DATE '2026-08-01', DATE '2027-07-31', 300000, 12.00, 3600000, 'R1')");
+        rows.put("policy_limit", "INSERT INTO policy_limit (tenant_id, ledger_id, agent_id, policy_no, contract_date, fy_start, fy_end, monthly_premium, limit_multiple, limit_amount, rule_version_id) VALUES (?, 'L1', 'A0001', 'P1', DATE '2026-08-01', DATE '2026-08-01', DATE '2027-07-31', 300000, '12', 3600000, 'R1')");
         rows.put("policy_limit_history", "INSERT INTO policy_limit_history (tenant_id, ledger_id, source_seq, posting_seq, kind, calc_id, amount, accum_after) VALUES (?, 'L1', 3, 1, 'POST', 'C1', 2800000, 2800000)");
         rows.put("deferral_item", "INSERT INTO deferral_item (tenant_id, schedule_id, agent_id, policy_no, source_calc_id, due_ym, amount, pay_condition, status, reason, curve_version_id, last_seq) VALUES (?, 'S1', 'A0001', 'P1', 'C2', '202708', 200000, 'INFORCE', 'SCHEDULED', 'LIMIT_DEFER', 'CV1', 6)");
         rows.put("clawback_item", "INSERT INTO clawback_item (tenant_id, receivable_id, agent_id, origin_calc_id, amount, remaining, status, last_seq) VALUES (?, 'RCV1', 'A0001', 'C9', 350000, 350000, 'OPEN', 12)");

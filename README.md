@@ -33,13 +33,13 @@ Phase 2(프로젝션) 구현 완료, 수용 심사 대기 — [지시문](docs/p
 엔진 피드를 테넌트별로 읽는 폴링은 `PORTAL_INGEST_ENABLED=true`일 때만 돈다. 테넌트 목록은 전용 롤 `portal_directory`(`PORTAL_DIRECTORY_USER`·`PORTAL_DIRECTORY_PASSWORD`), 서비스 토큰은 테넌트별 파일 `$PORTAL_ENGINE_TOKEN_DIR/<TENANT_ID>`(소유자만 읽게 — 값은 저장소·로그에 쓰지 않는다). 멈춘 테넌트를 다루는 운영 명령:
 
 ```bash
-java -jar portal-app.jar --spring.profiles.active=cli ingest status [--tenant=GA01] --actor=ops-kim
-java -jar portal-app.jar --spring.profiles.active=cli ingest resume --tenant=GA01 --from-seq=120 --actor=ops-kim
-java -jar portal-app.jar --spring.profiles.active=cli ingest pause --tenant=GA01 --actor=ops-kim
-java -jar portal-app.jar --spring.profiles.active=cli ingest rebuild --tenant=GA01 --actor=ops-kim   # Phase 2 — 설계서 §6.7
+java -jar portal-app.jar --spring.profiles.active=cli ingest status [--tenant=GA01]
+java -jar portal-app.jar --spring.profiles.active=cli ingest resume --tenant=GA01 --from-seq=120
+java -jar portal-app.jar --spring.profiles.active=cli ingest pause --tenant=GA01
+java -jar portal-app.jar --spring.profiles.active=cli ingest rebuild --tenant=GA01   # Phase 2 — 설계서 §6.7
 ```
 
-전 건 `audit_access`에 남는다(거부도). `--from-seq`는 마지막으로 적용한 seq 이하만 — 건너뛰기는 재구축으로만. **인가의 한계**: 조회 API·인증이 오는 Phase 3 전까지 CLI는 실행한 OS 사용자를 믿는다 — 운영 호스트 접근 통제가 곧 인가다.
+전 건 `audit_access`에 남는다(거부도). `--from-seq`는 마지막으로 적용한 seq 이하만 — 건너뛰기는 재구축으로만. **인가(Phase 3)**: 행위자는 실행한 OS 사용자이고, `cli:<OS 사용자>`가 그 테넌트의 `identity_link`에 `OPERATOR`로 등록돼 있어야 한다(등록 SQL은 `docs/운영.md` §3). `--actor`는 없어졌다(종료 코드 64). 거부는 `T not authorized` + 종료 코드 2.
 
 `rebuild`(Phase 2)는 그 테넌트의 뷰를 피드 seq 1부터 **한 트랜잭션**으로 다시 만든다 — 실패하면 아무것도 바뀌지 않고 커서가 `FAILED(REBUILD_FAILED: …)`가 된다(종료 코드 1). 재구축 중에도 조회는 옛 행을 본다. 피드 머리가 `portal.ingest.rebuild.max-events`(기본 50,000)를 넘으면 시작하지 않는다.
 
@@ -48,6 +48,12 @@ java -jar portal-app.jar --spring.profiles.active=cli ingest rebuild --tenant=GA
 엔진 이벤트 13종을 뷰 9표로 투영한다(설계서 §4.2 표·§5). 금액은 엔진 값을 그대로 담고 포털은 정수 합산만 한다. 골든: `portal-projection/src/test/resources/golden-streams/`(스트림·출처 해시는 그 README)과 `golden-views/`(기대 행 — 손으로 검산). 마감·지급 이벤트의 합계가 포털 합산과 다르면 독이 아니라 그 달 `DRIFT`(지표 `projection_drift_total`).
 
 `earnings_line.basis`의 `reason`처럼 엔진이 주는 자유 문자열은 설계사·고객 값이 아니어서 평문 스캔 대상이 아니다(엔진 규칙 설명) — 저장은 하되 로그·오류 메시지에는 옮기지 않는다.
+
+## 조회 API (Phase 3)
+
+설계사 본인 조회 `/api/v1/me/**`(계약 `contracts/api/v1/portal-api.openapi.yaml`, 인가 표 `docs/authz-matrix.md`). 인증은 테넌트 IdP의 RS256 액세스 토큰 — 테넌트는 토큰 발급자(`iss`)로, 설계사·역할은 `identity_link`로만 정한다(경로·쿼리에 agentId 없음). 거부는 같은 바이트(401 하나·404 하나·쿼리 형식 400 하나). 증권번호는 응답에 없고 `policyMasked`·`policyKey`(배포 비밀 HMAC)만. 운영 등록(발급자·설계사 링크·운영자·`policyKey` 비밀)은 `docs/운영.md`. 배포에 필요한 것: `PORTAL_ISSUER_USER`·`PORTAL_ISSUER_PASSWORD`(전용 롤 `portal_issuer`), `PORTAL_POLICY_KEY_SECRET_FILE`.
+
+실 엔진 E2E(정규 빌드 밖, 손으로 실행): `ENGINE_REPO=<엔진 commission-system 경로> e2e/engine-feed/run.sh` — 엔진 로컬 스택 → 포털(인제스트 켬) → 뷰 9표 = 골든 `a1`, 조회 API 한 건 계약 통과 → `e2e/engine-feed/RESULT.md`. 절차·비밀 처리는 `e2e/engine-feed/README.md`.
 
 ## 모듈
 

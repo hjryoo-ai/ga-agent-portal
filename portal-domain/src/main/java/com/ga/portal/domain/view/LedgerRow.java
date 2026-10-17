@@ -5,7 +5,7 @@ import java.util.Objects;
 
 /**
  * {@code policy_limit} 한 행. {@code limitMultiple}은 엔진이 준 불투명 소수 문자열이다 — 포털은 곱하지 않고 숫자로 바꾸지 않는다
- * (저장은 SQL이 {@code NUMERIC}으로, 읽기는 {@code trim_scale(…)::text}). {@code accumPaid}는 엔진 {@code accumAfter} 그대로다.
+ * (V5부터 {@code TEXT} 원문 그대로 저장·반환). {@code accumPaid}는 엔진 {@code accumAfter} 그대로다.
  */
 public record LedgerRow(String ledgerId, String agentId, String policyNo, LocalDate contractDate, LocalDate fyStart, LocalDate fyEnd,
                         long monthlyPremium, String limitMultiple, long limitAmount, long accumPaid, long cutTotal, long deferredTotal,
