@@ -125,3 +125,20 @@
 | DD-8 | §5 불변식 "`accum_paid ≤ limit_amount`"가 부록 A-3 감액 재산정(newLimit < accum)과 모순 — 글자대로면 재산정 뒤 첫 전기(음수 환수라도)에서 멀쩡한 테넌트가 멈춘다 | 엔진 `LimitLedger.post` 규칙: 양수 전기 뒤만 상한, 모든 전기 뒤 누적 ≥ 0, 재산정은 검사 없음(Q5). §5 문장 v1.5 |
 | DD-9 | §6.2 분급 상태 그림이 `HELD → RELEASED`를 그렸다 — 엔진 `ScheduleEntry.released`는 `SCHEDULED`에서만 받는다 | 엔진 전이·사유 짝 그대로(Q8, `DeferralTransitions`). §6.2는 해당 단계에서 |
 
+
+## 2026-10-17 — Phase 2 구현에서 계획과 다르게 한 것 (보고서 §5)
+
+| # | 계획 | 구현 | 이유 |
+|---|---|---|---|
+| P2-1 | 뷰 행 타입은 `portal-projection` | **`portal-domain`의 `com.ga.portal.domain.view`**(`AgentRow`·`LineRow`·`MonthRow`·`LedgerRow`·`HistoryRow`·`DeferralRow`·`ReceivableRow`·`FlagRow`·`ReconRow`·`MonthSums`) | 의존 규칙 `infra`는 `app`만 — `portal-infra` 저장소가 행 타입을 받으려면 둘 다 보는 모듈에 있어야 한다. Phase 1 `CursorRecord`·`IngestEventRecord`와 같은 이유. JSONB 열은 거기서 JSON 문자열 |
+| P2-2 | 골든 반례는 파일(`closed-month-line` 외 6개, 계획 ⑨) | **시험 코드가 A-1에서 한 줄을 바꾼다**(`ProjectionInvariantTest`·`ProjectionWorkerIT`·`RebuildIT`) | 반례마다 파일을 두면 A-1이 바뀔 때 일곱 파일을 같이 고쳐야 하고, 바꾼 줄이 시험 옆에 보이지 않는다. 정상 스트림 4개만 파일(출처 해시는 README) |
+| P2-3 | 임시 골든 `a1-provisional.jsonl`(D-1) | **만들지 않았다** | 엔진 E2 ⓪a 파일(`a124621`)이 2단계 전에 와서 v1.3으로 바로 채택했다(6단계 "교체"가 할 일이 없다). 계획 값과 엔진 값의 차이는 0 — 보고서 §6 |
+| P2-4 | `limit_multiple`은 원문 문자열 보존 | `NUMERIC(6,2)` 열(V1)이라 **소수 둘째 자리까지만** 되돌아온다 — 저장 `CAST(:s AS NUMERIC)`, 읽기 `trim_scale(…)::text` | 계약 `decimalString`은 소수 여섯 자리까지 허용한다(`^(0\|[1-9][0-9]*)(\.[0-9]{1,6})?$`). 엔진 값은 지금 `"12"`라 골든이 같다. 셋째 자리 이상은 PostgreSQL이 반올림하고, 끝의 0(`"12.50"`)은 `trim_scale`이 지워 원문과 바이트가 달라진다 — 열을 `TEXT`로 바꾸는 V 마이그레이션은 다음 Phase 질문(보고서 §8) |
+| P2-5 | `IngestPollingIT`는 정규 시험 스트림(17건) | **엔진 A-1(10건)** + 월 행 단언 | 뷰 프로젝터가 조립되면 정규 스트림의 단건 예시(seq 11~17, A-1과 무관한 키)가 `UNKNOWN_REFERENCE`로 독이다. 폴링 경로를 보는 시험이라 스트림만 바꿨다 |
+| P2-6 | `RecordingProjector`는 main에서 운영 조립만 빠진다 | `portal-projection` **testFixtures로 옮겼다** | 운영 클래스패스에 시험용 프로젝터를 남길 이유가 없다. Phase 1 IT는 명시적으로 넘긴다 |
+| P2-7 | 감사 동작 `INGEST_REBUILD`·`INGEST_REBUILD_REJECTED` | **`INGEST_REBUILD_SUCCEEDED`·`INGEST_REBUILD_FAILED`** 추가(트랜잭션마다 한 행) | 재구축은 트랜잭션 셋이라 "시작"만 남기면 결과가 감사에 없다. P1-2와 같은 이유(전 건 감사) |
+| P2-8 | 종료 코드 0·2·64 | **1 = 재구축 실패**(커서 `FAILED`, 뷰 그대로) | 거부(2 — 아무것도 바뀌지 않음)와 실패(커서가 바뀜)는 운영자가 할 일이 다르다 |
+| P2-9 | txB 잠금 1회 | **짧은 재시도**(50 ms × 20) | txA 커밋 직전에 `RUNNING`을 읽은 워커의 적용 트랜잭션이 잠금을 잠깐 쥘 수 있다 — 그 트랜잭션은 `REBUILDING`을 보고 곧 끝난다. 실패한 `pg_try_advisory_xact_lock`은 트랜잭션을 깨지 않는다. 싼 경합은 문서로 남기지 않고 고친다 |
+| P2-10 | 재생은 피드 끝까지 | **첫 페이지 `headSeq`까지**, 재생 수가 상한에 닿으면 실패, 그 `headSeq`·재생 끝이 이미 `APPLIED`인 최대 seq보다 작으면 실패 | 자동 보안 검토 두 건(`a65357a`·`f190741`): ⓐ 재생 중 늘어난 머리를 따라가면 상한이 txB를 묶지 못한다 ⓑ 피드가 뒤로 가거나 잘리면 커서가 `APPLIED` 행 아래에 서고, 워커가 그 행들을 아는 이벤트로 건너뛰어 뷰에서 영영 빠진다 |
+| P2-11 | (계획에 없음) | 재생은 **알림을 파생하지 않는다** | Phase 6 전까지 no-op이고, `dedup_key`로 다시 불러도 되는지는 그 규칙을 볼 때 정한다(설계서 §14.1 #12) |
+| P2-12 | `EventCheck`로 꺼냄(계획 ⑥) | 그대로 — 적용기는 `Known` → `SKIPPED`, 재생은 `Known`도 seq 연속을 요구하고 다시 투영 | 동작 무변경의 증거: Phase 1 `IngestApplierTest` 18건이 손대지 않고 통과 |
