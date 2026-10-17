@@ -5,13 +5,22 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
-/** 계약 샘플(저장소 {@code contracts/events/v1/samples} — 허구 데이터)과 시험 스트림(이 모듈 시험 자원 {@code streams/}). */
+/**
+ * 계약 샘플(저장소 {@code contracts/events/v1/samples} — 허구 데이터)과 시험 스트림(이 모듈 시험 자원 {@code streams/}).
+ *
+ * <p>계약 v1.3부터 샘플은 셋이다: {@code a1/a1_portal_150000.jsonl}(엔진 E2 ⓪a가 낸 A-1 스트림 바이트 그대로 — seq 1~10),
+ * {@code contract-only/}·{@code standalone/}(단건 예시 7개 — 각자의 seq는 예시값이라 a1과 겹친다). 시험이 쓰는 <b>정규 스트림</b>
+ * {@link #all()}은 a1의 10건 뒤에 단건 예시 7개를 파일 이름 순으로 이어 seq를 11~17로 다시 매긴 것이다(eventId는 그대로 — 셋이 겹치지 않는다).
+ * 해시는 seq를 보지 않으므로(Phase 1 Q1) 다시 매겨도 각 이벤트의 해시는 샘플 파일의 것과 같다.
+ */
 public final class Samples {
 
     public static final JsonMapper JSON = JsonMapper.builder().build();
@@ -27,12 +36,29 @@ public final class Samples {
         return Path.of(root);
     }
 
-    /** 샘플 01~17(seq 순 — v1.2부터 {@code a1/}·{@code contract-only/}·{@code standalone/} 세 디렉터리를 합친 것). */
+    /** 정규 스트림 17건(seq 1~17 — 클래스 설명). */
     public static List<ObjectNode> all() {
         Path dir = repoRoot().resolve("contracts/events/v1/samples");
-        try (Stream<Path> files = Files.walk(dir)) {
-            return files.filter(p -> p.toString().endsWith(".json"))
-                    .sorted(Comparator.comparing(p -> p.getFileName().toString())).map(Samples::read).toList();
+        List<ObjectNode> out = new ArrayList<>(a1());
+        List<Path> singles;
+        try (Stream<Path> files = Stream.concat(Files.list(dir.resolve("contract-only")), Files.list(dir.resolve("standalone")))) {
+            singles = files.filter(p -> p.toString().endsWith(".json")).sorted(Comparator.comparing(p -> p.getFileName().toString())).toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        for (Path p : singles) {
+            ObjectNode e = read(p);
+            e.put("seq", out.size() + 1);
+            out.add(e);
+        }
+        return out;
+    }
+
+    /** 엔진 A-1 스트림(계약 {@code samples/a1/a1_portal_150000.jsonl}, 한 줄 한 Envelope) — 파일 순서·seq 그대로. */
+    public static List<ObjectNode> a1() {
+        try {
+            return Files.readAllLines(repoRoot().resolve("contracts/events/v1/samples/a1/a1_portal_150000.jsonl"), StandardCharsets.UTF_8)
+                    .stream().filter(l -> !l.isBlank()).map(l -> (ObjectNode) JSON.readTree(l)).toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

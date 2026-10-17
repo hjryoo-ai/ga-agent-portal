@@ -28,7 +28,7 @@ class ClasspathContractsTest {
                     })
                     .toList();
         }
-        assertThat(files).hasSizeGreaterThanOrEqualTo(1 + 2 + 13 + 17 + 1);
+        assertThat(files).hasSizeGreaterThanOrEqualTo(1 + 2 + 13 + (1 + 7) + 1);   // 샘플: A-1 스트림 파일 하나 + 단건 7(계약 v1.3)
         for (Path file : files) {
             String rel = CONTRACTS.relativize(file).toString().replace('\\', '/');
             try (InputStream in = getClass().getClassLoader().getResourceAsStream("contracts/" + rel)) {

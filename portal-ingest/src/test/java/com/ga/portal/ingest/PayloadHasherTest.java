@@ -14,7 +14,7 @@ class PayloadHasherTest {
 
     @Test
     void sameFactSameHashRegardlessOfKeyOrderSeqEventIdAndTransportFields() {
-        ObjectNode a = EnvelopeValidatorTest.sample("02-CommissionCalculated.json");
+        ObjectNode a = EnvelopeValidatorTest.sample(2);
         String h = PayloadHasher.hash(a);
         assertThat(h).matches("[0-9a-f]{64}");
         ObjectNode b = a.deepCopy();
@@ -30,7 +30,7 @@ class PayloadHasherTest {
 
     @Test
     void anyChangeInTheHashedFieldsChangesTheHash() {
-        ObjectNode a = EnvelopeValidatorTest.sample("02-CommissionCalculated.json");
+        ObjectNode a = EnvelopeValidatorTest.sample(2);
         String h = PayloadHasher.hash(a);
         ObjectNode amount = a.deepCopy();
         ((ObjectNode) amount.path("payload")).put("amount", 2_800_001);
@@ -47,7 +47,7 @@ class PayloadHasherTest {
 
     @Test
     void anEnvelopeWithoutAHashedFieldIsRefused() {
-        ObjectNode a = EnvelopeValidatorTest.sample("02-CommissionCalculated.json");
+        ObjectNode a = EnvelopeValidatorTest.sample(2);
         a.remove("aggregate");
         assertThatThrownBy(() -> PayloadHasher.hash(a)).hasMessageContaining("aggregate");
     }

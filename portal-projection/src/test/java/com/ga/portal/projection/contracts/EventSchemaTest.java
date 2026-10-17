@@ -20,8 +20,11 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * C7(지시문 v1.2 §5): 포털 계약(contracts/events/v1·api/v1)과 공유 핵심 사본(contracts/shared/ga-disclosure).
  * <ul>
- *   <li>샘플 17개(부록 A-1 seq 1~13 + 4)가 13종을 덮고 전부 통과, 필수 필드를 하나씩 뺀 변형은 전부 실패.</li>
+ *   <li>샘플 17건(v1.3 — 엔진 A-1 스트림 10줄 + 단건 7)이 13종을 덮고 전부 통과, 필수 필드를 하나씩 뺀 변형은 전부 실패.</li>
  *   <li>포털 Envelope ⊇ 핵심: 핵심이 거부하는 변형을 포털 Envelope도 거부하고, 포털 Envelope의 allOf 첫 항이 사본을 가리킨다.</li>
  *   <li>type ↔ payload, type ↔ aggregate.kind 짝(Q4·Q5), 열거 밖 type·version은 거부(else: false), 모르는 필드는 허용(§4.5).</li>
  *   <li>요율·배수는 소수 문자열(Q3) — JSON number는 거부. contracts/ 전 파일 format 0. OpenAPI 피드의 정수 커서 규약.</li>
@@ -42,6 +45,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *       피드 응답 필수 tenantId·422 Problem·limit 기본 200(K8), PolicyEventObserved 열거 설명(K9).</li>
  *   <li>v1.2(Phase 2 지시문 §0): 피드 400(M1), 분급 사유·채권 상태 닫힌 열거와 채권 금액 0 이상(M2·M3), 샘플 손질(M4),
  *       샘플 디렉터리 a1/·contract-only/·standalone/(M5).</li>
+ *   <li>v1.3(Phase 2 승인 §3): a1/ = 엔진 E2 ⓪a의 A-1 스트림 바이트 그대로, 동기 API R1~R8.</li>
  * </ul>
  * 스키마 IRI는 저장소 파일로만 풀린다(원격 조회 없음): {@code https://ga.example/portal/contracts/} → {@code contracts/},
  * {@code https://ga.example/contracts/}(ga-disclosure의 IRI) → {@code contracts/shared/ga-disclosure/}.
@@ -105,19 +109,44 @@ class EventSchemaTest {
         return (ObjectNode) JSON.readTree(readString(file));
     }
 
-    /** 샘플 전부(v1.2 — {@code a1/}·{@code contract-only/}·{@code standalone/} 세 디렉터리), 파일 이름(= seq) 순. */
-    static List<Path> samples() {
-        try (Stream<Path> files = Files.walk(CONTRACTS.resolve("events/v1/samples"))) {
-            return files.filter(p -> p.toString().endsWith(".json"))
-                    .sorted(Comparator.comparing(p -> p.getFileName().toString())).toList();
+    /** 샘플 하나 — 이름은 단건 파일 이름 또는 {@code a1#<seq>}(엔진 A-1 스트림 {@code a1/a1_portal_150000.jsonl}의 그 seq 줄). */
+    record Sample(String name, ObjectNode doc) {
+    }
+
+    private static final Path A1_STREAM = CONTRACTS.resolve("events/v1/samples/a1/a1_portal_150000.jsonl");
+
+    /** 샘플 전부(v1.3): 엔진 A-1 스트림 10줄(파일 순서) 뒤에 {@code contract-only/}·{@code standalone/}의 단건 7개(파일 이름 순). */
+    static List<Sample> samples() {
+        List<Sample> out = new ArrayList<>();
+        for (String line : readString(A1_STREAM).split("\n")) {
+            if (!line.isBlank()) {
+                ObjectNode doc = (ObjectNode) JSON.readTree(line);
+                out.add(new Sample("a1#" + doc.path("seq").asLong(), doc));
+            }
+        }
+        try (Stream<Path> files = Stream.concat(Files.list(CONTRACTS.resolve("events/v1/samples/contract-only")),
+                Files.list(CONTRACTS.resolve("events/v1/samples/standalone")))) {
+            files.filter(p -> p.toString().endsWith(".json")).sorted(Comparator.comparing(p -> p.getFileName().toString()))
+                    .forEach(p -> out.add(new Sample(p.getFileName().toString(), read(p))));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+        return out;
     }
 
-    /** 이름이 {@code name}인 샘플 파일(어느 디렉터리에 있든). */
-    static Path sample(String name) {
-        return samples().stream().filter(p -> p.getFileName().toString().equals(name)).findFirst().orElseThrow();
+    /** 이름이 {@code name}인 샘플의 복사본. */
+    static ObjectNode sample(String name) {
+        return samples().stream().filter(s -> s.name().equals(name)).findFirst().orElseThrow().doc().deepCopy();
+    }
+
+    private static String sha256(Path file) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static List<String> namesIn(String dir) {
@@ -129,7 +158,7 @@ class EventSchemaTest {
     }
 
     static Stream<Arguments> sampleFiles() {
-        return samples().stream().map(p -> Arguments.argumentSet(p.getFileName().toString(), p));
+        return samples().stream().map(s -> Arguments.argumentSet(s.name(), s.doc()));
     }
 
     private static ObjectNode payloadSchema(String type) {
@@ -139,27 +168,37 @@ class EventSchemaTest {
     // ------------------------------------------------------------------ 샘플
 
     @Test
-    void samplesCoverThe13TypesInSeqOrderOfAppendixA1() {
-        List<ObjectNode> all = samples().stream().map(EventSchemaTest::read).toList();
+    void samplesCoverThe13TypesAndA1IsTheEngineStream() {
+        List<ObjectNode> all = samples().stream().map(Sample::doc).toList();
         assertThat(all).hasSize(17);
         assertThat(all.stream().map(s -> s.path("type").asString()).distinct()).containsExactlyInAnyOrderElementsOf(EVENT_TYPES);
-        assertThat(all.stream().map(s -> s.path("seq").asLong())).containsExactly(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L, 13L, 14L, 15L, 16L, 17L);
-        // A-1 seq 3~5: 한도 3,600,000에 2,800,000 + 800,000(삭감 200,000 뒤) = 3,600,000 — amount는 삭감 뒤 지급분(I1)
-        assertThat(all.get(3).path("payload").path("amount").asLong()).isEqualTo(800_000L);
-        assertThat(all.get(3).path("payload").path("limitCutAmt").asLong()).isEqualTo(200_000L);
-        assertThat(all.get(4).path("payload").path("accumAfter").asLong()).isEqualTo(3_600_000L);
+        List<ObjectNode> a1 = all.subList(0, 10);
+        assertThat(a1.stream().map(s -> s.path("seq").asLong())).containsExactly(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
+        assertThat(a1.stream().map(s -> s.path("type").asString())).containsExactly("LimitLedgerOpened", "CommissionCalculated",
+                "CommissionCalculated", "LimitLedgerPosted", "LimitLedgerPosted", "StatementConfirmed", "PayoutCompleted", "PolicyEventObserved",
+                "CommissionCalculated", "LimitLedgerPosted");
+        // A-1(월납 150,000 — 엔진 E2 ⓪a): 한도 1,800,000 = FY 945,000 + 시책 855,000(삭감 145,000 뒤) — amount는 삭감 뒤 지급분(I1)
+        assertThat(a1.get(0).path("payload").path("limitAmount").asLong()).isEqualTo(1_800_000L);
+        assertThat(a1.get(1).path("payload").path("amount").asLong()).isEqualTo(945_000L);
+        assertThat(a1.get(2).path("payload").path("amount").asLong()).isEqualTo(855_000L);
+        assertThat(a1.get(2).path("payload").path("limitCutAmt").asLong()).isEqualTo(145_000L);
+        assertThat(a1.get(4).path("payload").path("accumAfter").asLong()).isEqualTo(1_800_000L);
+        assertThat(a1.get(6).path("payload").path("withholdingTax").asLong()).isEqualTo(59_400L);
+        assertThat(a1.get(6).path("payload").path("paidAmount").asLong()).isEqualTo(1_740_600L);
+        assertThat(a1.get(8).path("payload").path("amount").asLong()).isEqualTo(-720_000L);
+        assertThat(a1.get(9).path("payload").path("accumAfter").asLong()).isEqualTo(1_080_000L);
     }
 
     /**
-     * M5(v1.2): {@code a1/}는 엔진이 재현하는 A-1 순서(seq 6·7·13을 뺀 것 — Phase 2 1단계에서 엔진 스트림으로 바뀐다),
+     * M5(v1.2)·v1.3: {@code a1/}는 엔진 E2 ⓪a가 낸 A-1 스트림 파일 하나(바이트 그대로 — SHA-256 고정),
      * {@code contract-only/}는 엔진이 내지 않는 형태(StatementEstimated — E2 뒤 교체, LIMIT_DEFER 스케줄과 그 취소),
      * {@code standalone/}은 엔진이 내지만 A-1 밖인 단건 예시.
      */
     @Test
     void samplesAreSplitIntoTheEngineA1TheContractOnlyAndTheStandaloneDirectories() {
-        assertThat(namesIn("a1")).containsExactly("01-LimitLedgerOpened.json", "02-CommissionCalculated.json", "03-LimitLedgerPosted.json",
-                "04-CommissionCalculated.json", "05-LimitLedgerPosted.json", "08-StatementConfirmed.json", "09-PayoutCompleted.json",
-                "10-PolicyEventObserved.json", "11-CommissionCalculated.json", "12-LimitLedgerPosted.json");
+        assertThat(namesIn("a1")).containsExactly("a1_portal_150000.jsonl");
+        // 엔진 ga-commission-engine@a124621855ee142454b82af02cc066c563e51a7f commission-outbox/src/test/resources/outbox-golden/a1_portal_150000.jsonl
+        assertThat(sha256(A1_STREAM)).isEqualTo("25929e7f9908227cd943f75da02b5e0313483a1e05731d785cbbe66477abe718");
         assertThat(namesIn("contract-only")).containsExactly("06-DeferralScheduled.json", "07-StatementEstimated.json", "13-DeferralStatusChanged.json");
         assertThat(namesIn("standalone")).containsExactly("14-ClawbackReceivableUpdated.json", "15-AdjustmentPosted.json",
                 "16-AgentSnapshot.json", "17-LimitLedgerRebased.json");
@@ -169,21 +208,21 @@ class EventSchemaTest {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        assertThat(read(sample("06-DeferralScheduled.json")).path("payload").path("reason").asString()).isEqualTo("LIMIT_DEFER");
+        assertThat(sample("06-DeferralScheduled.json").path("payload").path("reason").asString()).isEqualTo("LIMIT_DEFER");
     }
 
     /** M4(v1.2): 엔진이 마감 시점에 갖지 않는 값·어휘를 샘플에서 뺐다. */
     @Test
     void samplesCarryOnlyWhatTheEngineHasAtThatPoint() {
-        JsonNode confirmed = read(sample("08-StatementConfirmed.json")).path("payload");
+        JsonNode confirmed = sample("a1#6").path("payload");
         assertThat(confirmed.has("withholdingTax")).isFalse();
         assertThat(confirmed.has("net")).isFalse();
-        assertThat(read(sample("13-DeferralStatusChanged.json")).path("payload").path("reason").asString()).isEqualTo("POLICY_TERMINATED");
-        JsonNode receivable = read(sample("14-ClawbackReceivableUpdated.json")).path("payload");
+        assertThat(sample("13-DeferralStatusChanged.json").path("payload").path("reason").asString()).isEqualTo("POLICY_TERMINATED");
+        JsonNode receivable = sample("14-ClawbackReceivableUpdated.json").path("payload");
         assertThat(receivable.path("amount").asLong()).isPositive();
         assertThat(receivable.path("remaining").asLong()).isBetween(1L, receivable.path("amount").asLong() - 1);
         assertThat(receivable.path("status").asString()).isEqualTo("OFFSET");
-        JsonNode agent = read(sample("16-AgentSnapshot.json")).path("payload");
+        JsonNode agent = sample("16-AgentSnapshot.json").path("payload");
         assertThat(agent.has("role")).isFalse();
         assertThat(agent.has("nameMasked")).isFalse();
     }
@@ -196,25 +235,25 @@ class EventSchemaTest {
         assertThat(payloadSchema("ClawbackReceivableUpdated").path("properties").path("status").path("enum")).extracting(JsonNode::asString)
                 .containsExactly("OPEN", "OFFSET", "CLOSED", "WRITTEN_OFF");
         for (String reason : List.of("DUE_RELEASED", "POLICY_NOT_INFORCE", "POLICY_TERMINATED", "SOURCE_REVERSED")) {
-            ObjectNode doc = read(sample("13-DeferralStatusChanged.json"));
+            ObjectNode doc = sample("13-DeferralStatusChanged.json");
             ((ObjectNode) doc.path("payload")).put("reason", reason);
             assertThat(schema(ENVELOPE).validate(doc)).as(reason).isEmpty();
         }
         for (String reason : List.of("POLICY_CANCELLED", "policy_terminated", "")) {
-            ObjectNode doc = read(sample("13-DeferralStatusChanged.json"));
+            ObjectNode doc = sample("13-DeferralStatusChanged.json");
             ((ObjectNode) doc.path("payload")).put("reason", reason);
             assertThat(schema(ENVELOPE).validate(doc)).as("reason %s", reason).isNotEmpty();
         }
         for (String status : List.of("PARTIALLY_OFFSET", "offset", "")) {
-            ObjectNode doc = read(sample("14-ClawbackReceivableUpdated.json"));
+            ObjectNode doc = sample("14-ClawbackReceivableUpdated.json");
             ((ObjectNode) doc.path("payload")).put("status", status);
             assertThat(schema(ENVELOPE).validate(doc)).as("status %s", status).isNotEmpty();
         }
         for (String field : List.of("amount", "remaining")) {
-            ObjectNode negative = read(sample("14-ClawbackReceivableUpdated.json"));
+            ObjectNode negative = sample("14-ClawbackReceivableUpdated.json");
             ((ObjectNode) negative.path("payload")).put(field, -1);
             assertThat(schema(ENVELOPE).validate(negative)).as("%s −1", field).isNotEmpty();
-            ObjectNode zero = read(sample("14-ClawbackReceivableUpdated.json"));
+            ObjectNode zero = sample("14-ClawbackReceivableUpdated.json");
             ((ObjectNode) zero.path("payload")).put(field, 0);
             assertThat(schema(ENVELOPE).validate(zero)).as("%s 0", field).isEmpty();
         }
@@ -222,8 +261,8 @@ class EventSchemaTest {
 
     @ParameterizedTest
     @MethodSource("sampleFiles")
-    void everySamplePassesTheEnvelopeTheCoreAndItsPayloadSchema(Path file) {
-        ObjectNode sample = read(file);
+    void everySamplePassesTheEnvelopeTheCoreAndItsPayloadSchema(ObjectNode given) {
+        ObjectNode sample = given.deepCopy();
         String type = sample.path("type").asString();
         assertThat(schema(ENVELOPE).validate(sample)).isEmpty();
         assertThat(schema(CORE_ID).validate(sample)).isEmpty();
@@ -234,8 +273,8 @@ class EventSchemaTest {
     /** 각 샘플에서 필수 필드(Envelope 일곱 개 + payload의 required, 안쪽 객체의 required까지)를 하나씩 뺀 변형은 전부 실패한다. */
     @ParameterizedTest
     @MethodSource("sampleFiles")
-    void removingAnyRequiredFieldFails(Path file) {
-        ObjectNode sample = read(file);
+    void removingAnyRequiredFieldFails(ObjectNode given) {
+        ObjectNode sample = given.deepCopy();
         Schema envelope = schema(ENVELOPE);
         for (String field : List.of("eventId", "seq", "type", "version", "occurredAt", "aggregate", "payload")) {
             ObjectNode missing = sample.deepCopy();
@@ -307,7 +346,9 @@ class EventSchemaTest {
     @ParameterizedTest
     @MethodSource("coreViolations")
     void everythingTheCoreRejectsThePortalEnvelopeRejects(Mutation mutation) {
-        ObjectNode doc = read(sample("02-CommissionCalculated.json"));
+        // 엔진 eventId는 순차라 대부분 숫자뿐이다 — "대문자" 변형이 실제로 바꾸도록 16진 문자가 있는 줄(seq 10 …00a)을 쓴다
+        ObjectNode doc = sample("a1#10");
+        assertThat(doc.path("eventId").asString()).matches(".*[a-f].*");
         mutation.apply(doc);
         assertThat(schema(CORE_ID).validate(doc)).as("core").isNotEmpty();
         assertThat(schema(ENVELOPE).validate(doc)).as("portal envelope").isNotEmpty();
@@ -318,7 +359,7 @@ class EventSchemaTest {
     @Test
     void aPayloadOfAnotherTypeIsRejected() {
         Map<String, ObjectNode> byType = new TreeMap<>();
-        samples().stream().map(EventSchemaTest::read).forEach(s -> byType.putIfAbsent(s.path("type").asString(), s));
+        samples().stream().map(Sample::doc).forEach(s -> byType.putIfAbsent(s.path("type").asString(), s));
         for (int i = 0; i < EVENT_TYPES.size(); i++) {
             ObjectNode doc = byType.get(EVENT_TYPES.get(i)).deepCopy();
             JsonNode foreign = byType.get(EVENT_TYPES.get((i + 1) % EVENT_TYPES.size())).path("payload");
@@ -330,8 +371,8 @@ class EventSchemaTest {
 
     @ParameterizedTest
     @MethodSource("sampleFiles")
-    void aggregateKindMustBeTheOnePairedWithTheType(Path file) {
-        ObjectNode sample = read(file);
+    void aggregateKindMustBeTheOnePairedWithTheType(ObjectNode given) {
+        ObjectNode sample = given.deepCopy();
         Set<String> others = new LinkedHashSet<>(KINDS.values());
         others.remove(sample.path("aggregate").path("kind").asString());
         for (String kind : others) {
@@ -343,12 +384,12 @@ class EventSchemaTest {
 
     @Test
     void unknownTypeOrVersionIsRejectedEvenWhenTheCoreAcceptsIt() {
-        ObjectNode unknown = read(sample("09-PayoutCompleted.json"));
+        ObjectNode unknown = sample("a1#7");
         unknown.put("type", "BonusGranted");
         assertThat(schema(CORE_ID).validate(unknown)).isEmpty();
         assertThat(schema(ENVELOPE).validate(unknown)).isNotEmpty();
 
-        ObjectNode v2 = read(sample("09-PayoutCompleted.json"));
+        ObjectNode v2 = sample("a1#7");
         v2.put("version", 2);
         assertThat(schema(CORE_ID).validate(v2)).isEmpty();
         assertThat(schema(ENVELOPE).validate(v2)).isNotEmpty();
@@ -356,19 +397,20 @@ class EventSchemaTest {
 
     @Test
     void statementAndPayoutAggregateIdsAreAgentColonYm() {
-        for (String file : List.of("07-StatementEstimated.json", "08-StatementConfirmed.json", "09-PayoutCompleted.json")) {
-            ObjectNode doc = read(sample(file));
-            assertThat(doc.path("aggregate").path("id").asString()).isEqualTo("A0001:202608");
-            ((ObjectNode) doc.path("aggregate")).put("id", "A0001");
+        for (String file : List.of("07-StatementEstimated.json", "a1#6", "a1#7")) {
+            ObjectNode doc = sample(file);
+            String agent = doc.path("payload").path("agentId").asString();
+            assertThat(doc.path("aggregate").path("id").asString()).isEqualTo(agent + ":" + doc.path("payload").path("closeYm").asString());
+            ((ObjectNode) doc.path("aggregate")).put("id", agent);
             assertThat(schema(ENVELOPE).validate(doc)).as(file).isNotEmpty();
-            ((ObjectNode) doc.path("aggregate")).put("id", "A0001:202613");
+            ((ObjectNode) doc.path("aggregate")).put("id", agent + ":202613");
             assertThat(schema(ENVELOPE).validate(doc)).as(file).isNotEmpty();
         }
     }
 
     @Test
     void unknownFieldsAreAllowedInTheEnvelopeAndThePayload() {
-        ObjectNode doc = read(sample("02-CommissionCalculated.json"));
+        ObjectNode doc = sample("a1#2");
         doc.put("traceId", "abc");
         ((ObjectNode) doc.path("payload")).put("futureField", 1);
         ((ObjectNode) doc.path("payload").path("basis")).put("tier", "B");
@@ -379,13 +421,13 @@ class EventSchemaTest {
 
     @Test
     void ratesAndMultiplesAreDecimalStringsNotNumbers() {
-        ObjectNode calc = read(sample("02-CommissionCalculated.json"));
+        ObjectNode calc = sample("a1#2");
         ((ObjectNode) calc.path("payload").path("basis")).put("rate", 9.333333);
         assertThat(schema(ENVELOPE).validate(calc)).as("basis.rate as a JSON number").isNotEmpty();
-        ObjectNode calc2 = read(sample("02-CommissionCalculated.json"));
+        ObjectNode calc2 = sample("a1#2");
         ((ObjectNode) calc2.path("payload").path("basis")).put("payoutRate", "0.1234567");
         assertThat(schema(ENVELOPE).validate(calc2)).as("more than 6 decimals").isNotEmpty();
-        ObjectNode opened = read(sample("01-LimitLedgerOpened.json"));
+        ObjectNode opened = sample("a1#1");
         ((ObjectNode) opened.path("payload")).put("limitMultiple", 12);
         assertThat(schema(ENVELOPE).validate(opened)).as("limitMultiple as a JSON number").isNotEmpty();
         ((ObjectNode) opened.path("payload")).put("limitMultiple", "012");
@@ -402,7 +444,7 @@ class EventSchemaTest {
         // K6(v1.1): 삭감 뒤·분할 뒤 지급 예정액, 요청액 = amount + limitCutAmt, 이연분은 DeferralScheduled(CURVE·LIMIT_DEFER)
         assertThat(amount.path("description").asString()).contains("한도 삭감 뒤·분급 분할 뒤 지급 예정액").contains("amount + limitCutAmt")
                 .contains("DeferralScheduled").contains("CURVE").contains("LIMIT_DEFER");
-        ObjectNode calc = read(sample("02-CommissionCalculated.json"));
+        ObjectNode calc = sample("a1#2");
         ((ObjectNode) calc.path("payload")).put("amount", 2_800_000.5);
         assertThat(schema(ENVELOPE).validate(calc)).as("non-integer amount").isNotEmpty();
     }
@@ -411,17 +453,24 @@ class EventSchemaTest {
 
     static Stream<Arguments> optionalInV11() {
         return Stream.of(
-                Arguments.argumentSet("K1 policySummary.productName·insuredMasked", "02-CommissionCalculated.json", List.of("policySummary"),
+                Arguments.argumentSet("K1 policySummary.productName·insuredMasked", "a1#2", List.of("policySummary"),
                         List.of("productName", "insuredMasked"), List.of("contractDate", "monthlyPremium")),
-                Arguments.argumentSet("K2 basis.rate·payoutRate·installmentNo", "02-CommissionCalculated.json", List.of("basis"),
+                Arguments.argumentSet("K2 basis.rate·payoutRate·installmentNo", "a1#2", List.of("basis"),
                         List.of("rate", "payoutRate", "installmentNo"), List.of("ruleVersionIds")),
                 Arguments.argumentSet("K3 AgentSnapshot.grade·role", "16-AgentSnapshot.json", List.<String>of(),
                         List.of("grade"), List.of("agentId", "name", "orgPath", "status", "validFrom")),
-                Arguments.argumentSet("K4 StatementConfirmed.clawbackOffset·withholdingTax·net", "08-StatementConfirmed.json", List.<String>of(),
+                Arguments.argumentSet("K4 StatementConfirmed.clawbackOffset·withholdingTax·net", "a1#6", List.<String>of(),
                         List.of("clawbackOffset"), List.of("agentId", "closeYm", "gross", "adjustment", "closedAt")),
                 Arguments.argumentSet("L1 LimitLedgerRebased.postingSeq (v1.1.1)", "17-LimitLedgerRebased.json", List.<String>of(),
                         List.of("postingSeq"), List.of("ledgerId", "oldLimit", "newLimit", "monthlyPremium", "reason")));
     }
+
+    /** 샘플에 없는 선택 필드를 채울 유효한 값(허구). */
+    private static final Map<String, JsonNode> FILL = Map.of(
+            "productName", JsonNodeFactory.instance.stringNode("허구 종신"), "insuredMasked", JsonNodeFactory.instance.stringNode("허*"),
+            "rate", JsonNodeFactory.instance.stringNode("7"), "payoutRate", JsonNodeFactory.instance.stringNode("0.9"),
+            "installmentNo", JsonNodeFactory.instance.numberNode(1), "grade", JsonNodeFactory.instance.stringNode("G3"),
+            "clawbackOffset", JsonNodeFactory.instance.numberNode(0), "postingSeq", JsonNodeFactory.instance.numberNode(1));
 
     /**
      * 선택이 된 필드를 전부 뺀 변형이 통과하고, 그 객체의 required는 정확히 남은 목록이다(다시 필수로 조여지면 여기서 보인다).
@@ -431,7 +480,7 @@ class EventSchemaTest {
     @ParameterizedTest
     @MethodSource("optionalInV11")
     void fieldsTheEngineDoesNotHaveAreOptional(String sampleFile, List<String> objectPath, List<String> optional, List<String> required) {
-        ObjectNode doc = read(sample(sampleFile));
+        ObjectNode doc = sample(sampleFile);
         ObjectNode target = (ObjectNode) doc.path("payload");
         JsonNode schemaNode = payloadSchema(doc.path("type").asString());
         for (String step : objectPath) {
@@ -439,7 +488,13 @@ class EventSchemaTest {
             schemaNode = schemaNode.path("properties").path(step);
         }
         for (String field : optional) {
-            assertThat(target.has(field)).as("sample has %s", field).isTrue();
+            if (!target.has(field)) {
+                // v1.3: 엔진 A-1 줄에는 엔진에 없는 값이 처음부터 없다 — 유효한 값을 넣어 통과를 본 뒤 빼야 "뺀 변형"이 의미를 갖는다
+                target.set(field, FILL.get(field));
+            }
+        }
+        assertThat(schema(ENVELOPE).validate(doc)).as("with the optional fields").isEmpty();
+        for (String field : optional) {
             target.remove(field);
         }
         assertThat(schema(ENVELOPE).validate(doc)).isEmpty();
@@ -448,10 +503,11 @@ class EventSchemaTest {
 
     @Test
     void payoutCompletedCarriesTheRunsSettledAmountsAsOptionalIntegers() {
-        ObjectNode doc = read(sample("09-PayoutCompleted.json"));
+        ObjectNode doc = sample("a1#7");
         ObjectNode payload = (ObjectNode) doc.path("payload");
-        payload.put("runSeq", 1).put("gross", 3_600_000).put("clawbackOffset", 0).put("receivableOffset", 0).put("carriedReceivable", 0)
-                .put("adjustment", 0).put("payable", 3_600_000).put("withholdingTax", 118_800).put("net", 3_481_200);
+        // 엔진 A-1 지급(월납 150,000): 세전 1,800,000, 원천세 59,400, 순액 1,740,600 = paidAmount — adjustment는 엔진이 싣지 않으므로 더해 본다
+        payload.put("runSeq", 1).put("gross", 1_800_000).put("clawbackOffset", 0).put("receivableOffset", 0).put("carriedReceivable", 0)
+                .put("adjustment", 0).put("payable", 1_800_000).put("withholdingTax", 59_400).put("net", 1_740_600);
         assertThat(schema(ENVELOPE).validate(doc)).isEmpty();
         assertThat(payload.path("net").asLong()).isEqualTo(payload.path("paidAmount").asLong());
         for (String field : List.of("gross", "clawbackOffset", "receivableOffset", "carriedReceivable", "adjustment", "payable", "withholdingTax", "net")) {
@@ -491,7 +547,7 @@ class EventSchemaTest {
     /** v1.1.1 L1~L3: postingSeq는 있으면 여전히 ≥ 1, paidAt·limitCutPolicy의 뜻이 설명문에 있다. */
     @Test
     void v111DescriptionsAndTheRemainingPostingSeqBound() {
-        ObjectNode rebased = read(sample("17-LimitLedgerRebased.json"));
+        ObjectNode rebased = sample("17-LimitLedgerRebased.json");
         ((ObjectNode) rebased.path("payload")).put("postingSeq", 0);
         assertThat(schema(ENVELOPE).validate(rebased)).as("postingSeq 0").isNotEmpty();
         assertThat(payloadSchema("LimitLedgerRebased").path("properties").path("postingSeq").path("description").asString())
@@ -518,12 +574,20 @@ class EventSchemaTest {
         List<Path> files;
         try (Stream<Path> walk = Files.walk(CONTRACTS)) {
             files = walk.filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".json") || p.toString().endsWith(".yaml") || p.toString().endsWith(".yml"))
+                    .filter(p -> p.toString().endsWith(".json") || p.toString().endsWith(".jsonl") || p.toString().endsWith(".yaml")
+                            || p.toString().endsWith(".yml"))
                     .toList();
         }
         for (Path p : files) {
             String text = Files.readString(p);
-            int n = formatKeywords(p.toString().endsWith(".json") ? JSON.readTree(text) : YAML.readTree(text));
+            int n = 0;
+            if (p.toString().endsWith(".jsonl")) {
+                for (String line : text.split("\n")) {
+                    n += line.isBlank() ? 0 : formatKeywords(JSON.readTree(line));
+                }
+            } else {
+                n = formatKeywords(p.toString().endsWith(".json") ? JSON.readTree(text) : YAML.readTree(text));
+            }
             if (n > 0) {
                 found.put(CONTRACTS.relativize(p).toString(), n);
             }
@@ -532,7 +596,7 @@ class EventSchemaTest {
                 .contains("shared/ga-disclosure/events/v1/envelope-core.schema.json", "events/v1/envelope.schema.json",
                         "events/v1/defs.schema.json", "events/v1/payloads/CommissionCalculated.v1.schema.json",
                         "api/v1/engine-internal.openapi.yaml")
-                .hasSize(1 + 2 + 13 + 17 + 1);
+                .hasSize(1 + 2 + 13 + (1 + 7) + 1);   // 샘플: A-1 스트림 하나 + 단건 7(v1.3)
         assertThat(found).isEmpty();
     }
 
@@ -586,8 +650,8 @@ class EventSchemaTest {
         Schema feedSchema = schema(PORTAL + "api/v1/engine-internal.openapi.yaml#/components/schemas/FeedResponse");
         ObjectNode response = JsonNodeFactory.instance.objectNode();
         ArrayNode events = response.putArray("events");
-        samples().stream().limit(9).map(EventSchemaTest::read).forEach(events::add);
-        response.put("tenantId", "GA01").put("nextSeq", 9).put("headSeq", 13).put("schemaVersion", 1);
+        samples().stream().limit(9).map(Sample::doc).forEach(events::add);
+        response.put("tenantId", "GA01").put("nextSeq", 9).put("headSeq", 10).put("schemaVersion", 1);
         assertThat(feedSchema.validate(response)).isEmpty();
         ObjectNode noTenant = response.deepCopy();
         noTenant.remove("tenantId");
