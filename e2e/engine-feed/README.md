@@ -1,3 +1,5 @@
+> 🌐 **한국어** · [English](README.en.md)
+
 # e2e/engine-feed — 실 엔진 피드 E2E
 
 포털과 실제 엔진(`ga-commission-engine`)을 잇는 E2E(포털 Phase 3 지시문 D-16, Phase 1 수용 심사 Q6). **정규 빌드 밖**이다 — 엔진 앱·Oracle Free 컨테이너가 포털 빌드 의존이 되지 않게. 사용자가 손으로 실행하고, 결과는 `RESULT.md`(스크립트가 쓴다)와 아래 "재현 기록"에 남긴다. 수용 심사는 이 실행을 기다리지 않는다.

@@ -1,3 +1,5 @@
+> 🌐 **한국어** · [English](en/authz-matrix.md)
+
 # 조회 API 인가 매트릭스 (정본)
 
 > 포털 Phase 3(지시문 D-11, 계획 ④, 승인 Q8). 이 문서의 `authz-matrix` 블록이 정본이고 `AuthzMatrixTest`가 코드와 **양방향**으로 대조한다 —
