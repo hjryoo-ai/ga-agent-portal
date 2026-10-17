@@ -2,6 +2,7 @@ package com.ga.portal.app.ingest;
 
 import com.ga.platform.spring.jdbc.TenantDirectoryReader;
 import com.ga.portal.infra.persistence.AuditAccessRepository;
+import com.ga.portal.infra.persistence.IdentityLinkRepository;
 import com.ga.portal.infra.persistence.TenantRepository;
 import com.ga.portal.infra.persistence.ViewResetRepository;
 import com.ga.portal.ingest.EnvelopeValidator;
@@ -36,9 +37,9 @@ public class IngestCliConfiguration {
     @Bean
     IngestCommands ingestCommands(TenantTransactions transactions, IngestStore store, IngestLock lock, AuditAccessRepository audit,
                                   IngestProperties props, @Value("${spring.datasource.url}") String jdbcUrl, Rebuilder rebuilder,
-                                  IngestMetrics metrics, Clock clock) {
+                                  IngestMetrics metrics, Clock clock, IdentityLinkRepository links) {
         TenantDirectoryReader reader = new TenantDirectoryReader(jdbcUrl, props.directoryUsername(), props.directoryPassword());
-        return new IngestCommands(transactions, store, lock, audit, reader::allTenants, rebuilder, metrics, clock);
+        return new IngestCommands(transactions, store, lock, audit, reader::allTenants, rebuilder, metrics, clock, links);
     }
 
     @Bean

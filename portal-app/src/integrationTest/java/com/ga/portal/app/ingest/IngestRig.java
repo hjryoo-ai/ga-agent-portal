@@ -11,6 +11,7 @@ import com.ga.portal.infra.persistence.IngestLockRepository;
 import com.ga.portal.infra.persistence.TenantRepository;
 import com.ga.portal.infra.persistence.ViewResetRepository;
 import com.ga.portal.infra.testing.PostgresHarness;
+import com.ga.portal.infra.testing.SeedData;
 import com.ga.portal.ingest.ContractSchemas;
 import com.ga.portal.ingest.EnvelopeValidator;
 import com.ga.portal.ingest.apply.IngestApplier;
@@ -54,6 +55,7 @@ final class IngestRig {
     final JdbcIngestStore store = new JdbcIngestStore(new IngestCursorRepository(gateway), new IngestEventRepository(gateway));
     final IngestLock lock = new JdbcIngestLock(new IngestLockRepository(gateway));
     final TenantRepository tenants = new TenantRepository(gateway);
+    final com.ga.portal.infra.persistence.IdentityLinkRepository links = new com.ga.portal.infra.persistence.IdentityLinkRepository(gateway);
 
     IngestApplier applier(Projector projector) {
         return applier(projector, lock);
@@ -133,6 +135,18 @@ final class IngestRig {
                     String[] f = r.split("\\|", -1);
                     return transactions.inTransaction(t, () -> store.event(f[0])).orElseThrow();
                 }).toList();
+    }
+
+    /** 운영 명령 주체의 링크(Phase 3 D-9) — 역할·상태는 시험이 고른다(OPERATOR는 설계사·조직 없음). */
+    static void link(TenantId t, String subject, String role, String status) {
+        DB.seed(t.value(), c -> SeedData.exec(c, """
+                INSERT INTO identity_link (tenant_id, subject, agent_id, role, status, org_path, linked_at)
+                VALUES (?, ?, ?, ?, ?, ?, TIMESTAMPTZ '2026-10-17 00:00:00+00') ON CONFLICT DO NOTHING
+                """, t.value(), subject, role.equals("OPERATOR") ? null : "A-OPS-1", role, status, role.equals("OPERATOR") ? null : "/HQ1"));
+    }
+
+    static void operator(TenantId t, String subject) {
+        link(t, subject, "OPERATOR", "ACTIVE");
     }
 
     /** {@code tenant} 행(ACTIVE, 엔진 주소) — 마이그레이터로 테넌트 설정 후. */

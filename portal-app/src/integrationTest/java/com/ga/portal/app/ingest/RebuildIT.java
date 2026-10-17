@@ -47,9 +47,14 @@ class RebuildIT {
         return ViewRig.projector(rig.gateway);
     }
 
+    /** 명령 조립 — 시험의 행위자를 그 테넌트의 OPERATOR로 등록한다(Phase 3 D-9; 같은 테넌트에 두 번 부르면 이미 있다). */
     private IngestCommands commands(TenantId t, FeedClient feed, Projector projector, long maxEvents) {
+        IngestRig.DB.seed(t.value(), c -> SeedData.exec(c, """
+                INSERT INTO identity_link (tenant_id, subject, agent_id, role, status, org_path, linked_at)
+                VALUES (?, ?, NULL, 'OPERATOR', 'ACTIVE', NULL, TIMESTAMPTZ '2026-10-17 00:00:00+00') ON CONFLICT DO NOTHING
+                """, t.value(), ACTOR));
         return new IngestCommands(rig.transactions, rig.store, rig.lock, audit, () -> List.of(t), rig.rebuilder(feed, projector, PAGE, maxEvents),
-                IngestMetrics.NONE, IngestRig.CLOCK);
+                IngestMetrics.NONE, IngestRig.CLOCK, rig.links);
     }
 
     private IngestCommands commands(TenantId t, FeedClient feed) {
