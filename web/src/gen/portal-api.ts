@@ -1,0 +1,677 @@
+// 생성물 — 손으로 고치지 않는다. 계약 contracts/api/v1/portal-api.openapi.yaml → scripts/client-lock.mjs(./gradlew :web:clientLock).
+// 금액 스키마(Won·NonNegativeWon)는 불투명 타입 Won이다(src/money/won.ts).
+import type { Won } from '../money/won';
+
+export interface paths {
+    "/api/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 본인 프로필·역할·테넌트 설정 */
+        get: operations["getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/deferrals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 분급 전망(지급 예정월별 합과 항목) */
+        get: operations["listDeferrals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/earnings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 월별 수수료 요약(범위) */
+        get: operations["listEarnings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/earnings/{ym}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 월 하나 — 유형별 합·명세·지급 확정값·지급 예정일 */
+        get: operations["getMonth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/earnings/{ym}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 월의 라인(페이지) — 평평하게, 취소 짝은 reversalOf·reversedBy */
+        get: operations["listLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/earnings/lines/{calcId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 라인 상세 — 근거·계약 요약·분급·채권·한도 원장 */
+        get: operations["getLine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 한도 원장 카드(1200%룰) */
+        get: operations["listLimits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/limits/{ledgerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 한도 원장 하나와 타임라인 */
+        get: operations["getLimit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+}
+export type webhooks = Record<string, never>;
+export interface components {
+    schemas: {
+        AsOf: {
+            at?: components["schemas"]["Instant"];
+            seq: components["schemas"]["Seq"];
+        };
+        /**
+         * @description 동기화 상태 — 커서가 RUNNING이 아니거나 머리에 닿은 지 sync_delay_seconds를 넘으면 SYNC_DELAYED
+         * @enum {string}
+         */
+        DataStatus: "OK" | "SYNC_DELAYED";
+        Date: string;
+        /** @description 불투명 소수 문자열(표시 전용 — 계산·비교하지 않는다) */
+        DecimalString: string;
+        DeferralsResponse: {
+            asOf: components["schemas"]["AsOf"];
+            dataStatus: components["schemas"]["DataStatus"];
+            from: components["schemas"]["Ym"];
+            items: {
+                amount: components["schemas"]["Won"];
+                dueYm: components["schemas"]["Ym"];
+                payCondition: string;
+                policyKey: components["schemas"]["PolicyKey"];
+                policyMasked: components["schemas"]["PolicyMasked"];
+                /** @enum {string} */
+                reason: "CURVE" | "LIMIT_DEFER";
+                scheduleId: components["schemas"]["Key"];
+                sourceCalcId: components["schemas"]["Key"];
+                /** @enum {string} */
+                status: "SCHEDULED" | "RELEASED" | "HELD" | "CANCELLED";
+                /** @enum {string} */
+                statusReason?: "DUE_RELEASED" | "POLICY_NOT_INFORCE" | "POLICY_TERMINATED" | "SOURCE_REVERSED";
+            }[];
+            months: {
+                dueYm: components["schemas"]["Ym"];
+                /** @description Σ SCHEDULED + RELEASED */
+                expected: components["schemas"]["Won"];
+                /** @description Σ HELD */
+                held: components["schemas"]["Won"];
+            }[];
+            to: components["schemas"]["Ym"];
+        };
+        EarningsResponse: {
+            asOf: components["schemas"]["AsOf"];
+            dataStatus: components["schemas"]["DataStatus"];
+            from: components["schemas"]["Ym"];
+            items: components["schemas"]["MonthSummary"][];
+            to: components["schemas"]["Ym"];
+        };
+        Instant: string;
+        Key: string;
+        Ledger: {
+            accumPaid: components["schemas"]["Won"];
+            contractDate: components["schemas"]["Date"];
+            cutTotal: components["schemas"]["NonNegativeWon"];
+            deferredTotal: components["schemas"]["NonNegativeWon"];
+            flags: ("CANCELLED" | "LAPSED" | "OVERDUE" | "REDUCED")[];
+            fyEnd: components["schemas"]["Date"];
+            fyStart: components["schemas"]["Date"];
+            ledgerId: components["schemas"]["Key"];
+            limitAmount: components["schemas"]["NonNegativeWon"];
+            limitMultiple: components["schemas"]["DecimalString"];
+            monthlyPremium: components["schemas"]["NonNegativeWon"];
+            policyKey: components["schemas"]["PolicyKey"];
+            policyMasked: components["schemas"]["PolicyMasked"];
+            /** @description 한도 − 누적(정수 차감) */
+            remaining: components["schemas"]["Won"];
+            /**
+             * @description 테넌트 임계치(bp)와의 정수 비교
+             * @enum {string}
+             */
+            stage: "OK" | "WARN" | "CRIT" | "FULL";
+            /** @description 누적/한도 표시 문자열(한도 0이면 생략) */
+            utilization?: components["schemas"]["Percent"];
+        };
+        LimitDetailResponse: {
+            asOf: components["schemas"]["AsOf"];
+            dataStatus: components["schemas"]["DataStatus"];
+            history: {
+                accumAfter: components["schemas"]["Won"];
+                amount?: components["schemas"]["Won"];
+                calcId?: components["schemas"]["Key"];
+                /** @enum {string} */
+                kind: "POST" | "REBASE";
+                limitAfter: components["schemas"]["NonNegativeWon"];
+                occurredAt: components["schemas"]["Instant"];
+                postingSeq?: components["schemas"]["Seq"];
+                reason?: string;
+                sourceSeq: components["schemas"]["Seq"];
+            }[];
+            ledger: components["schemas"]["Ledger"];
+        };
+        LimitsResponse: {
+            asOf: components["schemas"]["AsOf"];
+            dataStatus: components["schemas"]["DataStatus"];
+            items: components["schemas"]["Ledger"][];
+            /** @enum {string} */
+            status: "ALL" | "WARN" | "CRIT" | "FULL";
+        };
+        Line: {
+            amount: components["schemas"]["Won"];
+            calcId: components["schemas"]["Key"];
+            closeYm: components["schemas"]["Ym"];
+            commType: string;
+            insuredMasked?: string;
+            limitCutAmt: components["schemas"]["NonNegativeWon"];
+            limitCutPolicy?: string;
+            policyKey: components["schemas"]["PolicyKey"];
+            policyMasked: components["schemas"]["PolicyMasked"];
+            productKey?: string;
+            productName?: string;
+            reversalOf?: components["schemas"]["Key"];
+            reversedBy?: components["schemas"]["Key"];
+        };
+        LineDetailResponse: {
+            asOf: components["schemas"]["AsOf"];
+            basis: {
+                installmentNo?: number;
+                payoutRate?: components["schemas"]["DecimalString"];
+                rate?: components["schemas"]["DecimalString"];
+                ruleVersionIds: string[];
+            };
+            dataStatus: components["schemas"]["DataStatus"];
+            deferrals: {
+                amount: components["schemas"]["Won"];
+                dueYm: components["schemas"]["Ym"];
+                scheduleId: components["schemas"]["Key"];
+                /** @enum {string} */
+                status: "SCHEDULED" | "RELEASED" | "HELD" | "CANCELLED";
+            }[];
+            ledgerId?: components["schemas"]["Key"];
+            line: components["schemas"]["Line"];
+            policySummary: {
+                contractDate?: components["schemas"]["Date"];
+                monthlyPremium?: components["schemas"]["NonNegativeWon"];
+            };
+            receivable?: {
+                amount: components["schemas"]["NonNegativeWon"];
+                receivableId: components["schemas"]["Key"];
+                remaining: components["schemas"]["NonNegativeWon"];
+                /** @enum {string} */
+                status: "OPEN" | "OFFSET" | "CLOSED" | "WRITTEN_OFF";
+            };
+        };
+        LinesResponse: {
+            asOf: components["schemas"]["AsOf"];
+            closeYm: components["schemas"]["Ym"];
+            dataStatus: components["schemas"]["DataStatus"];
+            items: components["schemas"]["Line"][];
+            page: number;
+            size: number;
+            total: number;
+        };
+        MeResponse: {
+            /** @description 본인 설계사 ID(identity_link) */
+            agentId: string;
+            /** @description 본인 이름(가리지 않는다 — DD-13) */
+            agentName?: string;
+            asOf: components["schemas"]["AsOf"];
+            dataStatus: components["schemas"]["DataStatus"];
+            grade?: string;
+            orgPath?: string;
+            role: components["schemas"]["Role"];
+            /** @enum {string} */
+            status?: "ACTIVE" | "DISMISSED";
+            tenant: {
+                limitCritBp: number;
+                /** @description 경고 임계치(백분율 × 100) */
+                limitWarnBp: number;
+                name: string;
+                payoutDayRule: string;
+            };
+        };
+        /**
+         * @description 그 달의 대사 결과(동기화 상태와 따로 — DD-12)
+         * @enum {string}
+         */
+        MonthDataStatus: "OK" | "DRIFT" | "REBUILDING";
+        MonthResponse: {
+            adjustment: components["schemas"]["Won"];
+            asOf: components["schemas"]["AsOf"];
+            /** @description 수수료 유형별 라인 합(정수 원) */
+            byType: {
+                [key: string]: components["schemas"]["Won"];
+            };
+            carriedReceivable?: components["schemas"]["Won"];
+            clawbackOffset: components["schemas"]["Won"];
+            closeYm: components["schemas"]["Ym"];
+            confirmedAt?: components["schemas"]["Instant"];
+            dataStatus: components["schemas"]["DataStatus"];
+            estimateAsOf?: components["schemas"]["Instant"];
+            estimateBasisSeq?: components["schemas"]["Seq"];
+            gross: components["schemas"]["Won"];
+            monthDataStatus: components["schemas"]["MonthDataStatus"];
+            net?: components["schemas"]["Won"];
+            netBasis?: components["schemas"]["NetBasis"];
+            paidAmount?: components["schemas"]["Won"];
+            paidAt?: components["schemas"]["Instant"];
+            payable?: components["schemas"]["Won"];
+            /** @description 테넌트 지급일 규칙(NEXT_MONTH_D{n}) — 형식이 다르거나 그 날이 없으면 생략 */
+            payoutExpectedOn?: components["schemas"]["Date"];
+            receivableOffset?: components["schemas"]["Won"];
+            runSeq?: components["schemas"]["Seq"];
+            status: components["schemas"]["MonthStatus"];
+            withholdingTax?: components["schemas"]["Won"];
+        };
+        /** @enum {string} */
+        MonthStatus: "PROVISIONAL" | "ESTIMATED" | "CONFIRMED" | "PAID";
+        MonthSummary: {
+            adjustment: components["schemas"]["Won"];
+            clawbackOffset: components["schemas"]["Won"];
+            closeYm: components["schemas"]["Ym"];
+            gross: components["schemas"]["Won"];
+            monthDataStatus: components["schemas"]["MonthDataStatus"];
+            net?: components["schemas"]["Won"];
+            netBasis?: components["schemas"]["NetBasis"];
+            paidAmount?: components["schemas"]["Won"];
+            paidAt?: components["schemas"]["Instant"];
+            status: components["schemas"]["MonthStatus"];
+            withholdingTax?: components["schemas"]["Won"];
+        };
+        /** @enum {string} */
+        NetBasis: "ESTIMATE" | "CONFIRM" | "PAYOUT";
+        NonNegativeWon: Won;
+        /** @description 표시용 백분율(소수 1자리) */
+        Percent: string;
+        /** @description HMAC-SHA256(배포 비밀, tenant_id + U+001F + policy_no) 앞 16자 — 비가역, 비밀 회전 시 바뀐다 */
+        PolicyKey: string;
+        /** @description 증권번호의 끝 4자 외 '*'(4자 이하면 전부 '*') */
+        PolicyMasked: string;
+        Problem: {
+            /** @enum {string} */
+            code: "UNAUTHENTICATED" | "NOT_FOUND" | "INVALID_REQUEST" | "INTERNAL_ERROR";
+            message: string;
+        };
+        /** @enum {string} */
+        Role: "AGENT" | "MANAGER" | "OPERATOR";
+        Seq: number;
+        /** @description 정수 원(부호 있음 — 환수·취소는 음수) */
+        Won: Won;
+        Ym: string;
+    };
+    responses: {
+        /** @description 쿼리 파라미터 형식·범위 오류(사유 없음) */
+        InvalidRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description 링크 없음·REVOKED·역할·남의(없는) 자원·없는 경로 — 사유와 무관하게 같은 바이트 */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description If-None-Match가 현재 ETag와 맞다(본문 없음, 같은 ETag·Cache-Control) */
+        NotModified: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content?: never;
+        };
+        /** @description 토큰 없음·형식·알고리즘·발급자·서명·만료·대상·테넌트 교차 검사 — 사유와 무관하게 같은 바이트 */
+        Unauthenticated: {
+            headers: {
+                "WWW-Authenticate"?: "Bearer";
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+    };
+    parameters: {
+        /** @description 시작 월 YYYYMM(포함). to와 함께 필수, from ≤ to, 폭 36개월 이하 */
+        From: components["schemas"]["Ym"];
+        /** @description 끝 월 YYYYMM(포함) */
+        To: components["schemas"]["Ym"];
+        /** @description 마감월 YYYYMM(형식이 틀리면 404 — 존재 여부를 형식 오류로 흘리지 않는다) */
+        Ym: components["schemas"]["Ym"];
+    };
+    requestBodies: never;
+    headers: {
+        CacheControl: "private, no-cache";
+        /** @description 약한 ETag W/"<seq>.<sync>.<cfg>"(라인 목록은 뒤에 .<page>.<size>.<filter>) — 피드 위치·동기화 상태·응답에 쓰인 테넌트 설정이 바뀌면 바뀐다 */
+        ETag: string;
+    };
+    pathItems: never;
+}
+export type $defs = Record<string, never>;
+export interface operations {
+    getMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 프로필(agent_profile 행이 없으면 이름·등급·조직·상태 생략) */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            304: components["responses"]["NotModified"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listDeferrals: {
+        parameters: {
+            query: {
+                /** @description 시작 월 YYYYMM(포함). to와 함께 필수, from ≤ to, 폭 36개월 이하 */
+                from: components["parameters"]["From"];
+                /** @description 끝 월 YYYYMM(포함) */
+                to: components["parameters"]["To"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 지급월별 예정(SCHEDULED+RELEASED)·보류(HELD) 합과 항목 */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeferralsResponse"];
+                };
+            };
+            304: components["responses"]["NotModified"];
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listEarnings: {
+        parameters: {
+            query: {
+                /** @description 시작 월 YYYYMM(포함). to와 함께 필수, from ≤ to, 폭 36개월 이하 */
+                from: components["parameters"]["From"];
+                /** @description 끝 월 YYYYMM(포함) */
+                to: components["parameters"]["To"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 그 범위의 월(마감월 오름차순). 행이 없으면 빈 목록 */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EarningsResponse"];
+                };
+            };
+            304: components["responses"]["NotModified"];
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getMonth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 마감월 YYYYMM(형식이 틀리면 404 — 존재 여부를 형식 오류로 흘리지 않는다) */
+                ym: components["parameters"]["Ym"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 월 하나 */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthResponse"];
+                };
+            };
+            304: components["responses"]["NotModified"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listLines: {
+        parameters: {
+            query?: {
+                /** @description 수수료 유형 정확 일치 */
+                commType?: string;
+                /** @description 0부터(기본 0) */
+                page?: number;
+                /** @description 응답의 policyKey(그 설계사의 계약만 풀린다 — 아니면 빈 목록) */
+                policyKey?: components["schemas"]["PolicyKey"];
+                /** @description 1~200(기본 50) */
+                size?: number;
+            };
+            header?: never;
+            path: {
+                /** @description 마감월 YYYYMM(형식이 틀리면 404 — 존재 여부를 형식 오류로 흘리지 않는다) */
+                ym: components["parameters"]["Ym"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 한 페이지(정렬 source_seq, calc_id)와 필터에 맞는 전체 수 */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinesResponse"];
+                };
+            };
+            304: components["responses"]["NotModified"];
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                calcId: components["schemas"]["Key"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 라인 상세 */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LineDetailResponse"];
+                };
+            };
+            304: components["responses"]["NotModified"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listLimits: {
+        parameters: {
+            query?: {
+                /** @description 경고 단계(기본 ALL) */
+                status?: "ALL" | "WARN" | "CRIT" | "FULL";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 원장 카드(원장 ID 순) */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LimitsResponse"];
+                };
+            };
+            304: components["responses"]["NotModified"];
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getLimit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ledgerId: components["schemas"]["Key"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 원장 카드 + 타임라인(source_seq 순) */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LimitDetailResponse"];
+                };
+            };
+            304: components["responses"]["NotModified"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+}

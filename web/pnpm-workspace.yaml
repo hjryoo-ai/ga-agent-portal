@@ -1,0 +1,7 @@
+# pnpm 설정(pnpm 12는 .npmrc가 아니라 이 파일에서 읽는다 — 패키지는 이 디렉터리 하나, 작업 공간 아님).
+# 정확한 버전만, 엔진 불일치·피어 범위 밖은 실패. 의존성의 설치 스크립트는 돌리지 않는다(허용 목록 onlyBuiltDependencies 없음 — pnpm 기본).
+# 발행 1일 미만 판은 받지 않는다(pnpm 기본값을 명시 — 공급망 격리). 예외 목록은 두지 않는다: 최신판이 그보다 새면 직전 판을 쓴다.
+saveExact: true
+engineStrict: true
+strictPeerDependencies: true
+minimumReleaseAge: 1440

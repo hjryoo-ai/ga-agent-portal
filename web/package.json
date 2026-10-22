@@ -1,0 +1,50 @@
+{
+  "name": "@ga/portal-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": "24.22.0"
+  },
+  "scripts": {
+    "client:check": "node scripts/client-lock.mjs check",
+    "client:lock": "node scripts/client-lock.mjs lock",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint --max-warnings 0 .",
+    "test": "vitest run",
+    "build": "vite build && node scripts/scan-dist.mjs && node scripts/bundle-size.mjs",
+    "licenses": "node scripts/licenses.mjs",
+    "audit:record": "node scripts/audit-record.mjs",
+    "e2e:install": "playwright install chromium webkit",
+    "e2e": "node e2e/run.mjs",
+    "e2e:serve": "node e2e/run.mjs --serve"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "5.104.3",
+    "openapi-fetch": "0.17.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-router": "8.4.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.1",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "eslint": "10.12.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.13.0",
+    "jsdom": "30.1.3",
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.2",
+    "vite": "8.3.4",
+    "vitest": "5.0.5"
+  }
+}

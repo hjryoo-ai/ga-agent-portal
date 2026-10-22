@@ -116,7 +116,7 @@ public class ApiSecurityConfiguration implements WebMvcConfigurer {
     SecurityFilterChain apiSecurityFilterChain(HttpSecurity http, IssuerDirectoryReader issuers, ApiProperties props, ApiMetrics metrics,
                                                Clock clock) throws Exception {
         ApiAuthenticationEntryPoint entryPoint = new ApiAuthenticationEntryPoint(metrics);
-        IssuerTenantResolver resolver = new IssuerTenantResolver(issuers::find, issuerDecoders(props), clock);
+        IssuerTenantResolver resolver = new IssuerTenantResolver(issuers::find, issuerDecoders(props), metrics, clock);
         http.securityMatcher("/api/**")
                 .csrf(c -> c.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

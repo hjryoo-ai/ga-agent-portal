@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * C13: 홈 세 콜({@code /me}, {@code /earnings/{ym}}, {@code /limits?status=WARN})의 SQL 문장 수는 데이터 양과 무관하고 계획 ⑤의 상한과 같다. 가벼운 설계사(라인 0·원장
  * 1)와 무거운 설계사(라인 1,000·원장 200, 원장마다 열린 플래그)가 같은 수. 셈은 애플리케이션 데이터소스의 문장 — 트랜잭션마다 플랫폼 바인더가 내는
  * {@code set_config} 빼고 — 이고, 발급자 조회 1은 전용 롤 풀이라 여기 잡히지 않는다(요청마다 정확히 1 — {@code IssuerTenantResolverTest}). 상한 = 발급자 1 +
- * 링크 1 + 설정·커서 1 + 본문(/me 1, /earnings/{ym} 2, /limits 1).
+ * 링크 1 + 설정·커서 1 + 본문(/me 1, /earnings/{ym} 2, /limits 1). 포털 Phase 4(P-4): 화면 홈이 실제로 부르는 {@code /limits?status=ALL}도 같은 상한.
  */
 @Import(QueryStatementIT.Recording.class)
 class QueryStatementIT extends ApiIntegrationTest {
@@ -97,6 +97,8 @@ class QueryStatementIT extends ApiIntegrationTest {
         caps.put("/api/v1/me", 4);
         caps.put("/api/v1/me/earnings/202608", 5);
         caps.put("/api/v1/me/limits?status=WARN", 4);
+        // 포털 Phase 4 P-4: 화면 홈은 status=ALL로 받는다(WARN은 정확히 WARN만 — 주의 N건은 화면이 단계 문자열로 센다). 같은 문장 수여야 한다
+        caps.put("/api/v1/me/limits?status=ALL", 4);
         assertThat(Recording.recording).as("the application data source is recorded").isNotNull();
         for (Map.Entry<String, Integer> e : caps.entrySet()) {
             int light = statements(SUB_LIGHT, e.getKey());

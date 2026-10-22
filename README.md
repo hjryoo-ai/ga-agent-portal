@@ -12,15 +12,22 @@ Phase 0(골격) 수용(2026-10-16) — [계획](docs/phase-00-계획.md)·[승�
 
 Phase 1(인제스트) 수용(2026-10-17) — [지시문](docs/phase-01-지시문.md)·[계획](docs/phase-01-계획.md)·[승인](docs/phase-01-계획승인.md)·[보고서](docs/phase-01-보고서.md)·[수용 심사](docs/phase-01-수용심사.md). 태그 `phase-1`.
 
-Phase 2(프로젝션) 구현 완료, 수용 심사 대기 — [지시문](docs/phase-02-지시문.md)·[계획](docs/phase-02-계획.md)·[승인](docs/phase-02-계획승인.md)·[보고서](docs/phase-02-보고서.md). 태그 `phase-2`. 계약 v1.3(A-1 = 엔진 E2 ⓪a 스트림 바이트 그대로). 정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.5), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
+Phase 2(프로젝션) 수용(2026-10-17) — [지시문](docs/phase-02-지시문.md)·[계획](docs/phase-02-계획.md)·[승인](docs/phase-02-계획승인.md)·[보고서](docs/phase-02-보고서.md)·[수용 심사](docs/phase-02-수용심사.md). 태그 `phase-2`.
+
+Phase 3(조회 API) 수용(2026-10-17) — [지시문](docs/phase-03-지시문.md)·[계획](docs/phase-03-계획.md)·[승인](docs/phase-03-계획승인.md)·[보고서](docs/phase-03-보고서.md)·[수용 심사](docs/phase-03-수용심사.md). 태그 `phase-3`.
+
+Phase 4(화면 1차) 수용(2026-10-22, 조건 A1 → `phase-4.1`) — [지시문](docs/phase-04-지시문.md)·[계획](docs/phase-04-계획.md)·[승인](docs/phase-04-계획승인.md)·[보고서](docs/phase-04-보고서.md)·[수용 심사](docs/phase-04-수용심사.md). 태그 `phase-4`·`phase-4.1`.
+
+정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.7.1), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## 실행
 
-필요한 것: JDK(툴체인 25는 Gradle이 받는다), Docker(통합 테스트 — 없으면 통합 테스트가 **실패**한다).
+필요한 것: JDK(툴체인 25는 Gradle이 받는다), Docker(통합 테스트 — 없으면 통합 테스트가 **실패**한다). 화면(`web/`)의 Node 24·pnpm도 Gradle이 받는다 — 따로 설치하지 않는다.
 
 ```bash
 ./gradlew build                      # 단위·아키텍처·통합 테스트 + 빌드 검사(SNAPSHOT 0, 플랫폼 SHA 고정, 테스트 입력 선언)
 ./gradlew printPlatformArtifacts     # 해석된 플랫폼 0.2.0 파일 13개의 경로·SHA-256(인계 §6 표와 대조)
+./gradlew :web:e2e                   # 화면 E2E(Playwright 세 프로젝트, Docker 필요 — 브라우저는 :web:e2eInstall)
 ```
 
 플랫폼 아티팩트(`com.ga.platform:*:0.2.0`)는
@@ -57,6 +64,18 @@ java -jar portal-app.jar --spring.profiles.active=cli ingest rebuild --tenant=GA
 
 실 엔진 E2E(정규 빌드 밖, 손으로 실행): `ENGINE_REPO=<엔진 commission-system 경로> e2e/engine-feed/run.sh` — 엔진 로컬 스택 → 포털(인제스트 켬) → 뷰 9표 = 골든 `a1`, 조회 API 한 건 계약 통과 → `e2e/engine-feed/RESULT.md`. 절차·비밀 처리는 `e2e/engine-feed/README.md`.
 
+## 화면 (Phase 4)
+
+`web/` — React 19 + TypeScript + Vite 모바일 웹. 빌드 산출물은 `portal-app` 부트 jar 안에 들어가 API와 **같은 출처**로 서빙된다(CORS 없음, CSP `'self'`만). 화면: 홈 `/`, 월별 명세 `/statements`, 라인 상세 `/lines/{calcId}`, 한도 `/limits`. 토큰은 웹뷰 호스트가 `/#token=<JWT>`로 넣고 화면은 메모리에만 둔다(새로고침하면 다시 넣어야 한다). 규약은 `CLAUDE.md` "화면 규약", 개발 명령은 [`web/README.md`](web/README.md).
+
+로컬에서 화면을 눈으로 보려면(Docker 필요):
+
+```bash
+./gradlew :web:e2eServe              # PostgreSQL·발급자·피드 스텁(GA01C~GA04C, 허구 스트림 전부) + 포털을 띄운다 — Ctrl-C로 정리
+```
+
+로그인 URL(토큰이 든 `/#token=…`)은 터미널에 찍지 않고 `web/build/e2e/.state/login-urls.txt`(디렉터리 700·파일 600, `build/`라 커밋되지 않는다)에만 쓴다. 그 파일의 URL을 브라우저로 연다. 토큰은 하네스의 시험용 발급자가 만든 것이라 3시간 뒤 또는 하네스가 내려가면 쓸 수 없다.
+
 ## 모듈
 
 | 모듈 | 역할 | Phase |
@@ -70,7 +89,7 @@ java -jar portal-app.jar --spring.profiles.active=cli ingest rebuild --tenant=GA
 | `portal-infra` | PostgreSQL 어댑터·Flyway·RLS | 0 |
 | `portal-app` | Spring Boot 조립·아키텍처 테스트 | 0 |
 | `portal-demo` | 데모 테넌트 데이터 생성기 | 8 |
-| `web/` | React PWA | 4 |
+| `web/` | React 모바일 웹(같은 출처 — 부트 jar 안) | 4 |
 | `contracts/` | 엔진↔포털 계약(JSON Schema·OpenAPI), `shared/ga-disclosure/` 공유 핵심 사본 | 0 |
 
 ## 라이선스

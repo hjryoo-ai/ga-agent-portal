@@ -351,7 +351,7 @@ val sentinelsFile = layout.projectDirectory.file("portal-infra/src/testFixtures/
 
 val scanPlaintextLeaks = tasks.register("scanPlaintextLeaks") {
     group = "verification"
-    description = "Fails when a plaintext sentinel appears in any test result XML or build log."
+    description = "Fails when a plaintext sentinel appears in any test result XML, build log or web output."
     val sentinels = sentinelsFile.asFile
     val root = layout.projectDirectory.asFile
     inputs.file(sentinels)
@@ -361,11 +361,12 @@ val scanPlaintextLeaks = tasks.register("scanPlaintextLeaks") {
         sentinels.reader(Charsets.UTF_8).use { props.load(it) }
         // names: 허구 개인정보(설계사 이름), secrets: 허구 서비스 토큰(포털 Phase 1 — J10), identifiers: 허구 subject·설계사 ID·증권번호
         // (포털 Phase 3 — D-14). 셋 다 원문·UTF-8 16진으로 찾는다.
-        val plain = listOf("names", "secrets", "identifiers").flatMap { key -> (props.getProperty(key) ?: "").split(",") }
+        // e2e: 화면 E2E 손 스트림의 증권번호·이웃 ID(포털 Phase 4)
+        val plain = listOf("names", "secrets", "identifiers", "e2e").flatMap { key -> (props.getProperty(key) ?: "").split(",") }
             .map { it.trim() }.filter { it.isNotEmpty() }
         if (plain.isEmpty()) throw GradleException("scanPlaintextLeaks: no sentinels in ${sentinels.relativeTo(root)}")
         val forbidden = plain + plain.map { v -> v.toByteArray(Charsets.UTF_8).joinToString("") { "%02x".format(it) } }
-        val files = root.listFiles().orEmpty()
+        val testFiles = root.listFiles().orEmpty()
             .map { it.resolve("build") }
             .filter { it.isDirectory }
             .flatMap { dir ->
@@ -373,6 +374,13 @@ val scanPlaintextLeaks = tasks.register("scanPlaintextLeaks") {
                     f.isFile && ((f.name.endsWith(".xml") && f.path.contains("${File.separator}test-results${File.separator}")) || f.name.endsWith(".log"))
                 }.toList()
             }
+        // 화면(포털 Phase 4 C12): 배포 산출물 전부, Vitest 결과, E2E 산출물(있으면)
+        val web = root.resolve("web/build")
+        val webFiles = listOf("web/dist", "reports/vitest", "e2e").map { web.resolve(it) }.filter { it.isDirectory }
+            .flatMap { d -> d.walkTopDown().filter { it.isFile }.toList() }
+        // 시험 하나만 돈 실행(finalizedBy)에는 화면 산출물이 없을 수 있다 — check는 :web:webBuild를 먼저 돌리므로 거기서는 늘 있다
+        if (webFiles.isEmpty()) logger.lifecycle("scanPlaintextLeaks: no web output yet (web/build/web/dist) — scanning test results only")
+        val files = (testFiles + webFiles).distinct()
         if (files.none { it.name.endsWith(".xml") }) {
             throw GradleException("scanPlaintextLeaks: no test result XML found — run the tests first")
         }
@@ -389,8 +397,12 @@ val scanPlaintextLeaks = tasks.register("scanPlaintextLeaks") {
 subprojects {
     tasks.withType<Test>().configureEach { finalizedBy(scanPlaintextLeaks) }
 }
-scanPlaintextLeaks.configure { mustRunAfter(subprojects.map { p -> p.tasks.withType<Test>() }) }
-tasks.named("check") { dependsOn(scanPlaintextLeaks) }
+scanPlaintextLeaks.configure {
+    mustRunAfter(subprojects.map { p -> p.tasks.withType<Test>() })
+    // 화면 산출물(포털 Phase 4)을 만든 뒤에 본다 — check는 webBuild를 거치므로(webLicenses) 순서만 정한다
+    mustRunAfter(":web:webBuild", ":web:webTest")
+}
+tasks.named("check") { dependsOn(scanPlaintextLeaks, ":web:webBuild") }
 
 // ---------------------------------------------------------------------------------------------
 // CLAUDE.md 코드 규약 — "소스셋 밖의 파일을 읽는 테스트는 그 파일을 Gradle 입력으로 선언한다"(ga-disclosure Phase 8 BUG-3, 지시문 v1.2 §7):
