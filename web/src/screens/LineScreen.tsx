@@ -1,9 +1,9 @@
 // 라인 상세(설계서 §8 5 — 계획 ⑥): 근거(엔진이 준 것만, 없으면 그 줄 생략 — v1.3), 한도 판정(Q4 문구), 계약 요약(가린 증권번호 — 원문은 API에 없다),
-// 연결 분급·채권(각 상태 라벨), 원장 링크. 금액 라벨은 그 라인이 속한 달의 상태(월 응답 하나 더 — 라벨 근거).
+// 연결 분급·채권(각 상태 라벨), 원장 링크. 금액 라벨은 그 라인이 속한 달의 상태(월 응답 하나 더 — 라벨 근거), 정정 라인은 "지급 반영 미정"(A1).
 import { Link, useParams } from 'react-router';
 import { ApiError } from '../api/client';
 import { useLine, useMonth } from '../api/queries';
-import { contractLabel, deferralLabel, monthLabel, receivableLabel } from '../labels/labels';
+import { contractLabel, deferralLabel, lineLabel, receivableLabel } from '../labels/labels';
 import { fill, m } from '../messages';
 import { Amount } from '../money/Amount';
 import { isZero, present } from '../money/won';
@@ -25,7 +25,7 @@ export function LineScreen() {
   if (month.isPending) return <Loading />;
   if (month.isError) return null;
   const { line, basis, policySummary, deferrals, receivable, ledgerId } = detail.data;
-  const label = monthLabel(month.data.status);
+  const label = lineLabel(line.commType, month.data.status);
   const uncertain = isUncertain(month.data);
   const names: Record<string, string> = m.enums.commType;
   return (

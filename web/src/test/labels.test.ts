@@ -2,7 +2,7 @@
 // (같은 코드로 기대값을 만들지 않는다).
 import { describe, expect, it } from 'vitest';
 import type { MonthStatus, NetBasis } from '../api/queries';
-import { contractLabel, deferralLabel, ledgerLabel, monthLabel, netView, payoutLabel, receivableLabel } from '../labels/labels';
+import { adjustmentLabel, contractLabel, deferralLabel, ledgerLabel, lineLabel, monthLabel, netView, payoutLabel, receivableLabel } from '../labels/labels';
 
 type Expected = { show: string } | { hide: string };
 const NIGHTLY = '세후는 야간 산출 후 표시';
@@ -50,5 +50,24 @@ describe('status label table', () => {
     expect(deferralLabel('HELD')).toBe('보류');
     expect(deferralLabel('RELEASED')).toBe('이번 달 지급 대상');
     expect(receivableLabel('OPEN')).toBe('미상계');
+  });
+
+  // Phase 4 수용 심사 A1 — 엔진 E1-2: 정정은 지급 런이 읽지 않는다. PAID 달의 정정도 "지급완료"가 아니다.
+  const MONTHS: MonthStatus[] = ['PROVISIONAL', 'ESTIMATED', 'CONFIRMED', 'PAID'];
+
+  it('adjustments have their own label, equal to none of the four month labels', () => {
+    expect(adjustmentLabel()).toBe('지급 반영 미정');
+    for (const status of MONTHS) {
+      expect(adjustmentLabel()).not.toBe(monthLabel(status));
+    }
+    expect(new Set(MONTHS.map((s) => monthLabel(s)))).toEqual(new Set(['예상', '확정', '지급완료']));
+  });
+
+  it('line amounts: ADJUSTMENT lines take the adjustment label in every month status, other types the month label', () => {
+    for (const status of MONTHS) {
+      expect(lineLabel('ADJUSTMENT', status)).toBe('지급 반영 미정');
+      expect(lineLabel('FY_COMM', status)).toBe(monthLabel(status));
+      expect(lineLabel('CLAWBACK', status)).toBe(monthLabel(status));
+    }
   });
 });

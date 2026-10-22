@@ -1,9 +1,10 @@
 // 월 카드(홈 "이번 달"·월별 명세 머리): 실수령(큰 숫자) · 세전 · 환수 상계 · 원천세 · 정정 · 지급예정일/지급일 · 상태 라벨.
 // 세후는 netView 표가 정한다(보이면 그 라벨, 아니면 세전을 크게 + 안내 — Phase 3 수용 심사 Q2). 확인 중(DRIFT·REBUILDING)이면 금액을 흐리게(§6.6).
-// 정정만 있는 확정 달은 "정정 N원 — 지급 반영은 정산팀 확인"(Q3 — 단정하지 않는다). 예상 이월 채권은 보이지 않는다(Q5).
+// 정정 금액은 월 상태와 무관하게 "지급 반영 미정"(엔진 E1-2 — 정정은 지급 런에 없다, Phase 4 수용 심사 A1). 정정만 있는 확정 달은
+// "정정 N원 — 지급 반영은 정산팀 확인"(Q3 — 단정하지 않는다). 예상 이월 채권은 보이지 않는다(Q5).
 import type { ReactNode } from 'react';
 import type { MonthResponse } from '../api/queries';
-import { monthLabel, netView } from '../labels/labels';
+import { adjustmentLabel, monthLabel, netView } from '../labels/labels';
 import { fill, m } from '../messages';
 import { Amount } from '../money/Amount';
 import { isZero, present } from '../money/won';
@@ -83,7 +84,7 @@ export function MonthCard({ month, heading, nowMs }: { month: MonthResponse; hea
         ) : null}
         {isZero(month.adjustment) ? null : (
           <Row name={m.home.adjustment} testId="row-adjustment">
-            <Amount value={month.adjustment} label={status} uncertain={uncertain} />
+            <Amount value={month.adjustment} label={adjustmentLabel()} uncertain={uncertain} />
           </Row>
         )}
       </dl>
@@ -104,7 +105,7 @@ export function MonthCard({ month, heading, nowMs }: { month: MonthResponse; hea
       ) : null}
       {isAdjustmentOnly(month) ? (
         <p className="note note--warn" data-testid="adjustment-only">
-          {fillNodes(m.adjustmentOnly, { amount: <Amount value={month.adjustment} label={status} uncertain={uncertain} /> })}
+          {fillNodes(m.adjustmentOnly, { amount: <Amount value={month.adjustment} label={adjustmentLabel()} uncertain={uncertain} /> })}
         </p>
       ) : null}
     </section>

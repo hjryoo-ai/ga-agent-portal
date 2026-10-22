@@ -10,9 +10,21 @@ export type StatusLabel = string & { readonly [statusLabelBrand]: true };
 
 const label = (text: string): StatusLabel => text as StatusLabel;
 
-/** 월 금액(세전·환수 상계·정정·원천세)과 그 달 라인의 라벨 — 월 상태. */
+/** 월 금액(세전·환수 상계)과 그 달 라인의 라벨 — 월 상태. 정정은 adjustmentLabel(원천세는 netView의 라벨). */
 export function monthLabel(status: MonthStatus): StatusLabel {
   return label(m.status.month[status]);
+}
+
+/** 정정 금액(월 정정 합·byType.ADJUSTMENT·ADJUSTMENT 라인) — 월 상태와 무관하다. 엔진 E1-2: 정정은 마감·지급 런이 읽지 않는다
+ *  (StatementConfirmed.adjustment에는 있고 PayoutCompleted에는 없다) — PAID 달의 정정도 지급된 것이 아니다(Phase 4 수용 심사 A1).
+ *  엔진이 정정을 지급에 넣는 날 문구만 바뀐다. */
+export function adjustmentLabel(): StatusLabel {
+  return label(m.status.adjustment);
+}
+
+/** 라인 금액의 라벨: 정정 라인은 adjustmentLabel, 나머지는 그 달의 상태. commType은 열린 값이다. */
+export function lineLabel(commType: string, status: MonthStatus): StatusLabel {
+  return commType === 'ADJUSTMENT' ? adjustmentLabel() : monthLabel(status);
 }
 
 /** 원장 금액(한도액·누적·잔여·삭감) — 사실 값. */

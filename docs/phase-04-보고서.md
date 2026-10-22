@@ -2,6 +2,8 @@
 
 > 지시문 `docs/phase-04-지시문.md` · 계획 `docs/phase-04-계획.md` · 승인 `docs/phase-04-계획승인.md`(2026-10-17, Q1~Q16 권장안, 조건 없음) ·
 > 브랜치 `work/phase-4` · PR [#12](https://github.com/hjryoo-ai/ga-agent-portal/pull/12) · 태그 `phase-4`(이 보고서 커밋). **병합은 수용 심사 회신 뒤.**
+>
+> **2판**(2026-10-22, 태그 `phase-4.1`): 수용 심사 `docs/phase-04-수용심사.md`(조건부 수용) — 조건 A1(정정 금액의 라벨)·Q9 한 줄. 바뀐 곳은 §4.5 표·주입 W29·§7. `phase-4`는 1판(`5bed1f1`) 그대로.
 
 ## 1. 커밋
 
@@ -110,6 +112,7 @@ CI run [39035626322](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/3
 | W26 | C12 | 락 갱신 없이 `package.json`의 `openapi-fetch` 0.16.0 | `pnpmInstall` `ERR_PNPM_OUTDATED_LOCKFILE` |
 | W27 | C6·C7(F16) | 요약 파일 이름을 프로젝트마다 상수로 | `run.mjs` "E2E summaries: 1 leak and 1 axe files for 4 passed tests", `:web:e2e` FAILED(데스크톱 ga01로 좁힘) |
 | W28 | C6·C12(F17) | 더한 센티널을 다시 뺌 | `run.mjs` "1 E2E sentinel(s) missing from pii-sentinels.properties (key e2e)", `:web:e2e` FAILED |
+| W29 | C4(2판 — A1) | `MonthCard` 정정 행의 라벨을 `monthLabel`(월 상태)로 되돌림 | `screens.test.tsx` "PAID month with ordinary lines and an adjustment…" `expected '지급완료' to be '지급 반영 미정'`, 73건 중 1 실패 |
 
 ## 4. 지시문 §5 추가 항목
 
@@ -200,7 +203,9 @@ CI run 39035626322 `web-e2e-reports/leak-scan/`(시험마다 한 파일)의 합:
 
 | 금액 | 라벨 |
 |---|---|
-| 세전·환수 상계·정정·원천세(세후가 보일 때만)·라인 금액 | 월 상태 — 예상(PROVISIONAL·ESTIMATED)·확정·지급완료 |
+| 세전·환수 상계·라인 금액(정정 라인 제외) | 월 상태 — 예상(PROVISIONAL·ESTIMATED)·확정·지급완료 |
+| 정정(월 정정 합·`byType.ADJUSTMENT`·`ADJUSTMENT` 라인 — 목록·상세, 정정만 있는 달 문구 안의 금액) | **지급 반영 미정** — 월 상태와 무관(2판 — 수용 심사 A1, 엔진 E1-2) |
+| 원천세(세후가 보일 때만) | 세후의 라벨(위 16칸 — 1판은 "월 상태"로 잘못 적었다, 코드는 1판부터 세후 라벨) |
 | 지급 런 값(지급액·채권 상계·이월 채권) | 지급완료 — PAID 달에만 |
 | 원장(한도액·누적·잔여·삭감·이연) | 원장 기준 |
 | 월납 보험료 | 계약 정보 |
@@ -276,3 +281,18 @@ CI run 39035626322의 `build/web/audit.json`(`pnpm audit --json`, 기록만 — 
 - **Q7(F5)** 정정만 있는 달 조건 "키 ⊆ {ADJUSTMENT}" — 이대로 둘지.
 - **Q8(F15)** 영문 번역 갱신 시점 — Phase 병합 때마다, 요청이 있을 때만.
 - **Q9 §14.1 #14** 웹뷰 호스트의 토큰 갱신 규약 — 기본 가정(401이면 호스트가 프래그먼트로 다시 연다)을 Phase 8 독립 브라우저 PKCE 전까지 유지할지.
+
+## 7. 2판 — `phase-4.1` (수용 심사 조건 A1, 2026-10-22)
+
+심사 `docs/phase-04-수용심사.md` §2: 엔진 E1-2 — 정정(`ADJUSTMENT`)은 마감·지급 런이 읽지 않는다(`StatementConfirmed.adjustment`에는 있고 `PayoutCompleted`에는 없다). 1판은 정정 금액에 월 상태 라벨을 붙여 PAID 달의 정정이 "지급완료"로 보였다. 정정만 있는 달(GA03)만 E2E에 있어 드러나지 않았다(RM-3).
+
+| 항목 | 바뀐 것 |
+|---|---|
+| 라벨 | `labels.ts` `adjustmentLabel()`("지급 반영 미정" — `messages.ko.json` `status.adjustment`), `lineLabel(commType, status)`(정정 라인이면 정정 라벨, 아니면 월 상태). 적용: `MonthCard` 정정 행·정정만 있는 달 문구 안의 금액, `StatementScreen` `byType.ADJUSTMENT`·라인 목록(접힌 짝 포함), `LineScreen` 상세 금액·한도 삭감 |
+| 문구 | 심사 예시 "정정 — 지급 반영 미정"에서 "정정 —"을 뺐다 — 라벨은 늘 "정정" 행 이름·유형 이름 옆에 붙어 중복된다(P4-12) |
+| 시험 | `labels.test.ts` +2(정정 라벨 ≠ 월 상태 라벨 넷, `lineLabel` 네 상태 × 정정·FY_COMM·CLAWBACK), `screens.test.tsx` +1(PAID + `FY_COMM`·`INCENTIVE` + 정정 — 정정 행·`by-type-ADJUSTMENT`·정정 라인·정정 라인 상세의 라벨이 "지급 반영 미정"이고 "지급완료" 0회, 정상 금액은 "지급완료"), 정정만 있는 달 기대 문구 갱신. E2E GA03: 문구 갱신 + 정정 행 라벨 단언(건수 그대로) |
+| 주입 | W29(§3 표) |
+| 문서 | 설계서 v1.7.1(§6.2·§8·§14.1 #12 — RM-3, #14 "다시 시도"의 새로고침은 호스트가 가로채야 한다 — 심사 Q9), DECISIONS P4-12와 "Phase 4 수용 심사" 절(RM-3·DE-20·DE-21·DD-14~16·결정), 심사 보관 `docs/phase-04-수용심사.md` |
+| 범위 밖 | 없음 — API·계약·서버·번들 구성 변경 없음. 원천세 라벨 줄(§4.5)은 1판 보고서의 표기 오류이고 코드는 그대로 |
+
+로컬(이 기계에 Docker 데몬이 없어 통합 시험은 설계대로 실패 — 로컬 증거에서 뺐다): `./gradlew build -x integrationTest` 성공, Vitest 73(+3)·실패 0, `webBuild` 초기 로드 118,208 B gzip(1판 118,149 B, +59 — 상한 130,048), `scanPlaintextLeaks` 0 hits. Java 통합 시험·Playwright 건수는 이 커밋의 CI 아티팩트로 센다 — PR #12 댓글.

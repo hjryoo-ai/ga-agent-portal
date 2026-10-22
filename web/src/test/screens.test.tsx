@@ -1,5 +1,5 @@
 // 화면 컴포넌트 시험(포털 Phase 4 C3·C5): 생성 클라이언트가 부르는 fetch를 계약 모양의 허구 응답으로 바꾸고 실제 화면을 그린다.
-// DRIFT 흐림·"확인 중", 정정만 있는 달(Q3), DEFER_AFTER_FY 문구(Q4), 라인 접기(Q6 — 같은 달 접힘·다른 달 배지 + 링크), 세후 표시(Q2),
+// DRIFT 흐림·"확인 중", 정정만 있는 달(Q3), 정정 라벨(A1 — PAID 달에서도 "지급완료"가 아니다), DEFER_AFTER_FY 문구(Q4), 라인 접기(Q6 — 같은 달 접힘·다른 달 배지 + 링크), 세후 표시(Q2),
 // 그리고 그려진 모든 금액에 라벨이 있다(C3).
 import { QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
@@ -95,7 +95,7 @@ describe('MonthCard', () => {
   it('adjustment-only confirmed month: "정정 N원 — 지급 반영은 정산팀 확인" (no lines, or ADJUSTMENT lines only)', () => {
     for (const byType of [{}, { ADJUSTMENT: won(-45000) }]) {
       render(<MonthCard month={month({ status: 'CONFIRMED', gross: won(0), byType, adjustment: won(-45000) })} heading="h" nowMs={Date.now()} />);
-      expect(screen.getByTestId('adjustment-only').textContent).toBe('정정 -45,000원확정 — 지급 반영은 정산팀 확인');
+      expect(screen.getByTestId('adjustment-only').textContent).toBe('정정 -45,000원지급 반영 미정 — 지급 반영은 정산팀 확인');
       cleanup();
     }
     render(<MonthCard month={month({ status: 'CONFIRMED', adjustment: won(-45000) })} heading="h" nowMs={Date.now()} />);
@@ -168,6 +168,62 @@ describe('screens', () => {
     expect(within(lines).getByTestId('limit-cut-defer-note').textContent).toBe('(사규: 초년도 후 이연 — 현재 이연 스케줄 없음)');
     expect(within(lines).getAllByTestId('limit-cut')[0]?.textContent).toContain('한도 초과 삭감');
     everyAmountHasALabel(container);
+  });
+
+  it('PAID month with ordinary lines and an adjustment: the adjustment is never labelled 지급완료 (A1 — engine E1-2)', async () => {
+    const paid = month({
+      status: 'PAID',
+      netBasis: 'PAYOUT',
+      net: won(1740600),
+      withholdingTax: won(59400),
+      adjustment: won(-45000),
+      byType: { FY_COMM: won(945000), INCENTIVE: won(855000), ADJUSTMENT: won(-45000) },
+      paidAt: '2026-09-10T10:00:00+09:00',
+      payable: won(1740600),
+    });
+    routes.set('/api/v1/me/earnings?from=202310&to=202608', { asOf, dataStatus: 'OK', from: '202310', to: '202608', items: [paid] });
+    routes.set('/api/v1/me/earnings/202608', paid);
+    routes.set('/api/v1/me/earnings/202608/lines?page=0&size=200', {
+      asOf,
+      dataStatus: 'OK',
+      closeYm: '202608',
+      page: 0,
+      size: 200,
+      total: 3,
+      items: [line('1'), line('2', { commType: 'INCENTIVE', amount: won(855000) }), line('5', { commType: 'ADJUSTMENT', amount: won(-45000) })],
+    });
+    const statement = show('/statements/202608', '/statements/:ym', <StatementScreen />);
+    const lines = await screen.findByTestId('lines');
+    const adjustments = [
+      screen.getByTestId('row-adjustment'),
+      screen.getByTestId('by-type-ADJUSTMENT'),
+      within(lines).getAllByTestId('line').find((l) => l.getAttribute('data-calc-id') === '5'),
+    ];
+    for (const el of adjustments) {
+      expect(el?.querySelector('.amount__label')?.textContent).toBe('지급 반영 미정');
+      expect(el?.textContent).not.toContain('지급완료');
+    }
+    // 정상 금액은 그대로 지급완료
+    expect(screen.getByTestId('row-gross').querySelector('.amount__label')?.textContent).toBe('지급완료');
+    expect(screen.getByTestId('by-type-FY_COMM').querySelector('.amount__label')?.textContent).toBe('지급완료');
+    expect(within(lines).getAllByTestId('line').find((l) => l.getAttribute('data-calc-id') === '1')?.querySelector('.amount__label')?.textContent).toBe('지급완료');
+    expect(screen.queryByTestId('adjustment-only')).toBeNull();
+    everyAmountHasALabel(statement.container);
+    cleanup();
+
+    routes.set('/api/v1/me/earnings/lines/5', {
+      asOf,
+      dataStatus: 'OK',
+      line: line('5', { commType: 'ADJUSTMENT', amount: won(-45000) }),
+      basis: { ruleVersionIds: [] },
+      policySummary: {},
+      deferrals: [],
+    });
+    const detail = show('/lines/5', '/lines/:calcId', <LineScreen />);
+    const card = await screen.findByTestId('line-detail');
+    expect(card.querySelector('.amount__label')?.textContent).toBe('지급 반영 미정');
+    expect(card.textContent).not.toContain('지급완료');
+    everyAmountHasALabel(detail.container);
   });
 
   it('line detail, limits and limit detail label every amount; CUT has no deferral note', async () => {

@@ -45,7 +45,8 @@
     "estimateAsOf": "기준 {at}",
     "paidOn": "{date} 지급",
     "ledger": "원장 기준",
-    "contract": "계약 정보"
+    "contract": "계약 정보",
+    "adjustment": "지급 반영 미정"
   },
   "enums": {
     "stage": {

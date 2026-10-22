@@ -16,7 +16,9 @@ Phase 2(프로젝션) 수용(2026-10-17) — [지시문](docs/phase-02-지시문
 
 Phase 3(조회 API) 수용(2026-10-17) — [지시문](docs/phase-03-지시문.md)·[계획](docs/phase-03-계획.md)·[승인](docs/phase-03-계획승인.md)·[보고서](docs/phase-03-보고서.md)·[수용 심사](docs/phase-03-수용심사.md). 태그 `phase-3`.
 
-Phase 4(화면 1차) 진행 중 — [지시문](docs/phase-04-지시문.md)·[계획](docs/phase-04-계획.md)·[승인](docs/phase-04-계획승인.md). 정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.7), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
+Phase 4(화면 1차) 수용(2026-10-22, 조건 A1 → `phase-4.1`) — [지시문](docs/phase-04-지시문.md)·[계획](docs/phase-04-계획.md)·[승인](docs/phase-04-계획승인.md)·[보고서](docs/phase-04-보고서.md)·[수용 심사](docs/phase-04-수용심사.md). 태그 `phase-4`·`phase-4.1`.
+
+정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.7.1), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## 실행
 

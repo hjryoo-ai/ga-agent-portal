@@ -1,10 +1,11 @@
 // 월별 명세(설계서 §8 5 — 계획 ⑥): 월 선택(행이 있는 달만, 36개월) → 월 카드 → 유형별 합계 → 라인 목록(같은 달 접기 — Q6·Q12, 화면 쪽 페이지)
-// → 라인 상세. 지급 런 값은 PAID 달에만(지급완료 라벨). 예상 이월은 보이지 않는다(Q5).
+// → 라인 상세. 지급 런 값은 PAID 달에만(지급완료 라벨). 정정(byType.ADJUSTMENT·ADJUSTMENT 라인)은 월 상태와 무관하게 "지급 반영 미정"(A1).
+// 예상 이월은 보이지 않는다(Q5).
 import { useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import { ApiError } from '../api/client';
-import { useEarnings, useLine, useMonth, useMonthLines, type Line, type MonthResponse } from '../api/queries';
-import { monthLabel, payoutLabel, type StatusLabel } from '../labels/labels';
+import { useEarnings, useLine, useMonth, useMonthLines, type Line, type MonthResponse, type MonthStatus } from '../api/queries';
+import { lineLabel, payoutLabel } from '../labels/labels';
 import { fill, m } from '../messages';
 import { Amount } from '../money/Amount';
 import { isZero, present } from '../money/won';
@@ -36,7 +37,8 @@ function CrossMonthBadge({ partnerCalcId, role }: { partnerCalcId: string; role:
   );
 }
 
-function LineItem({ line, label, uncertain, extra }: { line: Line; label: StatusLabel; uncertain: boolean; extra?: ReactNode }) {
+function LineItem({ line, status, uncertain, extra }: { line: Line; status: MonthStatus; uncertain: boolean; extra?: ReactNode }) {
+  const label = lineLabel(line.commType, status);
   return (
     <div className="line" data-testid="line" data-calc-id={line.calcId}>
       <Link className="line__main" to={`/lines/${line.calcId}`}>
@@ -51,16 +53,16 @@ function LineItem({ line, label, uncertain, extra }: { line: Line; label: Status
   );
 }
 
-function RowView({ row, label, uncertain }: { row: Row; label: StatusLabel; uncertain: boolean }) {
+function RowView({ row, status, uncertain }: { row: Row; status: MonthStatus; uncertain: boolean }) {
   if (row.kind === 'pair') {
     return (
       <div className="line-pair" data-testid="line-pair">
-        <LineItem line={row.reversal} label={label} uncertain={uncertain} />
+        <LineItem line={row.reversal} status={status} uncertain={uncertain} />
         <details className="line-pair__original">
           <summary>
             <span className="badge">{m.statement.cancelled}</span> {m.statement.showOriginal}
           </summary>
-          <LineItem line={row.original} label={label} uncertain={uncertain} />
+          <LineItem line={row.original} status={status} uncertain={uncertain} />
         </details>
       </div>
     );
@@ -68,7 +70,7 @@ function RowView({ row, label, uncertain }: { row: Row; label: StatusLabel; unce
   return (
     <LineItem
       line={row.line}
-      label={label}
+      status={status}
       uncertain={uncertain}
       extra={row.crossMonth === undefined ? null : <CrossMonthBadge partnerCalcId={row.crossMonth.partnerCalcId} role={row.crossMonth.role} />}
     />
@@ -83,14 +85,13 @@ function Lines({ month }: { month: MonthResponse }) {
   const rows = foldLines(lines.data.items);
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
   const current = Math.min(page, pages - 1);
-  const label = monthLabel(month.status);
   const uncertain = isUncertain(month);
   return (
     <section className="card" data-testid="lines">
       <h2>{fill(m.statement.lines, { n: String(lines.data.total) })}</h2>
       {rows.length === 0 ? <p>{m.statement.noLines}</p> : null}
       {rows.slice(current * PAGE, current * PAGE + PAGE).map((row) => (
-        <RowView key={row.kind === 'pair' ? row.reversal.calcId : row.line.calcId} row={row} label={label} uncertain={uncertain} />
+        <RowView key={row.kind === 'pair' ? row.reversal.calcId : row.line.calcId} row={row} status={month.status} uncertain={uncertain} />
       ))}
       {pages > 1 ? (
         <div className="pager">
@@ -118,7 +119,6 @@ function MonthBody({ ym, nowMs }: { ym: string; nowMs: number }) {
     return month.error instanceof ApiError && month.error.status === 404 ? <p data-testid="month-missing">{m.statement.notFound}</p> : null;
   }
   const data = month.data;
-  const label = monthLabel(data.status);
   const uncertain = isUncertain(data);
   const types = Object.entries(data.byType).sort(([a], [b]) => a.localeCompare(b));
   return (
@@ -132,7 +132,7 @@ function MonthBody({ ym, nowMs }: { ym: string; nowMs: number }) {
               <div className="row" key={type} data-testid={`by-type-${type}`}>
                 <dt>{commTypeName(type)}</dt>
                 <dd>
-                  <Amount value={amount} label={label} uncertain={uncertain} />
+                  <Amount value={amount} label={lineLabel(type, data.status)} uncertain={uncertain} />
                 </dd>
               </div>
             ))}
