@@ -16,6 +16,10 @@ import com.ga.portal.domain.view.HistoryRow;
 import com.ga.portal.domain.view.LedgerRow;
 import com.ga.portal.domain.view.MonthRow;
 import com.ga.portal.domain.view.ReceivableRow;
+import com.ga.portal.domain.DeferralStatus;
+import com.ga.portal.domain.NetBasis;
+import com.ga.portal.domain.view.MonthDetail;
+import com.ga.portal.query.api.DeferralsResponse;
 import com.ga.portal.query.api.Ledger;
 import com.ga.portal.query.api.LinesResponse;
 import com.ga.portal.query.api.LimitsResponse;
@@ -68,7 +72,11 @@ class MeQueriesTest {
     }
 
     static SyncSnapshot snapshot(Optional<Instant> caughtUp) {
-        return new SyncSnapshot("시험 GA", "NEXT_MONTH_D10", 8000, 9500, Optional.empty(),
+        return snapshot(caughtUp, false);
+    }
+
+    static SyncSnapshot snapshot(Optional<Instant> caughtUp, boolean forecast) {
+        return new SyncSnapshot("시험 GA", "NEXT_MONTH_D10", 8000, 9500, Optional.empty(), forecast,
                 Optional.of(new SyncSnapshot.Cursor(11, NOW.minusSeconds(3600), IngestState.RUNNING, caughtUp)));
     }
 
@@ -91,6 +99,8 @@ class MeQueriesTest {
         final List<String> calls = new ArrayList<>();
         final Map<String, LedgerItem> ledgers = new TreeMap<>();
         final List<LineItem> lines = new ArrayList<>();
+        /** 지급월별 원값 합(설계사 A의 것 — 계약별). */
+        final List<DeferralRow> deferralRows = new ArrayList<>();
 
         FakeStore() {
             ledgers.put("1", item("1", A, POLICY_A, 2_250_000, 1_800_000));
@@ -99,16 +109,26 @@ class MeQueriesTest {
             lines.add(line("1", A, POLICY_A, "FY_COMM", 945_000));
             lines.add(line("2", A, "POL-2026-0002", "INCENTIVE", 855_000));
             lines.add(line("9", B, POLICY_B, "FY_COMM", 1));
+            deferralRows.add(deferral("S1", A, POLICY_A, "202703", 300_001, DeferralStatus.SCHEDULED));
+            deferralRows.add(deferral("S2", A, POLICY_A, "202703", 100_000, DeferralStatus.HELD));
+            deferralRows.add(deferral("S3", A, "POL-2026-0002", "202704", 600_000, DeferralStatus.RELEASED));
+            deferralRows.add(deferral("S4", A, "POL-2026-0002", "202705", 50_000, DeferralStatus.CANCELLED));
+            deferralRows.add(deferral("S9", B, POLICY_B, "202703", 7, DeferralStatus.SCHEDULED));
+        }
+
+        static DeferralRow deferral(String id, AgentId agent, String policy, String dueYm, long amount, DeferralStatus status) {
+            return new DeferralRow(id, agent.value(), policy, "1", dueYm, amount, "INFORCE", status, "CURVE", "C1", Optional.empty(), 1);
         }
 
         static LedgerItem item(String id, AgentId agent, String policy, long limit, long accum) {
             return new LedgerItem(new LedgerRow(id, agent.value(), policy, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 1), LocalDate.of(2027, 7, 31),
-                    150_000, "15", limit, accum, 0, 0, 1, "LIMIT_RULE:1"), limit - accum, List.of());
+                    150_000, "15", limit, accum, 0, 0, 1, "LIMIT_RULE:1"), limit - accum, List.of(), Optional.of("WHOLE-LIFE-20Y"),
+                    Optional.of("종신20"), Optional.of("김*"));
         }
 
         static LineItem line(String calcId, AgentId agent, String policy, String type, long amount) {
             return new LineItem(calcId, "202608", type, amount, 0, Optional.empty(), Optional.of("P-" + agent.value()), Optional.empty(), Optional.empty(),
-                    policy, Optional.empty(), Optional.empty(), Long.parseLong(calcId));
+                    policy, Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Long.parseLong(calcId));
         }
 
         private boolean owns(AgentId agent, LineItem l) {
@@ -132,6 +152,16 @@ class MeQueriesTest {
             calls.add("month");
             return agent.equals(A) && closeYm.equals("202608") ? Optional.of(MonthRow.first(A.value(), "202608", MonthStatus.CONFIRMED, 6)
                     .withDataStatus(DataStatus.OK)) : Optional.empty();
+        }
+
+        @Override
+        public Optional<MonthDetail> monthDetail(AgentId agent, String closeYm, String previousYm) {
+            calls.add("monthDetail");
+            Optional<MonthRow> row = agent.equals(A) && closeYm.equals("202608")
+                    ? Optional.of(MonthRow.first(A.value(), "202608", MonthStatus.CONFIRMED, 6).withDataStatus(DataStatus.OK)) : Optional.empty();
+            return row.map(m -> new MonthDetail(m, previousYm.equals("202607")
+                    ? Optional.of(new MonthDetail.Previous("202607", MonthStatus.PAID, 10, Optional.of(9L), Optional.of(NetBasis.PAYOUT)))
+                    : Optional.empty()));
         }
 
         @Override
@@ -201,22 +231,48 @@ class MeQueriesTest {
         }
 
         @Override
-        public List<DeferralRow> deferrals(AgentId agent, String fromYm, String toYm) {
+        public List<DeferralRow> deferrals(AgentId agent, String fromYm, String toYm, Optional<String> policyNo) {
             calls.add("deferrals");
-            return List.of();
+            return mine(agent, fromYm, toYm, policyNo).toList();
+        }
+
+        private java.util.stream.Stream<DeferralRow> mine(AgentId agent, String fromYm, String toYm, Optional<String> policyNo) {
+            return deferralRows.stream().filter(r -> r.agentId().equals(agent.value()))
+                    .filter(r -> r.dueYm().compareTo(fromYm) >= 0 && r.dueYm().compareTo(toYm) <= 0)
+                    .filter(r -> policyNo.map(p -> p.equals(r.policyNo())).orElse(true));
         }
 
         @Override
-        public List<DueMonth> dueMonths(AgentId agent, String fromYm, String toYm) {
+        public List<DueMonth> dueMonths(AgentId agent, String fromYm, String toYm, Optional<String> policyNo) {
             calls.add("dueMonths");
-            return List.of();
+            Map<String, long[]> sums = new TreeMap<>();
+            mine(agent, fromYm, toYm, policyNo).forEach(r -> {
+                long[] v = sums.computeIfAbsent(r.dueYm(), k -> new long[2]);
+                switch (r.status()) {
+                    case SCHEDULED, RELEASED -> v[0] += r.amount();
+                    case HELD -> v[1] += r.amount();
+                    default -> { }
+                }
+            });
+            return sums.entrySet().stream().map(e -> new DueMonth(e.getKey(), e.getValue()[0], e.getValue()[1])).toList();
+        }
+
+        @Override
+        public Set<String> deferralPolicies(AgentId agent) {
+            calls.add("deferralPolicies");
+            return deferralRows.stream().filter(r -> r.agentId().equals(agent.value())).map(DeferralRow::policyNo)
+                    .collect(java.util.stream.Collectors.toCollection(java.util.TreeSet::new));
         }
     }
 
     static List<Function<MeQueries, Object>> everyEntry(Caller c) {
         return List.of(q -> q.me(c), q -> q.earnings(c, "202601", "202612"), q -> q.month(c, "202608"),
                 q -> q.lines(c, "202608", 0, 50, Optional.empty(), Optional.empty()), q -> q.line(c, "1"), q -> q.limits(c, "ALL"),
-                q -> q.limit(c, "1"), q -> q.deferrals(c, "202601", "202612"));
+                q -> q.limit(c, "1"), q -> deferrals(q, c, "202601", "202612"));
+    }
+
+    static QueryResult<DeferralsResponse> deferrals(MeQueries q, Caller c, String from, String to) {
+        return q.deferrals(c, from, to, Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     @Test
@@ -248,7 +304,7 @@ class MeQueriesTest {
         assertThatThrownBy(() -> queries.line(a, "x".repeat(129))).isInstanceOf(NotFound.class);
         List<Consumer<MeQueries>> bad = List.of(
                 q -> q.earnings(a, null, "202612"), q -> q.earnings(a, "202612", "202601"), q -> q.earnings(a, "202601", "202901"),
-                q -> q.earnings(a, "2026-1", "202612"), q -> q.deferrals(a, "202601", null),
+                q -> q.earnings(a, "2026-1", "202612"), q -> deferrals(q, a, "202601", null), q -> deferrals(q, a, "202601", "203301"),
                 q -> q.lines(a, "202608", -1, 50, Optional.empty(), Optional.empty()), q -> q.lines(a, "202608", 0, 0, Optional.empty(), Optional.empty()),
                 q -> q.lines(a, "202608", 0, 201, Optional.empty(), Optional.empty()),
                 q -> q.lines(a, "202608", 0, 50, Optional.of("fy_comm"), Optional.empty()),
@@ -311,5 +367,110 @@ class MeQueriesTest {
         assertThat(late.etag()).isNotEqualTo(fresh.etag());
         assertThat(((com.ga.portal.query.api.MeResponse) late.body()).dataStatus()).isEqualTo("SYNC_DELAYED");
         assertThat(((com.ga.portal.query.api.MeResponse) fresh.body()).dataStatus()).isEqualTo("OK");
+    }
+
+    // ------------------------------------------------------------------ 1.1.0 (포털 Phase 5 ⑦·C9, CR-1~4)
+
+    @Test
+    void theTimelineRangeIs84MonthsOnlyForDeferrals() {
+        Caller a = caller(A, Role.AGENT);
+        assertThat(deferrals(queries, a, "202701", "203312").body().months()).as("84 months").isNotEmpty();
+        assertThatThrownBy(() -> deferrals(queries, a, "202701", "203401")).as("85 months").isInstanceOf(InvalidRequest.class);
+        assertThatThrownBy(() -> queries.earnings(a, "202701", "203001")).as("other ranges stay at 36").isInstanceOf(InvalidRequest.class);
+    }
+
+    @Test
+    void scenarioAndPercentAreValidatedAndRetentionNeedsTheTenantSwitch() {
+        Caller a = caller(A, Role.AGENT);
+        List<Consumer<MeQueries>> bad = List.of(
+                q -> q.deferrals(a, "202701", "202712", Optional.of("RETENTION"), Optional.of("30"), Optional.empty()),   // 테넌트가 끔
+                q -> q.deferrals(a, "202701", "202712", Optional.of("BEST"), Optional.empty(), Optional.empty()),
+                q -> q.deferrals(a, "202701", "202712", Optional.of("ALL_INFORCE"), Optional.of("30"), Optional.empty()),
+                q -> q.deferrals(a, "202701", "202712", Optional.empty(), Optional.of("30"), Optional.empty()),
+                q -> q.deferrals(a, "202701", "202712", Optional.empty(), Optional.empty(), Optional.of("POL-2026-0001")));
+        for (Consumer<MeQueries> call : bad) {
+            assertThatThrownBy(() -> call.accept(queries)).isInstanceOf(InvalidRequest.class);
+        }
+        snapshot = snapshot(Optional.of(NOW.minusSeconds(10)), true);
+        for (String p : new String[] {"0", "101", "05", "3.5", "", "-1"}) {
+            assertThatThrownBy(() -> queries.deferrals(a, "202701", "202712", Optional.of("RETENTION"), Optional.of(p), Optional.empty()))
+                    .as(p).isInstanceOf(InvalidRequest.class);
+        }
+        assertThatThrownBy(() -> queries.deferrals(a, "202701", "202712", Optional.of("RETENTION"), Optional.empty(), Optional.empty()))
+                .isInstanceOf(InvalidRequest.class);
+        assertThat(queries.deferrals(a, "202701", "202712", Optional.of("RETENTION"), Optional.of("100"), Optional.empty()).body().p()).contains(100);
+    }
+
+    @Test
+    void retentionScalesOnlyTheMonthlyExpectedAndKeepsTheBaseHeldAndItems() {
+        Caller a = caller(A, Role.AGENT);
+        snapshot = snapshot(Optional.of(NOW.minusSeconds(10)), true);
+        DeferralsResponse all = deferrals(queries, a, "202701", "202712").body();
+        DeferralsResponse thirty = queries.deferrals(a, "202701", "202712", Optional.of("RETENTION"), Optional.of("30"), Optional.empty()).body();
+        assertThat(all.scenario()).contains("ALL_INFORCE");
+        assertThat(all.p()).isEmpty();
+        assertThat(all.months()).allSatisfy(m -> assertThat(m.expectedBase()).isEmpty());
+        assertThat(thirty.scenario()).contains("RETENTION");
+        // 202703: 예정 300,001 × 30 / 100 = 90,000.3 → 90,000(내림), 보류 100,000 그대로
+        assertThat(thirty.months()).extracting(DeferralsResponse.Month::dueYm, DeferralsResponse.Month::expected, DeferralsResponse.Month::held,
+                        DeferralsResponse.Month::expectedBase)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("202703", 90_000L, 100_000L, Optional.of(300_001L)),
+                        org.assertj.core.groups.Tuple.tuple("202704", 180_000L, 0L, Optional.of(600_000L)),
+                        org.assertj.core.groups.Tuple.tuple("202705", 0L, 0L, Optional.of(0L)));   // 취소분만 있는 달도 행(SQL GROUP BY와 같다)
+        assertThat(thirty.items()).isEqualTo(all.items());
+        assertThat(thirty.items()).extracting(DeferralsResponse.Item::amount).containsExactly(300_001L, 100_000L, 600_000L, 50_000L);
+        // 막대는 응답 값 기준: 최댓값 = 202704의 180,000(적용 후) — 202703 90,000 + 100,000 = 190,000이 더 크다
+        assertThat(thirty.months().getFirst().bar()).contains(new DeferralsResponse.Bar("47.4%", "52.6%"));
+        assertThat(all.months().getFirst().bar()).contains(new DeferralsResponse.Bar("50.0%", "16.7%"));   // max = 202704 600,000
+
+        DeferralsResponse hundred = queries.deferrals(a, "202701", "202712", Optional.of("RETENTION"), Optional.of("100"), Optional.empty()).body();
+        assertThat(hundred.months()).allSatisfy(m -> assertThat(m.expectedBase()).contains(m.expected()));
+        assertThat(hundred.months()).extracting(DeferralsResponse.Month::expected, DeferralsResponse.Month::held, DeferralsResponse.Month::bar)
+                .isEqualTo(all.months().stream().map(m -> org.assertj.core.groups.Tuple.tuple(m.expected(), m.held(), m.bar())).toList());
+    }
+
+    @Test
+    void theBarIsOmittedWhenNothingIsPositive() {
+        Caller a = caller(A, Role.AGENT);
+        store.deferralRows.clear();
+        store.deferralRows.add(FakeStore.deferral("N1", A, POLICY_A, "202703", 0, DeferralStatus.SCHEDULED));
+        assertThat(deferrals(queries, a, "202701", "202712").body().months()).singleElement().satisfies(m -> assertThat(m.bar()).isEmpty());
+        assertThat(deferrals(queries, a, "203001", "203012").body().months()).isEmpty();
+    }
+
+    @Test
+    void aDeferralPolicyKeyResolvesOnlyWithinTheCallersDeferrals() {
+        Caller a = caller(A, Role.AGENT);
+        DeferralsResponse one = queries.deferrals(a, "202701", "202712", Optional.empty(), Optional.empty(), Optional.of(key(POLICY_A))).body();
+        assertThat(one.months()).extracting(DeferralsResponse.Month::dueYm, DeferralsResponse.Month::expected)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("202703", 300_001L));
+        assertThat(one.items()).extracting(DeferralsResponse.Item::scheduleId).containsExactly("S1", "S2");
+        store.calls.clear();
+        DeferralsResponse others = queries.deferrals(a, "202701", "202712", Optional.empty(), Optional.empty(), Optional.of(key(POLICY_B))).body();
+        assertThat(others.months()).isEmpty();
+        assertThat(others.items()).isEmpty();
+        assertThat(store.calls).containsExactly("deferralPolicies");
+    }
+
+    @Test
+    void cr1To4AndTheFeatureSwitchAreCarried() {
+        Caller a = caller(A, Role.AGENT);
+        assertThat(queries.month(a, "202608").body().previous())
+                .contains(new com.ga.portal.query.api.MonthResponse.Previous("202607", "PAID", 10, Optional.of(9L), Optional.of("PAYOUT")));
+        store.calls.clear();
+        queries.month(a, "202608");
+        assertThat(store.calls).as("one month statement (CR-1 is a join)").containsExactly("monthDetail", "byType");
+        assertThat(queries.limits(a, "ALL").body().items()).first().satisfies(l -> {
+            assertThat(l.ruleVersionId()).contains("LIMIT_RULE:1");
+            assertThat(l.productKey()).contains("WHOLE-LIFE-20Y");
+            assertThat(l.productName()).contains("종신20");
+            assertThat(l.insuredMasked()).contains("김*");
+        });
+        assertThat(queries.me(a).body().features()).contains(new com.ga.portal.query.api.MeResponse.Features(false));
+        QueryResult<?> off = queries.me(a);
+        snapshot = snapshot(Optional.of(NOW.minusSeconds(10)), true);
+        QueryResult<com.ga.portal.query.api.MeResponse> on = queries.me(a);
+        assertThat(on.body().features()).contains(new com.ga.portal.query.api.MeResponse.Features(true));
+        assertThat(on.etag()).as("the switch is part of the ETag").isNotEqualTo(off.etag());
     }
 }

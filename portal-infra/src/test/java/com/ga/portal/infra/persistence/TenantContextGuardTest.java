@@ -93,8 +93,8 @@ class TenantContextGuardTest {
         assertThat(publicMethods(ViewResetRepository.class)).containsExactly("deleteViews", "violations");
         assertThat(publicMethods(ViewRepository.class)).isEmpty();
         assertThat(publicMethods(IdentityLinkRepository.class)).containsExactly("find");
-        assertThat(publicMethods(AgentQueryRepository.class)).containsExactly("byType", "deferrals", "deferralsOfLine", "dueMonths", "history",
-                "ledger", "ledgerIdOfPolicy", "ledgers", "line", "linePolicies", "lines", "month", "months", "profile", "receivableOfLine");
+        assertThat(publicMethods(AgentQueryRepository.class)).containsExactly("byType", "deferralPolicies", "deferrals", "deferralsOfLine", "dueMonths", "history",
+                "ledger", "ledgerIdOfPolicy", "ledgers", "line", "linePolicies", "lines", "month", "monthDetail", "months", "profile", "receivableOfLine");
         assertThat(publicMethods(SyncStatusRepository.class)).containsExactly("snapshot");
     }
 
@@ -157,8 +157,10 @@ class TenantContextGuardTest {
         assertThatThrownBy(() -> query.ledgers("A-1001")).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> query.ledger("A-1001", "1")).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> query.history("A-1001", "1")).isInstanceOf(TenantNotBoundException.class);
-        assertThatThrownBy(() -> query.deferrals("A-1001", "202601", "202612")).isInstanceOf(TenantNotBoundException.class);
-        assertThatThrownBy(() -> query.dueMonths("A-1001", "202601", "202612")).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> query.deferrals("A-1001", "202601", "202612", Optional.empty())).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> query.dueMonths("A-1001", "202601", "202612", Optional.empty())).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> query.monthDetail("A-1001", "202608", "202607")).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> query.deferralPolicies("A-1001")).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(sync::snapshot).isInstanceOf(TenantNotBoundException.class);
         AgentRow agent = new AgentRow("A-1001", "n", Optional.empty(), "/HQ", Optional.empty(), AgentStatus.ACTIVE, LocalDate.of(2026, 8, 1), 1);
         LineRow line = new LineRow("1", "A-1001", "P", Optional.empty(), "FY_COMM", 1, "202608", Optional.empty(), 0, Optional.empty(), "{}", "{}", 2);

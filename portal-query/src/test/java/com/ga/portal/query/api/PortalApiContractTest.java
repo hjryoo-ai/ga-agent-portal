@@ -57,9 +57,11 @@ class PortalApiContractTest {
         m.put(AsOf.class, schema("AsOf"));
         m.put(MeResponse.class, schema("MeResponse"));
         m.put(MeResponse.Tenant.class, schema("MeResponse").path("properties").path("tenant"));
+        m.put(MeResponse.Features.class, schema("MeResponse").path("properties").path("features"));
         m.put(MonthSummary.class, schema("MonthSummary"));
         m.put(EarningsResponse.class, schema("EarningsResponse"));
         m.put(MonthResponse.class, schema("MonthResponse"));
+        m.put(MonthResponse.Previous.class, schema("MonthResponse").path("properties").path("previous"));
         m.put(Line.class, schema("Line"));
         m.put(LinesResponse.class, schema("LinesResponse"));
         m.put(LineDetailResponse.class, schema("LineDetailResponse"));
@@ -73,6 +75,7 @@ class PortalApiContractTest {
         m.put(LimitDetailResponse.History.class, schema("LimitDetailResponse").path("properties").path("history").path("items"));
         m.put(DeferralsResponse.class, schema("DeferralsResponse"));
         m.put(DeferralsResponse.Month.class, schema("DeferralsResponse").path("properties").path("months").path("items"));
+        m.put(DeferralsResponse.Bar.class, schema("DeferralsResponse").path("properties").path("months").path("items").path("properties").path("bar"));
         m.put(DeferralsResponse.Item.class, schema("DeferralsResponse").path("properties").path("items").path("items"));
         return m;
     }
@@ -96,6 +99,9 @@ class PortalApiContractTest {
         }
         if (c == String.class || c == java.time.Instant.class || c == java.time.LocalDate.class) {
             return "string";
+        }
+        if (c == boolean.class || c == Boolean.class) {
+            return "boolean";
         }
         if (c.isRecord()) {
             return "object";

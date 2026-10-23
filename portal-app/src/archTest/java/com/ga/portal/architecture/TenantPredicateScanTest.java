@@ -101,7 +101,8 @@ class TenantPredicateScanTest {
         assertThat(javaSqlCount).as("repository SQL literals found (TenantRepository 1, IngestCursorRepository 3, IngestEventRepository 4, "
                 + "IngestLockRepository 1, AuditAccessRepository 2; Phase 2: AgentProfile 2, EarningsLine 3, EarningsMonth 2, PolicyLimit 5, "
                 + "DeferralItem 3, ClawbackItem 2, PolicyFlag 2, ReconResult 1, ViewReset 8 DELETE + 3 invariant queries; Phase 3: IngestCursor +2 caught_up_at, IssuerDirectoryReader 1, IdentityLink 1, "
-                + "AuditAccess +1 denial, AgentQuery 16, SyncStatus 1)").isEqualTo(11 + 20 + 11 + 2 + 3 + 17);
+                + "AuditAccess +1 denial, AgentQuery 16, SyncStatus 1; Phase 5: AgentQuery +2 monthDetail·deferralPolicies)")
+                .isEqualTo(11 + 20 + 11 + 2 + 3 + 17 + 2);
     }
 
     @Test
@@ -154,7 +155,7 @@ class TenantPredicateScanTest {
                 violations.addAll(SqlTenantScanner.scanAgentPredicate(source, literal, agentTables));
             }
         }
-        assertThat(statements).as("AgentQueryRepository statements (not vacuous)").isEqualTo(16);
+        assertThat(statements).as("AgentQueryRepository statements (not vacuous — Phase 5: +monthDetail, +deferralPolicies)").isEqualTo(18);
         assertThat(violations).as("agent-scoped statements without agent_id = :agentId per agent table (D-4)").isEmpty();
         assertThat(AGENT_ALLOWLIST).as("second-predicate allowlist (Phase 3: empty)").isEmpty();
     }

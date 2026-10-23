@@ -12,6 +12,8 @@ import com.ga.portal.domain.view.AgentRow;
 import com.ga.portal.domain.view.DeferralRow;
 import com.ga.portal.domain.view.HistoryRow;
 import com.ga.portal.domain.view.LedgerRow;
+import com.ga.portal.domain.view.DueMonth;
+import com.ga.portal.domain.view.MonthDetail;
 import com.ga.portal.domain.view.MonthRow;
 import com.ga.portal.query.api.AsOf;
 import com.ga.portal.query.api.DeferralsResponse;
@@ -35,6 +37,7 @@ import com.ga.portal.query.port.ReadTransaction;
 import com.ga.portal.domain.view.SyncSnapshot;
 import com.ga.portal.query.port.SyncStatusStore;
 import com.ga.portal.query.rule.Etags;
+import com.ga.portal.query.rule.ForecastScenario;
 import com.ga.portal.query.rule.LimitStage;
 import com.ga.portal.query.rule.PayoutDay;
 import com.ga.portal.query.rule.PolicyMask;
@@ -54,17 +57,23 @@ import java.util.regex.Pattern;
  *
  * <p>입력 규칙: 경로 변수(월·라인·원장)의 형식이 틀리면 404(존재 여부를 형식 오류로 흘리지 않는다), 쿼리 파라미터가 틀리면 400 한 가지(Q11).
  * 응답에 증권번호 원문은 없다 — {@code policyMasked}·{@code policyKey}(D-7·Q5). 금액은 뷰의 값 그대로이고 여기서 만드는 숫자는 {@code remaining}(SQL 차감)·
- * 단계(정수 bp 비교)·{@code utilization}(표시 문자열)뿐이다.
+ * 단계(정수 bp 비교)·{@code utilization}·{@code bar}(표시 문자열)와 분급 시나리오의 {@code expected}({@link ForecastScenario} — 포털의 유일한 금액 곱셈,
+ * 1.1.0)뿐이다.
  */
 public final class MeQueries {
 
     static final int MAX_RANGE_MONTHS = 36;
+    /** 분급 타임라인의 범위 상한(1.1.0 — 기간 토글 12/24/48/84개월). 다른 범위 API는 36 그대로. */
+    static final int MAX_DEFERRAL_RANGE_MONTHS = 84;
+    static final String ALL_INFORCE = "ALL_INFORCE";
+    static final String RETENTION = "RETENTION";
     static final int MAX_PAGE_SIZE = 200;
     static final int MAX_PAGE = 1_000_000;
     static final int MAX_KEY_LENGTH = 128;
     private static final Pattern COMM_TYPE = Pattern.compile("[A-Z][A-Z0-9_]{0,31}");
     private static final Pattern POLICY_KEY = Pattern.compile("[0-9a-f]{16}");
     private static final Pattern YM = Pattern.compile("[0-9]{6}");
+    private static final Pattern PERCENT = Pattern.compile("[1-9][0-9]?|100");
     private static final List<String> STAGE_FILTERS = List.of("ALL", "WARN", "CRIT", "FULL");
     private static final System.Logger LOG = System.getLogger(MeQueries.class.getName());
 
@@ -99,9 +108,10 @@ public final class MeQueries {
             SyncSnapshot s = c.snapshot;
             MeResponse body = new MeResponse(c.asOf(), c.status.name(), caller.agentId().value(), caller.role().name(),
                     profile.map(AgentRow::name), profile.flatMap(AgentRow::grade), profile.map(AgentRow::orgPath),
-                    profile.map(p -> p.status().name()),
+                    profile.map(p -> p.status().name()), Optional.of(new MeResponse.Features(s.forecastScenarioEnabled())),
                     new MeResponse.Tenant(s.tenantName(), s.payoutDayRule(), s.limitWarnBp(), s.limitCritBp()));
-            return new QueryResult<>(body, c.etag(s.tenantName(), s.payoutDayRule(), Long.toString(s.limitWarnBp()), Long.toString(s.limitCritBp())));
+            return new QueryResult<>(body, c.etag(s.tenantName(), s.payoutDayRule(), Long.toString(s.limitWarnBp()), Long.toString(s.limitCritBp()),
+                    Boolean.toString(s.forecastScenarioEnabled())));
         });
     }
 
@@ -122,14 +132,18 @@ public final class MeQueries {
         Ym closeYm = pathYm(ym);
         return transaction.read(() -> {
             Context c = context();
-            MonthRow m = store.month(caller.agentId(), closeYm.value()).orElseThrow(() -> new NotFound(DenyReason.MISSING));
+            MonthDetail detail = store.monthDetail(caller.agentId(), closeYm.value(), closeYm.prev().value())
+                    .orElseThrow(() -> new NotFound(DenyReason.MISSING));
+            MonthRow m = detail.row();
             PayoutDay.Result payout = PayoutDay.expected(c.snapshot.payoutDayRule(), closeYm);
             payout.omitted().ifPresent(reason -> LOG.log(System.Logger.Level.WARNING,
                     "PAYOUT_DAY_OMITTED tenant=" + caller.tenant().value() + " reason=" + reason + " ym=" + closeYm.value()));
             MonthResponse body = new MonthResponse(c.asOf(), c.status.name(), m.closeYm(), m.status().name(), m.dataStatus().name(), m.gross(),
                     m.clawbackOffset(), m.adjustment(), m.withholdingTax(), m.net(), m.netBasis().map(Enum::name),
                     store.byType(caller.agentId(), closeYm.value()), m.estimateAsOf(), m.estimateBasisSeq(), m.confirmedAt(), m.receivableOffset(),
-                    m.carriedReceivable(), m.payable(), m.runSeq(), m.paidAmount(), m.paidAt(), payout.date());
+                    m.carriedReceivable(), m.payable(), m.runSeq(), m.paidAmount(), m.paidAt(), payout.date(),
+                    detail.previous().map(pm -> new MonthResponse.Previous(pm.closeYm(), pm.status().name(), pm.gross(), pm.net(),
+                            pm.netBasis().map(Enum::name))));
             return new QueryResult<>(body, c.etag(c.snapshot.payoutDayRule()));
         });
     }
@@ -218,18 +232,65 @@ public final class MeQueries {
         });
     }
 
+    /**
+     * 분급 타임라인(1.1.0): 범위 84개월까지, {@code scenario}(기본 {@code ALL_INFORCE})·{@code p}(RETENTION일 때만 필수 1~100)·{@code policyKey}(그 설계사의 분급
+     * 항목 증권번호 집합에서 푼다 — 모르는 키는 빈 결과). RETENTION은 테넌트가 켰을 때만(아니면 400). RETENTION이면 월 {@code expected}만
+     * {@link ForecastScenario}로 바꾸고 적용 전 값을 {@code expectedBase}로 함께 싣는다 — {@code held}·항목은 원값. 막대({@code bar})는 응답에 실린 값 기준
+     * (월마다 {@code expected + held}의 최댓값 대비, 최댓값 ≤ 0이면 생략).
+     */
     @UseCaseEntry(ApiAuthorization.DEFERRALS)
-    public QueryResult<DeferralsResponse> deferrals(Caller caller, String from, String to) {
+    public QueryResult<DeferralsResponse> deferrals(Caller caller, String from, String to, Optional<String> scenario, Optional<String> p,
+                                                    Optional<String> policyKey) {
         ApiAuthorization.require(caller, ApiAuthorization.DEFERRALS);
-        Ym[] range = range(from, to);
+        Ym[] range = range(from, to, MAX_DEFERRAL_RANGE_MONTHS);
+        String chosen = scenario.orElse(ALL_INFORCE);
+        if (!chosen.equals(ALL_INFORCE) && !chosen.equals(RETENTION)) {
+            throw new InvalidRequest("scenario");
+        }
+        if (chosen.equals(RETENTION) != p.isPresent() || p.isPresent() && !PERCENT.matcher(p.get()).matches()) {
+            throw new InvalidRequest("p");
+        }
+        if (policyKey.isPresent() && !POLICY_KEY.matcher(policyKey.get()).matches()) {
+            throw new InvalidRequest("policyKey");
+        }
+        Optional<Integer> percent = p.map(Integer::valueOf);
         return transaction.read(() -> {
             Context c = context();
-            List<DeferralsResponse.Month> months = store.dueMonths(caller.agentId(), range[0].value(), range[1].value()).stream()
-                    .map(m -> new DeferralsResponse.Month(m.dueYm(), m.expected(), m.held())).toList();
-            List<DeferralsResponse.Item> items = store.deferrals(caller.agentId(), range[0].value(), range[1].value()).stream()
-                    .map(r -> deferral(caller, r)).toList();
-            return new QueryResult<>(new DeferralsResponse(c.asOf(), c.status.name(), range[0].value(), range[1].value(), months, items), c.etag());
+            if (chosen.equals(RETENTION) && !c.snapshot.forecastScenarioEnabled()) {
+                throw new InvalidRequest("scenario");
+            }
+            Optional<String> policyNo = Optional.empty();
+            boolean unknownKey = false;
+            if (policyKey.isPresent()) {
+                // 키 → 원문은 요청 안에서 그 설계사의 분급 항목 증권번호 집합으로만(SQL에 키는 없다 — /lines와 같은 규약)
+                policyNo = store.deferralPolicies(caller.agentId()).stream()
+                        .filter(n -> policyKeys.key(caller.tenant(), n).equals(policyKey.get())).findFirst();
+                unknownKey = policyNo.isEmpty();
+            }
+            List<DueMonth> sums = unknownKey ? List.of() : store.dueMonths(caller.agentId(), range[0].value(), range[1].value(), policyNo);
+            List<DeferralsResponse.Item> items = unknownKey ? List.of()
+                    : store.deferrals(caller.agentId(), range[0].value(), range[1].value(), policyNo).stream().map(r -> deferral(caller, r)).toList();
+            DeferralsResponse body = new DeferralsResponse(c.asOf(), c.status.name(), range[0].value(), range[1].value(), Optional.of(chosen), percent,
+                    timeline(sums, percent), items);
+            return new QueryResult<>(body, c.etag(Boolean.toString(c.snapshot.forecastScenarioEnabled())));
         });
+    }
+
+    /** 월 합 → 응답 월: 시나리오 적용(있으면)과 막대. 막대의 분모는 응답에 실린 {@code expected + held}의 최댓값. */
+    private static List<DeferralsResponse.Month> timeline(List<DueMonth> sums, Optional<Integer> percent) {
+        List<long[]> shown = sums.stream()
+                .map(m -> new long[] {percent.map(pp -> ForecastScenario.apply(m.expected(), pp)).orElse(m.expected()), m.held()}).toList();
+        long max = shown.stream().mapToLong(v -> Math.addExact(v[0], v[1])).max().orElse(0L);
+        List<DeferralsResponse.Month> out = new ArrayList<>();
+        for (int i = 0; i < sums.size(); i++) {
+            DueMonth m = sums.get(i);
+            long[] v = shown.get(i);
+            Optional<DeferralsResponse.Bar> bar = max > 0
+                    ? Optional.of(new DeferralsResponse.Bar(Ratio.of(v[0], max).toPercentString(), Ratio.of(v[1], max).toPercentString()))
+                    : Optional.empty();
+            out.add(new DeferralsResponse.Month(m.dueYm(), v[0], m.held(), percent.map(pp -> m.expected()), bar));
+        }
+        return out;
     }
 
     // ------------------------------------------------------------------ 공통
@@ -280,6 +341,10 @@ public final class MeQueries {
     }
 
     private static Ym[] range(String from, String to) {
+        return range(from, to, MAX_RANGE_MONTHS);
+    }
+
+    private static Ym[] range(String from, String to, int maxMonths) {
         if (from == null || to == null || !YM.matcher(from).matches() || !YM.matcher(to).matches()) {
             throw new InvalidRequest("from/to");
         }
@@ -291,7 +356,7 @@ public final class MeQueries {
         } catch (IllegalArgumentException e) {
             throw new InvalidRequest("from/to");
         }
-        if (f.compareTo(t) > 0 || Ym.range(f, t).size() > MAX_RANGE_MONTHS) {
+        if (f.compareTo(t) > 0 || Ym.range(f, t).size() > maxMonths) {
             throw new InvalidRequest("range");
         }
         return new Ym[] {f, t};
@@ -319,7 +384,8 @@ public final class MeQueries {
 
     private Line line(Caller caller, LineItem l) {
         return new Line(l.calcId(), l.closeYm(), l.commType(), l.amount(), l.limitCutAmt(), l.limitCutPolicy(), l.productKey(), l.productName(),
-                l.insuredMasked(), PolicyMask.mask(l.policyNo()), policyKeys.key(caller.tenant(), l.policyNo()), l.reversalOf(), l.reversedBy());
+                l.insuredMasked(), PolicyMask.mask(l.policyNo()), policyKeys.key(caller.tenant(), l.policyNo()), l.reversalOf(), l.reversedBy(),
+                l.reversalOfYm(), l.reversedByYm());
     }
 
     private Ledger ledger(Caller caller, LedgerItem item, SyncSnapshot s) {
@@ -328,7 +394,8 @@ public final class MeQueries {
         Optional<String> utilization = r.limitAmount() > 0 ? Optional.of(Ratio.of(r.accumPaid(), r.limitAmount()).toPercentString()) : Optional.empty();
         return new Ledger(r.ledgerId(), PolicyMask.mask(r.policyNo()), policyKeys.key(caller.tenant(), r.policyNo()), r.contractDate(), r.fyStart(),
                 r.fyEnd(), r.monthlyPremium(), r.limitMultiple(), r.limitAmount(), r.accumPaid(), item.remaining(), utilization, stage.name(),
-                r.cutTotal(), r.deferredTotal(), item.openFlags());
+                r.cutTotal(), r.deferredTotal(), item.openFlags(), Optional.of(r.ruleVersionId()), item.productKey(), item.productName(),
+                item.insuredMasked());
     }
 
     private static LimitDetailResponse.History history(HistoryRow h) {

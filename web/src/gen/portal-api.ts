@@ -175,12 +175,26 @@ export interface components {
                 statusReason?: "DUE_RELEASED" | "POLICY_NOT_INFORCE" | "POLICY_TERMINATED" | "SOURCE_REVERSED";
             }[];
             months: {
+                /** @description 막대 너비(1.1.0) — 값 / 범위 안 max(expected + held). max ≤ 0이면 생략 */
+                bar?: {
+                    expected: components["schemas"]["Percent"];
+                    held: components["schemas"]["Percent"];
+                };
                 dueYm: components["schemas"]["Ym"];
-                /** @description Σ SCHEDULED + RELEASED */
+                /** @description Σ SCHEDULED + RELEASED. RETENTION이면 floor(expectedBase × p / 100) — 포털의 유일한 금액 곱셈(설계서 §6.4) */
                 expected: components["schemas"]["Won"];
-                /** @description Σ HELD */
+                /** @description RETENTION일 때 적용 전 예정(1.1.0) */
+                expectedBase?: components["schemas"]["Won"];
+                /** @description Σ HELD(시나리오와 무관 — 원값) */
                 held: components["schemas"]["Won"];
             }[];
+            /** @description RETENTION의 유지율 가정(1.1.0) */
+            p?: number;
+            /**
+             * @description 응답에 쓰인 시나리오(1.1.0 — 언제나 있다)
+             * @enum {string}
+             */
+            scenario?: "ALL_INFORCE" | "RETENTION";
             to: components["schemas"]["Ym"];
         };
         EarningsResponse: {
@@ -200,14 +214,20 @@ export interface components {
             flags: ("CANCELLED" | "LAPSED" | "OVERDUE" | "REDUCED")[];
             fyEnd: components["schemas"]["Date"];
             fyStart: components["schemas"]["Date"];
+            insuredMasked?: string;
             ledgerId: components["schemas"]["Key"];
             limitAmount: components["schemas"]["NonNegativeWon"];
             limitMultiple: components["schemas"]["DecimalString"];
             monthlyPremium: components["schemas"]["NonNegativeWon"];
             policyKey: components["schemas"]["PolicyKey"];
             policyMasked: components["schemas"]["PolicyMasked"];
+            /** @description 그 계약의 첫 라인의 상품 키(1.1.0 */
+            productKey?: string;
+            productName?: string;
             /** @description 한도 − 누적(정수 차감) */
             remaining: components["schemas"]["Won"];
+            /** @description 원장을 연 한도 룰 버전(1.1.0 */
+            ruleVersionId?: string;
             /**
              * @description 테넌트 임계치(bp)와의 정수 비교
              * @enum {string}
@@ -253,7 +273,11 @@ export interface components {
             productKey?: string;
             productName?: string;
             reversalOf?: components["schemas"]["Key"];
+            /** @description reversalOf 라인의 마감월(1.1.0 */
+            reversalOfYm?: components["schemas"]["Ym"];
             reversedBy?: components["schemas"]["Key"];
+            /** @description reversedBy 라인의 마감월(1.1.0 */
+            reversedByYm?: components["schemas"]["Ym"];
         };
         LineDetailResponse: {
             asOf: components["schemas"]["AsOf"];
@@ -301,6 +325,11 @@ export interface components {
             agentName?: string;
             asOf: components["schemas"]["AsOf"];
             dataStatus: components["schemas"]["DataStatus"];
+            /** @description 테넌트가 켠 화면 기능(1.1.0) */
+            features?: {
+                /** @description 분급 타임라인의 유지율 시나리오(RETENTION)를 쓸 수 있다 */
+                forecastScenario: boolean;
+            };
             grade?: string;
             orgPath?: string;
             role: components["schemas"]["Role"];
@@ -342,6 +371,14 @@ export interface components {
             payable?: components["schemas"]["Won"];
             /** @description 테넌트 지급일 규칙(NEXT_MONTH_D{n}) — 형식이 다르거나 그 날이 없으면 생략 */
             payoutExpectedOn?: components["schemas"]["Date"];
+            /** @description 지난달 행의 값(1.1.0, CR-1 — 그 달의 상태 그대로, 차감하지 않는다). 지난달 행이 없으면 생략 */
+            previous?: {
+                closeYm: components["schemas"]["Ym"];
+                gross: components["schemas"]["Won"];
+                net?: components["schemas"]["Won"];
+                netBasis?: components["schemas"]["NetBasis"];
+                status: components["schemas"]["MonthStatus"];
+            };
             receivableOffset?: components["schemas"]["Won"];
             runSeq?: components["schemas"]["Seq"];
             status: components["schemas"]["MonthStatus"];
@@ -421,6 +458,10 @@ export interface components {
         };
     };
     parameters: {
+        /** @description 시작 지급월 YYYYMM(포함). to와 함께 필수, from ≤ to, 폭 84개월 이하(1.1.0 — 분급 타임라인 7년) */
+        DeferralFrom: components["schemas"]["Ym"];
+        /** @description 끝 지급월 YYYYMM(포함) */
+        DeferralTo: components["schemas"]["Ym"];
         /** @description 시작 월 YYYYMM(포함). to와 함께 필수, from ≤ to, 폭 36개월 이하 */
         From: components["schemas"]["Ym"];
         /** @description 끝 월 YYYYMM(포함) */
@@ -466,10 +507,16 @@ export interface operations {
     listDeferrals: {
         parameters: {
             query: {
-                /** @description 시작 월 YYYYMM(포함). to와 함께 필수, from ≤ to, 폭 36개월 이하 */
-                from: components["parameters"]["From"];
-                /** @description 끝 월 YYYYMM(포함) */
-                to: components["parameters"]["To"];
+                /** @description 시작 지급월 YYYYMM(포함). to와 함께 필수, from ≤ to, 폭 84개월 이하(1.1.0 — 분급 타임라인 7년) */
+                from: components["parameters"]["DeferralFrom"];
+                /** @description 유지율 가정 백분율 1~100(1.1.0) — scenario=RETENTION이면 필수, 아니면 주면 400 */
+                p?: string;
+                /** @description 그 설계사의 계약 하나로 월 합계·항목·막대를 낸다(1.1.0 — 모르는 키는 빈 결과) */
+                policyKey?: components["schemas"]["PolicyKey"];
+                /** @description 전망 시나리오(1.1.0, 기본 ALL_INFORCE). RETENTION은 테넌트가 켰을 때만(아니면 400) */
+                scenario?: "ALL_INFORCE" | "RETENTION";
+                /** @description 끝 지급월 YYYYMM(포함) */
+                to: components["parameters"]["DeferralTo"];
             };
             header?: never;
             path?: never;

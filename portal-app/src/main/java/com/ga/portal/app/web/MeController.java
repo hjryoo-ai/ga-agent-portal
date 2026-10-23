@@ -82,7 +82,11 @@ final class MeController {
     @GetMapping("/api/v1/me/deferrals")
     ResponseEntity<DeferralsResponse> deferrals(Caller caller, @RequestParam(name = "from", required = false) String from,
                                                 @RequestParam(name = "to", required = false) String to,
+                                                @RequestParam(name = "scenario", required = false) String scenario,
+                                                @RequestParam(name = "p", required = false) String p,
+                                                @RequestParam(name = "policyKey", required = false) String policyKey,
                                                 @RequestHeader(name = EtagSupport.IF_NONE_MATCH, required = false) String ifNoneMatch) {
-        return EtagSupport.respond(queries.deferrals(caller, from, to), ifNoneMatch);
+        return EtagSupport.respond(queries.deferrals(caller, from, to, Optional.ofNullable(scenario), Optional.ofNullable(p),
+                Optional.ofNullable(policyKey)), ifNoneMatch);
     }
 }

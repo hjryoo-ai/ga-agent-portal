@@ -613,7 +613,9 @@ class EventSchemaTest {
                 .contains("shared/ga-disclosure/events/v1/envelope-core.schema.json", "events/v1/envelope.schema.json",
                         "events/v1/defs.schema.json", "events/v1/payloads/CommissionCalculated.v1.schema.json",
                         "api/v1/engine-internal.openapi.yaml", "api/v1/portal-api.openapi.yaml")
-                .hasSize(1 + 2 + 13 + (1 + 6) + 2);   // 샘플: A-1 스트림 하나 + 단건 6(v1.4 — 07은 a1 seq 11의 실 샘플로), API 둘(Phase 3 — 포털 조회 API)
+                .contains("shared/ga-commission-engine/samples/simulations/index.json")
+                .hasSize(1 + 2 + 13 + (1 + 6) + 2 + 27);   // 샘플: A-1 스트림 하나 + 단건 6(v1.4 — 07은 a1 seq 11의 실 샘플로), API 둘(Phase 3 — 포털 조회 API),
+                                                           // 엔진 시뮬레이션 샘플 27(포털 Phase 5 — 요청·응답 13쌍 + index)
         assertThat(found).isEmpty();
     }
 

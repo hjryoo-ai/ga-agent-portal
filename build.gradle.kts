@@ -260,17 +260,20 @@ tasks.register("printPlatformArtifacts") {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 계약(지시문 v1.2 §5, H4·H5): contracts/는 두 부분이다.
-//  - contracts/shared/ga-disclosure/ : ga-disclosure가 소유한 공유 계약의 사본(지금은 events/v1/envelope-core.schema.json 하나). 고치지 않는다.
-//      전용 CHECKSUMS(평문 SHA-256, sha256sum 형식)와 UPSTREAM(첫 줄 owner/repo@<40자 병합 커밋>, 다음 줄부터 업스트림 contracts/ 기준 파일 목록).
+// 계약(지시문 v1.2 §5, H4·H5 — 포털 Phase 5 P-22에서 업스트림 둘로): contracts/는 두 부분이다.
+//  - contracts/shared/<업스트림>/ : 다른 저장소가 소유한 계약의 사본. 고치지 않는다. 닫힌 목록 SHARED_UPSTREAMS.
+//      ga-disclosure          : 공유 Envelope 핵심(events/v1/envelope-core.schema.json).
+//      ga-commission-engine   : 시뮬레이션 요청·응답 샘플(samples/simulations/ — 포털 Phase 5 Q17, 스텁·E2E의 유일한 엔진 데이터).
+//    디렉터리마다 CHECKSUMS(평문 SHA-256, sha256sum 형식)와 UPSTREAM — 첫 줄 owner/repo@<40자 병합 커밋>[:<계약 디렉터리>](생략하면 contracts —
+//    엔진은 git 루트 밑 commission-system/contracts), 다음 줄부터 그 계약 디렉터리 기준 파일 목록.
 //  - 그 밖(contracts/events/v1, contracts/api/v1): 포털 정본. contracts/CHECKSUMS(같은 형식, shared/ 제외)는 엔진이 사본을 들일 때 대조한다.
-//  - contractChecksums       : 두 CHECKSUMS를 쓴다.
-//  - verifyContractChecksums : 두 CHECKSUMS가 파일과 다르면 실패(오프라인, check에 연결).
+//  - contractChecksums       : CHECKSUMS 셋을 쓴다.
+//  - verifyContractChecksums : CHECKSUMS가 파일과 다르거나 shared/ 디렉터리 집합이 닫힌 목록과 다르면 실패(오프라인, check에 연결).
 //  - verifyUpstreamContract  : shared/ 사본만 UPSTREAM의 커밋과 바이트 대조(네트워크, CI 전용). 엔진처럼 contracts/ 전체를 대조하면 포털 정본이
 //                              업스트림에 없어 실패한다(H4). 사본 파일 집합 = UPSTREAM 목록(닫힌 목록 — 남거나 빠지면 실패).
 // ---------------------------------------------------------------------------------------------
 val contractsDir = layout.projectDirectory.dir("contracts")
-val sharedContractsDir = layout.projectDirectory.dir("contracts/shared/ga-disclosure")
+val SHARED_UPSTREAMS = listOf("ga-commission-engine", "ga-disclosure")
 
 fun contractFiles(dir: File, exclude: (File) -> Boolean = { false }): List<File> = dir.walkTopDown()
     .onEnter { !exclude(it) }
@@ -284,60 +287,70 @@ fun checksumText(dir: File, files: List<File>): String = files
 
 fun ownContractFiles(dir: File) = contractFiles(dir) { it == dir.resolve("shared") }
 
+fun sharedDirs(dir: File): List<File> {
+    val present = dir.resolve("shared").listFiles().orEmpty().filter { it.isDirectory }.map { it.name }.sorted()
+    if (present != SHARED_UPSTREAMS) {
+        throw GradleException("contracts/shared/ 업스트림 디렉터리는 $SHARED_UPSTREAMS 이다: $present")
+    }
+    return SHARED_UPSTREAMS.map { dir.resolve("shared/$it") }
+}
+
 tasks.register("contractChecksums") {
     group = "contracts"
-    description = "Writes contracts/CHECKSUMS (portal-owned files) and contracts/shared/ga-disclosure/CHECKSUMS (sha256sum format, sorted by path)."
+    description = "Writes contracts/CHECKSUMS (portal-owned files) and contracts/shared/<upstream>/CHECKSUMS (sha256sum format, sorted by path)."
     val dir = contractsDir.asFile
-    val shared = sharedContractsDir.asFile
     doLast {
         dir.resolve("CHECKSUMS").writeText(checksumText(dir, ownContractFiles(dir)))
-        shared.resolve("CHECKSUMS").writeText(checksumText(shared, contractFiles(shared)))
+        sharedDirs(dir).forEach { it.resolve("CHECKSUMS").writeText(checksumText(it, contractFiles(it))) }
     }
 }
 
 val verifyContractChecksums = tasks.register("verifyContractChecksums") {
     group = "verification"
-    description = "Fails when contracts/CHECKSUMS or contracts/shared/ga-disclosure/CHECKSUMS is stale."
+    description = "Fails when contracts/CHECKSUMS or a contracts/shared/<upstream>/CHECKSUMS is stale."
     val dir = contractsDir.asFile
-    val shared = sharedContractsDir.asFile
     inputs.dir(dir).withPathSensitivity(PathSensitivity.RELATIVE)
     doLast {
-        listOf(dir to ownContractFiles(dir), shared to contractFiles(shared)).forEach { (d, files) ->
+        (listOf(dir to ownContractFiles(dir)) + sharedDirs(dir).map { it to contractFiles(it) }).forEach { (d, files) ->
             val actual = d.resolve("CHECKSUMS").takeIf { it.exists() }?.readText() ?: ""
             if (checksumText(d, files) != actual) {
                 throw GradleException("${d.relativeTo(rootDir).invariantSeparatorsPath}/CHECKSUMS 가 계약 파일과 다르다. " +
                     "사본(shared/)은 고치지 않는다 — 업스트림에서 다시 받고 ./gradlew contractChecksums 로 갱신하라.")
             }
         }
-        logger.lifecycle("verifyContractChecksums: contracts/CHECKSUMS and contracts/shared/ga-disclosure/CHECKSUMS match")
+        logger.lifecycle("verifyContractChecksums: contracts/CHECKSUMS and contracts/shared/{${SHARED_UPSTREAMS.joinToString(",")}}/CHECKSUMS match")
     }
 }
 tasks.named("check") { dependsOn(verifyContractChecksums) }
 
 tasks.register("verifyUpstreamContract") {
     group = "verification"
-    description = "Compares each file under contracts/shared/ga-disclosure with ga-disclosure at the commit pinned in its UPSTREAM (network, CI)."
-    val shared = sharedContractsDir.asFile
+    description = "Compares each file under contracts/shared/<upstream> with that upstream at the commit pinned in its UPSTREAM (network, CI)."
+    val dir = contractsDir.asFile
     doLast {
-        val lines = shared.resolve("UPSTREAM").readLines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
-        val match = Regex("^([\\w.-]+/[\\w.-]+)@([0-9a-f]{40})$").matchEntire(lines.firstOrNull() ?: "")
-            ?: throw GradleException("contracts/shared/ga-disclosure/UPSTREAM 첫 줄은 owner/repo@<40자 커밋>이어야 한다: ${lines.firstOrNull()}")
-        val (repo, commit) = match.destructured
-        val listed = lines.drop(1).toSortedSet()
-        val present = contractFiles(shared).map { it.relativeTo(shared).invariantSeparatorsPath }.toSortedSet()
-        if (listed != present || listed.isEmpty()) {
-            throw GradleException("사본 파일 집합이 UPSTREAM 목록과 다르다: 목록=$listed, 사본=$present")
-        }
-        listed.forEach { path ->
-            val upstream = java.net.URI("https://raw.githubusercontent.com/$repo/$commit/contracts/$path").toURL().openStream().use { it.readBytes() }
-            val local = shared.resolve(path).readBytes()
-            val up = MessageDigest.getInstance("SHA-256").digest(upstream).joinToString("") { "%02x".format(it) }
-            val copy = sha256(shared.resolve(path))
-            if (up != copy || !upstream.contentEquals(local)) {
-                throw GradleException("contracts/shared/ga-disclosure/$path differs from $repo@$commit:contracts/$path " +
-                    "(copy sha256=$copy, upstream sha256=$up) — 사본을 고치지 말고 업스트림에서 다시 받는다")
+        sharedDirs(dir).forEach { shared ->
+            val name = shared.name
+            val lines = shared.resolve("UPSTREAM").readLines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
+            val match = Regex("^([\\w.-]+/[\\w.-]+)@([0-9a-f]{40})(?::([\\w.-]+(?:/[\\w.-]+)*))?$").matchEntire(lines.firstOrNull() ?: "")
+                ?: throw GradleException("contracts/shared/$name/UPSTREAM 첫 줄은 owner/repo@<40자 커밋>[:<계약 디렉터리>]이어야 한다: ${lines.firstOrNull()}")
+            val (repo, commit, prefixGroup) = match.destructured
+            val prefix = prefixGroup.ifEmpty { "contracts" }
+            val listed = lines.drop(1).toSortedSet()
+            val present = contractFiles(shared).map { it.relativeTo(shared).invariantSeparatorsPath }.toSortedSet()
+            if (listed != present || listed.isEmpty()) {
+                throw GradleException("contracts/shared/$name 사본 파일 집합이 UPSTREAM 목록과 다르다: 목록=$listed, 사본=$present")
             }
-            logger.lifecycle("contracts/shared/ga-disclosure/$path == $repo@$commit:contracts/$path ($up)")
+            listed.forEach { path ->
+                val upstream = java.net.URI("https://raw.githubusercontent.com/$repo/$commit/$prefix/$path").toURL().openStream().use { it.readBytes() }
+                val local = shared.resolve(path).readBytes()
+                val up = MessageDigest.getInstance("SHA-256").digest(upstream).joinToString("") { "%02x".format(it) }
+                val copy = sha256(shared.resolve(path))
+                if (up != copy || !upstream.contentEquals(local)) {
+                    throw GradleException("contracts/shared/$name/$path differs from $repo@$commit:$prefix/$path " +
+                        "(copy sha256=$copy, upstream sha256=$up) — 사본을 고치지 말고 업스트림에서 다시 받는다")
+                }
+                logger.lifecycle("contracts/shared/$name/$path == $repo@$commit:$prefix/$path ($up)")
+            }
         }
     }
 }

@@ -1,15 +1,20 @@
 openapi: 3.1.0
 info:
-  title: ga-agent-portal 조회 API — 설계사 본인 (v1)
-  version: 1.0.0
+  title: ga-agent-portal 조회·시뮬레이션 API — 설계사 본인 (v1)
+  version: 1.1.0
   description: |
     포털이 웹(Phase 4)에 제공하는 조회 API(설계서 §7 v1.6, 포털 Phase 3 지시문 D-5·D-15). 포털 소유 계약 — 웹이 클라이언트를 생성한다.
+    1.1.0(포털 Phase 5, 설계서 §7 v1.8 — 추가·완화뿐, 1.0.0 응답은 1.1.0을 통과한다): 시뮬레이션 POST 둘(엔진 결과 사본의 속성을 그대로 옮기고
+    포털 사실 simId·requestedAt을 더한다 — 금액을 가공하지 않는다), /me/deferrals의 scenario·p·policyKey와 막대 비율(bar)·범위 84개월,
+    /me의 features, 월 응답의 previous(CR-1), 라인의 reversalOfYm·reversedByYm(CR-2), 원장의 ruleVersionId(CR-3)·상품·피보험자(CR-4).
+    Problem.code에 시뮬레이션 거부 여섯. 요청 본문의 금액·횟수는 숫자 문자열(화면이 문자열을 숫자로 바꾸지 않는다 — 서버가 정수로 읽는다).
     인증은 테넌트 IdP의 OIDC 액세스 토큰(Bearer, RS256). 테넌트는 토큰 발급자(iss)로, 설계사·역할은 포털의 identity_link로만 정한다 — 경로·쿼리에 agentId는 없다.
     거부는 같은 바이트: 인증 실패 전부 401 UNAUTHENTICATED(WWW-Authenticate: Bearer), 링크 없음·역할·남의(없는) 자원·없는 경로 전부 404 NOT_FOUND,
     쿼리 파라미터 형식·범위 오류만 400 INVALID_REQUEST. 본문은 application/problem+json {code, message}.
     금액은 정수 원(integer), 비율·배수는 문자열(표시 전용), 날짜·시각·월은 pattern(format을 쓰지 않는다). 증권번호 원문은 어느 응답에도 없다 —
     policyMasked(끝 4자)와 policyKey(배포 비밀의 HMAC 앞 16자 — 비밀을 회전하면 바뀐다. 저장하지 말 것).
-    선택 필드는 값이 없으면 빠진다(null을 보내지 않는다). 모든 200 응답은 약한 ETag, Cache-Control: private, no-cache — If-None-Match가 맞으면 304(본문 없음).
+    선택 필드는 값이 없으면 빠진다(null을 보내지 않는다). 모든 GET 200 응답은 약한 ETag, Cache-Control: private, no-cache — If-None-Match가 맞으면 304(본문 없음).
+    시뮬레이션 POST는 ETag가 없고 Cache-Control: no-store(요청마다 새 결과). 본문은 application/json 2 KiB 이하 — 다른 형식·초과·스키마 오류는 400 한 바이트.
 servers:
   - url: https://portal.invalid
 security:
@@ -124,8 +129,11 @@ paths:
       operationId: listDeferrals
       summary: 분급 전망(지급 예정월별 합과 항목)
       parameters:
-        - {$ref: '#/components/parameters/From'}
-        - {$ref: '#/components/parameters/To'}
+        - {$ref: '#/components/parameters/DeferralFrom'}
+        - {$ref: '#/components/parameters/DeferralTo'}
+        - {name: scenario, in: query, required: false, description: '전망 시나리오(1.1.0, 기본 ALL_INFORCE). RETENTION은 테넌트가 켰을 때만(아니면 400)', schema: {type: string, enum: [ALL_INFORCE, RETENTION]}}
+        - {name: p, in: query, required: false, description: '유지율 가정 백분율 1~100(1.1.0) — scenario=RETENTION이면 필수, 아니면 주면 400', schema: {type: string, pattern: '^([1-9][0-9]?|100)$'}}
+        - {name: policyKey, in: query, required: false, description: '그 설계사의 계약 하나로 월 합계·항목·막대를 낸다(1.1.0 — 모르는 키는 빈 결과)', schema: {$ref: '#/components/schemas/PolicyKey'}}
       responses:
         '200':
           description: 지급월별 예정(SCHEDULED+RELEASED)·보류(HELD) 합과 항목
@@ -166,6 +174,18 @@ components:
       in: query
       required: true
       description: 끝 월 YYYYMM(포함)
+      schema: {$ref: '#/components/schemas/Ym'}
+    DeferralFrom:
+      name: from
+      in: query
+      required: true
+      description: 시작 지급월 YYYYMM(포함). to와 함께 필수, from ≤ to, 폭 84개월 이하(1.1.0 — 분급 타임라인 7년)
+      schema: {$ref: '#/components/schemas/Ym'}
+    DeferralTo:
+      name: to
+      in: query
+      required: true
+      description: 끝 지급월 YYYYMM(포함)
       schema: {$ref: '#/components/schemas/Ym'}
   responses:
     NotModified:
@@ -225,6 +245,13 @@ components:
         grade: {type: string}
         orgPath: {type: string}
         status: {type: string, enum: [ACTIVE, DISMISSED]}
+        features:
+          type: object
+          additionalProperties: false
+          required: [forecastScenario]
+          description: 테넌트가 켠 화면 기능(1.1.0)
+          properties:
+            forecastScenario: {type: boolean, description: 분급 타임라인의 유지율 시나리오(RETENTION)를 쓸 수 있다}
         tenant:
           type: object
           additionalProperties: false
@@ -291,6 +318,17 @@ components:
         paidAmount: {$ref: '#/components/schemas/Won'}
         paidAt: {$ref: '#/components/schemas/Instant'}
         payoutExpectedOn: {$ref: '#/components/schemas/Date', description: '테넌트 지급일 규칙(NEXT_MONTH_D{n}) — 형식이 다르거나 그 날이 없으면 생략'}
+        previous:
+          type: object
+          additionalProperties: false
+          required: [closeYm, status, gross]
+          description: 지난달 행의 값(1.1.0, CR-1 — 그 달의 상태 그대로, 차감하지 않는다). 지난달 행이 없으면 생략
+          properties:
+            closeYm: {$ref: '#/components/schemas/Ym'}
+            status: {$ref: '#/components/schemas/MonthStatus'}
+            gross: {$ref: '#/components/schemas/Won'}
+            net: {$ref: '#/components/schemas/Won'}
+            netBasis: {$ref: '#/components/schemas/NetBasis'}
     Line:
       type: object
       additionalProperties: false
@@ -309,6 +347,8 @@ components:
         policyKey: {$ref: '#/components/schemas/PolicyKey'}
         reversalOf: {$ref: '#/components/schemas/Key'}
         reversedBy: {$ref: '#/components/schemas/Key'}
+        reversalOfYm: {$ref: '#/components/schemas/Ym', description: reversalOf 라인의 마감월(1.1.0, CR-2)}
+        reversedByYm: {$ref: '#/components/schemas/Ym', description: reversedBy 라인의 마감월(1.1.0, CR-2)}
     LinesResponse:
       type: object
       additionalProperties: false
@@ -387,6 +427,10 @@ components:
         cutTotal: {$ref: '#/components/schemas/NonNegativeWon'}
         deferredTotal: {$ref: '#/components/schemas/NonNegativeWon'}
         flags: {type: array, items: {type: string, enum: [CANCELLED, LAPSED, OVERDUE, REDUCED]}}
+        ruleVersionId: {type: string, minLength: 1, description: 원장을 연 한도 룰 버전(1.1.0, CR-3)}
+        productKey: {type: string, description: 그 계약의 첫 라인의 상품 키(1.1.0, CR-4)}
+        productName: {type: string}
+        insuredMasked: {type: string}
     LimitsResponse:
       type: object
       additionalProperties: false
@@ -429,6 +473,8 @@ components:
         dataStatus: {$ref: '#/components/schemas/DataStatus'}
         from: {$ref: '#/components/schemas/Ym'}
         to: {$ref: '#/components/schemas/Ym'}
+        scenario: {type: string, enum: [ALL_INFORCE, RETENTION], description: 응답에 쓰인 시나리오(1.1.0 — 언제나 있다)}
+        p: {type: integer, minimum: 1, maximum: 100, description: RETENTION의 유지율 가정(1.1.0)}
         months:
           type: array
           items:
@@ -437,8 +483,17 @@ components:
             required: [dueYm, expected, held]
             properties:
               dueYm: {$ref: '#/components/schemas/Ym'}
-              expected: {$ref: '#/components/schemas/Won', description: Σ SCHEDULED + RELEASED}
-              held: {$ref: '#/components/schemas/Won', description: Σ HELD}
+              expected: {$ref: '#/components/schemas/Won', description: 'Σ SCHEDULED + RELEASED. RETENTION이면 floor(expectedBase × p / 100) — 포털의 유일한 금액 곱셈(설계서 §6.4)'}
+              held: {$ref: '#/components/schemas/Won', description: Σ HELD(시나리오와 무관 — 원값)}
+              expectedBase: {$ref: '#/components/schemas/Won', description: RETENTION일 때 적용 전 예정(1.1.0)}
+              bar:
+                type: object
+                additionalProperties: false
+                required: [expected, held]
+                description: '막대 너비(1.1.0) — 값 / 범위 안 max(expected + held). max ≤ 0이면 생략'
+                properties:
+                  expected: {$ref: '#/components/schemas/Percent'}
+                  held: {$ref: '#/components/schemas/Percent'}
         items:
           type: array
           items:

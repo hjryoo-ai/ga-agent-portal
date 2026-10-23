@@ -9,6 +9,9 @@ import com.ga.portal.domain.view.LedgerItem;
 import com.ga.portal.domain.view.LineDetail;
 import com.ga.portal.domain.view.LineItem;
 import com.ga.portal.domain.view.LinePage;
+import com.ga.portal.domain.MonthStatus;
+import com.ga.portal.domain.NetBasis;
+import com.ga.portal.domain.view.MonthDetail;
 import com.ga.portal.domain.view.MonthRow;
 import com.ga.portal.domain.view.ReceivableRow;
 import org.springframework.jdbc.core.RowMapper;
@@ -37,10 +40,12 @@ public class AgentQueryRepository extends ViewRepository {
     private static final RowMapper<LineItem> LINE = (rs, n) -> new LineItem(rs.getString("calc_id"), rs.getString("close_ym"),
             rs.getString("comm_type"), rs.getLong("amount"), rs.getLong("limit_cut_amt"), optString(rs, "limit_cut_policy"),
             optString(rs, "product_key"), optString(rs, "product_name"), optString(rs, "insured_masked"), rs.getString("policy_no"),
-            optString(rs, "reversal_of_calc_id"), optString(rs, "reversed_by"), rs.getLong("source_seq"));
+            optString(rs, "reversal_of_calc_id"), optString(rs, "reversed_by"), optString(rs, "reversal_of_ym"), optString(rs, "reversed_by_ym"),
+            rs.getLong("source_seq"));
 
     private static final RowMapper<LedgerItem> LEDGER = (rs, n) -> new LedgerItem(PolicyLimitRepository.MAPPER.mapRow(rs, n), rs.getLong("remaining"),
-            optString(rs, "open_flags").map(s -> List.of(s.split(","))).orElse(List.of()));
+            optString(rs, "open_flags").map(s -> List.of(s.split(","))).orElse(List.of()), optString(rs, "product_key"), optString(rs, "product_name"),
+            optString(rs, "insured_masked"));
 
     public AgentQueryRepository(TenantJdbcGateway gateway) {
         super(gateway);
@@ -79,6 +84,27 @@ public class AgentQueryRepository extends ViewRepository {
                 """, agent(agentId, "closeYm", closeYm), EarningsMonthRepository.MAPPER);
     }
 
+    /**
+     * 월 상세 — 그 달 행과 지난달 행의 값 넷(포털 Phase 5 CR-1, 같은 문장의 {@code LEFT JOIN} — 문장 수가 그대로다). 지난달 행이 없으면 {@code previous}가 비어 있다.
+     */
+    public Optional<MonthDetail> monthDetail(String agentId, String closeYm, String previousYm) {
+        return queryAtMostOne("""
+                SELECT m.agent_id, m.close_ym, m.gross, m.clawback_offset, m.adjustment, m.withholding_tax, m.net, m.status, m.data_status, m.estimate_as_of,
+                       m.estimate_basis_seq, m.confirmed_at, m.paid_at, m.paid_amount, m.receivable_offset, m.carried_receivable, m.payable, m.run_seq,
+                       m.net_basis, m.last_seq,
+                       pm.close_ym AS prev_close_ym, pm.status AS prev_status, pm.gross AS prev_gross, pm.net AS prev_net, pm.net_basis AS prev_net_basis
+                  FROM earnings_month m
+                  LEFT JOIN earnings_month pm ON pm.tenant_id = :tenantId AND pm.agent_id = :agentId AND pm.close_ym = :previousYm
+                 WHERE m.tenant_id = :tenantId AND m.agent_id = :agentId AND m.close_ym = :closeYm
+                """, agent(agentId, "closeYm", closeYm, "previousYm", previousYm), (rs, n) -> {
+            Optional<String> prevYm = optString(rs, "prev_close_ym");
+            Optional<MonthDetail.Previous> previous = prevYm.isEmpty() ? Optional.empty()
+                    : Optional.of(new MonthDetail.Previous(prevYm.get(), MonthStatus.valueOf(rs.getString("prev_status")), rs.getLong("prev_gross"),
+                            optLong(rs, "prev_net"), optString(rs, "prev_net_basis").map(NetBasis::valueOf)));
+            return new MonthDetail(EarningsMonthRepository.MAPPER.mapRow(rs, n), previous);
+        });
+    }
+
     /** 그 달 라인의 유형별 정수 합(유형 이름순). */
     public Map<String, Long> byType(String agentId, String closeYm) {
         Map<String, Long> out = new LinkedHashMap<>();
@@ -101,6 +127,11 @@ public class AgentQueryRepository extends ViewRepository {
                        l.reversal_of_calc_id,
                        (SELECT min(r.calc_id) FROM earnings_line r
                          WHERE r.tenant_id = :tenantId AND r.agent_id = :agentId AND r.reversal_of_calc_id = l.calc_id) AS reversed_by,
+                       (SELECT o.close_ym FROM earnings_line o
+                         WHERE o.tenant_id = :tenantId AND o.agent_id = :agentId AND o.calc_id = l.reversal_of_calc_id) AS reversal_of_ym,
+                       (SELECT r.close_ym FROM earnings_line r
+                         WHERE r.tenant_id = :tenantId AND r.agent_id = :agentId AND r.reversal_of_calc_id = l.calc_id
+                         ORDER BY r.calc_id LIMIT 1) AS reversed_by_ym,
                        l.source_seq
                   FROM earnings_line l
                  WHERE l.tenant_id = :tenantId AND l.agent_id = :agentId AND l.close_ym = :closeYm
@@ -135,6 +166,11 @@ public class AgentQueryRepository extends ViewRepository {
                        l.reversal_of_calc_id,
                        (SELECT min(r.calc_id) FROM earnings_line r
                          WHERE r.tenant_id = :tenantId AND r.agent_id = :agentId AND r.reversal_of_calc_id = l.calc_id) AS reversed_by,
+                       (SELECT o.close_ym FROM earnings_line o
+                         WHERE o.tenant_id = :tenantId AND o.agent_id = :agentId AND o.calc_id = l.reversal_of_calc_id) AS reversal_of_ym,
+                       (SELECT r.close_ym FROM earnings_line r
+                         WHERE r.tenant_id = :tenantId AND r.agent_id = :agentId AND r.reversal_of_calc_id = l.calc_id
+                         ORDER BY r.calc_id LIMIT 1) AS reversed_by_ym,
                        l.source_seq,
                        l.basis->>'rate' AS rate, l.basis->>'payoutRate' AS payout_rate, l.basis->>'installmentNo' AS installment_no,
                        array_to_string(ARRAY(SELECT e FROM jsonb_array_elements_text(l.basis->'ruleVersionIds') WITH ORDINALITY AS t(e, i) ORDER BY i),
@@ -169,14 +205,24 @@ public class AgentQueryRepository extends ViewRepository {
                 """, agent(agentId, "policyNo", policyNo), (rs, n) -> rs.getString("ledger_id"));
     }
 
-    /** 원장 전부 + 남은 한도 + 열린 플래그(한 문장 — 원장 수와 무관, C13). 원장 ID 순(길이, 사전). */
+    /**
+     * 원장 전부 + 남은 한도 + 열린 플래그 + 그 계약의 첫 라인({@code source_seq, calc_id} 최소)의 상품·피보험자(포털 Phase 5 CR-4) — 한 문장(원장 수와 무관, C13).
+     * 원장 ID 순(길이, 사전).
+     */
     public List<LedgerItem> ledgers(String agentId) {
         return query("""
                 SELECT p.ledger_id, p.agent_id, p.policy_no, p.contract_date, p.fy_start, p.fy_end, p.monthly_premium, p.limit_multiple, p.limit_amount,
                        p.accum_paid, p.cut_total, p.deferred_total, p.last_posting_seq, p.rule_version_id, p.limit_amount - p.accum_paid AS remaining,
                        (SELECT string_agg(f.flag_type, ',' ORDER BY f.flag_type) FROM policy_flag f
-                         WHERE f.tenant_id = :tenantId AND f.agent_id = :agentId AND f.policy_no = p.policy_no AND f.cleared_at IS NULL) AS open_flags
-                  FROM policy_limit p WHERE p.tenant_id = :tenantId AND p.agent_id = :agentId
+                         WHERE f.tenant_id = :tenantId AND f.agent_id = :agentId AND f.policy_no = p.policy_no AND f.cleared_at IS NULL) AS open_flags,
+                       fl.product_key, fl.product_name, fl.insured_masked
+                  FROM policy_limit p
+                  LEFT JOIN LATERAL (SELECT l.product_key, l.policy_summary->>'productName' AS product_name,
+                                            l.policy_summary->>'insuredMasked' AS insured_masked
+                                       FROM earnings_line l
+                                      WHERE l.tenant_id = :tenantId AND l.agent_id = :agentId AND l.policy_no = p.policy_no
+                                      ORDER BY l.source_seq, l.calc_id LIMIT 1) fl ON true
+                 WHERE p.tenant_id = :tenantId AND p.agent_id = :agentId
                  ORDER BY length(p.ledger_id), p.ledger_id
                 """, agent(agentId), LEDGER);
     }
@@ -186,8 +232,15 @@ public class AgentQueryRepository extends ViewRepository {
                 SELECT p.ledger_id, p.agent_id, p.policy_no, p.contract_date, p.fy_start, p.fy_end, p.monthly_premium, p.limit_multiple, p.limit_amount,
                        p.accum_paid, p.cut_total, p.deferred_total, p.last_posting_seq, p.rule_version_id, p.limit_amount - p.accum_paid AS remaining,
                        (SELECT string_agg(f.flag_type, ',' ORDER BY f.flag_type) FROM policy_flag f
-                         WHERE f.tenant_id = :tenantId AND f.agent_id = :agentId AND f.policy_no = p.policy_no AND f.cleared_at IS NULL) AS open_flags
-                  FROM policy_limit p WHERE p.tenant_id = :tenantId AND p.agent_id = :agentId AND p.ledger_id = :ledgerId
+                         WHERE f.tenant_id = :tenantId AND f.agent_id = :agentId AND f.policy_no = p.policy_no AND f.cleared_at IS NULL) AS open_flags,
+                       fl.product_key, fl.product_name, fl.insured_masked
+                  FROM policy_limit p
+                  LEFT JOIN LATERAL (SELECT l.product_key, l.policy_summary->>'productName' AS product_name,
+                                            l.policy_summary->>'insuredMasked' AS insured_masked
+                                       FROM earnings_line l
+                                      WHERE l.tenant_id = :tenantId AND l.agent_id = :agentId AND l.policy_no = p.policy_no
+                                      ORDER BY l.source_seq, l.calc_id LIMIT 1) fl ON true
+                 WHERE p.tenant_id = :tenantId AND p.agent_id = :agentId AND p.ledger_id = :ledgerId
                 """, agent(agentId, "ledgerId", ledgerId), LEDGER);
     }
 
@@ -204,23 +257,38 @@ public class AgentQueryRepository extends ViewRepository {
                 rs.getLong("limit_after"), optString(rs, "reason"), instant(rs, "occurred_at")));
     }
 
-    public List<DeferralRow> deferrals(String agentId, String fromYm, String toYm) {
+    /** 분급 항목 — {@code policyNo}가 있으면 그 계약만(유스케이스가 {@code policyKey}를 그 설계사의 증권번호 집합에서 푼 원문). */
+    public List<DeferralRow> deferrals(String agentId, String fromYm, String toYm, Optional<String> policyNo) {
         return query("""
                 SELECT schedule_id, agent_id, policy_no, source_calc_id, due_ym, amount, pay_condition, status, reason, curve_version_id, status_reason, last_seq
                   FROM deferral_item WHERE tenant_id = :tenantId AND agent_id = :agentId AND due_ym BETWEEN :fromYm AND :toYm
+                   AND (CAST(:policyNo AS text) IS NULL OR policy_no = :policyNo)
                  ORDER BY due_ym, schedule_id
-                """, agent(agentId, "fromYm", fromYm, "toYm", toYm), DeferralItemRepository.MAPPER);
+                """, agent(agentId, "fromYm", fromYm, "toYm", toYm, "policyNo", policyNo.orElse(null)), DeferralItemRepository.MAPPER);
     }
 
-    /** 지급월별 정수 합(설계서 §6.4): 예정 = SCHEDULED + RELEASED, 보류 = HELD. 취소분은 어느 쪽에도 없다. */
-    public List<DueMonth> dueMonths(String agentId, String fromYm, String toYm) {
+    /** 그 설계사의 분급 항목 증권번호 집합 — {@code policyKey} 필터를 풀 때만(포털 Phase 5 Q15). */
+    public Set<String> deferralPolicies(String agentId) {
+        return new LinkedHashSet<>(query("""
+                SELECT DISTINCT policy_no
+                  FROM deferral_item WHERE tenant_id = :tenantId AND agent_id = :agentId
+                 ORDER BY policy_no
+                """, agent(agentId), (rs, n) -> rs.getString("policy_no")));
+    }
+
+    /**
+     * 지급월별 정수 합(설계서 §6.4): 예정 = SCHEDULED + RELEASED, 보류 = HELD. 취소분은 어느 쪽에도 없다. 값은 원값이다 — 시나리오(RETENTION)는 유스케이스의
+     * {@code ForecastScenario}가 적용한다(SQL에 곱셈 없음 — {@code SqlArithmeticScanTest}).
+     */
+    public List<DueMonth> dueMonths(String agentId, String fromYm, String toYm, Optional<String> policyNo) {
         return query("""
                 SELECT due_ym,
                        coalesce(sum(amount) FILTER (WHERE status IN ('SCHEDULED', 'RELEASED')), 0)::bigint AS expected,
                        coalesce(sum(amount) FILTER (WHERE status = 'HELD'), 0)::bigint AS held
                   FROM deferral_item WHERE tenant_id = :tenantId AND agent_id = :agentId AND due_ym BETWEEN :fromYm AND :toYm
+                   AND (CAST(:policyNo AS text) IS NULL OR policy_no = :policyNo)
                  GROUP BY due_ym ORDER BY due_ym
-                """, agent(agentId, "fromYm", fromYm, "toYm", toYm), (rs, n) -> new DueMonth(rs.getString("due_ym"), rs.getLong("expected"),
+                """, agent(agentId, "fromYm", fromYm, "toYm", toYm, "policyNo", policyNo.orElse(null)), (rs, n) -> new DueMonth(rs.getString("due_ym"), rs.getLong("expected"),
                 rs.getLong("held")));
     }
 }
