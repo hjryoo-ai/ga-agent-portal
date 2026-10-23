@@ -251,7 +251,6 @@
     "insurerCd": "보험사 코드",
     "insurerNeeded": "같은 상품 키를 가진 보험사가 둘 이상입니다 — 보험사 코드를 입력해 주세요",
     "policy": "계약",
-    "policyChoose": "계약을 고르세요",
     "eventType": "변경 유형",
     "asOfDate": "기준일",
     "elapsedInstallments": "경과 회차(선택)",

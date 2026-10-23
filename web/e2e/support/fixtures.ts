@@ -80,7 +80,8 @@ export const test = base.extend<{ portal: Portal; watch: Watch }>({
       const w: Watch = { console: [], bodies: [], urls: [], requestUrls: [], external: [], doms: 0, axe: [], opened: new Set() };
       await page.addInitScript((mark) => {
         document.addEventListener('securitypolicyviolation', (ev) => {
-          console.log(`${mark} ${ev.violatedDirective} ${ev.blockedURI}`);
+          // 위반한 요소의 이름도 싣는다(어느 요소가 막혔는지 — Phase 5에서 WebKit <select>를 찾는 데 이것이 없었다)
+          console.log(`${mark} ${ev.violatedDirective} ${ev.blockedURI} ${ev.target instanceof Element ? ev.target.tagName.toLowerCase() : '-'}`);
         });
       }, CSP_MARK);
       page.on('console', (m) => w.console.push(m.text()));

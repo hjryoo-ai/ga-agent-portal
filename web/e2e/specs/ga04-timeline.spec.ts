@@ -25,7 +25,8 @@ test('12개월·84개월, 보류 범례, 막대 = API 문자열, 계약 필터',
   const bars = page.getByTestId('timeline-bar');
   expect([await cssVar(bars.nth(0), '--bar-expected'), await cssVar(bars.nth(0), '--bar-held')]).toEqual(['100.0%', '0.0%']);
   expect([await cssVar(bars.nth(1), '--bar-expected'), await cssVar(bars.nth(1), '--bar-held')]).toEqual(['0.0%', '100.0%']);
-  await expect(bars.nth(1)).toHaveAccessibleName('2027년 9월 0원분급 예정 40,000원보류');
+  // 접근 이름은 표의 세 칸을 이은 것 — 브라우저가 칸 사이·금액과 라벨 사이에 공백을 넣는다
+  await expect(bars.nth(1)).toHaveAccessibleName('2027년 9월 0원 분급 예정 40,000원 보류');
   await expect(page.getByTestId('timeline-item')).toHaveText([/예정/, /보류/]);
   await portal.check('ga04 timeline 12');
 
@@ -35,9 +36,9 @@ test('12개월·84개월, 보류 범례, 막대 = API 문자열, 계약 필터',
   await expect(page.getByText('2034년 1월')).toHaveCount(0);
   await portal.check('ga04 timeline 84');
 
-  await page.getByTestId('timeline-policy').selectOption({ label: 'TERM-10Y · *********0001' });
+  await page.getByTestId('timeline-policy').getByRole('button', { name: 'TERM-10Y · *********0001' }).click();
   await expect(page.getByTestId('timeline-empty')).toHaveText('이 기간에 분급 예정이 없습니다');
-  await page.getByTestId('timeline-policy').selectOption({ label: 'TERM-10Y · *********0002' });
+  await page.getByTestId('timeline-policy').getByRole('button', { name: 'TERM-10Y · *********0002' }).click();
   await expect(rows).toHaveCount(5);
 });
 

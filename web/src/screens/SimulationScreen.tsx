@@ -20,6 +20,7 @@ import { EVENT_TYPES } from '../sim/eventTypes';
 import { takePolicy } from '../sim/handoff';
 import { dateAt, formatAt, ymParts } from '../time/kst';
 import { useNow } from '../time/useNow';
+import { Choices } from '../ui/Choices';
 import { policyOptions } from '../ui/policyOptions';
 
 type Tab = 'new' | 'event';
@@ -54,16 +55,21 @@ export function errorText(error: Error): string {
   }
 }
 
+function FieldError({ name, label, problem }: { name: string; label: string; problem: FieldProblem | undefined }) {
+  if (problem === undefined) return null;
+  return (
+    <span className="field__error" data-testid={`error-${name}`}>
+      {fill(problem === 'required' ? m.simulation.required : m.simulation.invalid, { field: label })}
+    </span>
+  );
+}
+
 function Field({ name, label, problem, children }: { name: string; label: string; problem: FieldProblem | undefined; children: ReactNode }) {
   return (
     <label className="field" data-testid={`field-${name}`}>
       <span>{label}</span>
       {children}
-      {problem === undefined ? null : (
-        <span className="field__error" data-testid={`error-${name}`}>
-          {fill(problem === 'required' ? m.simulation.required : m.simulation.invalid, { field: label })}
-        </span>
-      )}
+      <FieldError name={name} label={label} problem={problem} />
     </label>
   );
 }
@@ -119,6 +125,11 @@ export function NewContractResult({ result }: { result: SimNewContractResponse }
           ))}
         </tbody>
       </table>
+      {present(result.limitAmount) || present(result.projectedAccum) ? null : (
+        <p className="note" data-testid="sim-no-limit">
+          {m.simulation.noLimit}
+        </p>
+      )}
       <dl className="rows" data-testid="sim-limit">
         {present(result.limitAmount) ? (
           <Row name={m.simulation.limitAmount} testId="sim-limit-amount">
@@ -130,7 +141,6 @@ export function NewContractResult({ result }: { result: SimNewContractResponse }
             <Amount value={result.projectedAccum} label={label} />
           </Row>
         ) : null}
-        {present(result.limitAmount) || present(result.projectedAccum) ? null : <p className="note">{m.simulation.noLimit}</p>}
       </dl>
       <h3>{m.simulation.incentives}</h3>
       <ul className="items" data-testid="sim-incentives">
@@ -336,29 +346,24 @@ function PolicyEventForm({ today, handedOff }: { today: string; handedOff: strin
   return (
     <>
       <form className="form" noValidate onSubmit={submit} data-testid="form-event">
-        <Field name="policyKey" label={m.simulation.policy} problem={form.problems['policyKey']}>
-          <select value={form.values['policyKey']} onChange={(e) => {
-              form.set('policyKey')(e.target.value);
-            }}>
-            <option value="">{m.simulation.policyChoose}</option>
-            {options.map((o) => (
-              <option key={o.key} value={o.key}>
-                {o.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field name="eventType" label={m.simulation.eventType} problem={form.problems['eventType']}>
-          <select value={form.values['eventType']} onChange={(e) => {
-              form.set('eventType')(e.target.value);
-            }}>
-            {EVENT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {m.enums.eventType[t]}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <Choices
+          label={m.simulation.policy}
+          options={options.map((o) => ({ value: o.key, name: o.name }))}
+          value={form.values['policyKey'] ?? ''}
+          onChange={form.set('policyKey')}
+          testId="field-policyKey"
+        >
+          <FieldError name="policyKey" label={m.simulation.policy} problem={form.problems['policyKey']} />
+        </Choices>
+        <Choices
+          label={m.simulation.eventType}
+          options={EVENT_TYPES.map((t) => ({ value: t, name: m.enums.eventType[t] }))}
+          value={form.values['eventType'] ?? ''}
+          onChange={form.set('eventType')}
+          testId="field-eventType"
+        >
+          <FieldError name="eventType" label={m.simulation.eventType} problem={form.problems['eventType']} />
+        </Choices>
         <Field name="asOfDate" label={m.simulation.asOfDate} problem={form.problems['asOfDate']}>
           <input type="date" value={form.values['asOfDate']} onChange={(e) => {
               form.set('asOfDate')(e.target.value);

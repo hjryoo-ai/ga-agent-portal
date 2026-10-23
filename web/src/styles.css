@@ -566,6 +566,10 @@ a {
   font-weight: 600;
 }
 
+.segmented--wrap {
+  flex-wrap: wrap;
+}
+
 .rows--pair {
   display: grid;
   grid-template-columns: 1fr 1fr;

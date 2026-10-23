@@ -25,6 +25,7 @@ async function expectNewContract(page: Page, name: string) {
   await expect(result.getByTestId('sim-installments').locator('tr')).toHaveCount(s.fyCommissionByInstallment.length);
   if (s.limitAmount === undefined) {
     await expect(result.getByTestId('sim-limit-amount')).toHaveCount(0);
+    await expect(result.getByTestId('sim-no-limit')).toHaveText('한도 원장 대상 아님');
   } else {
     await expect(result.getByTestId('sim-limit-amount')).toHaveText(`한도액${wonText(s.limitAmount)}시뮬레이션`);
   }
@@ -61,8 +62,9 @@ test('해약 영향 S5·S6 — 한도 상세에서 그 계약이 골라진 채�
   await expect(page).toHaveURL(/\/simulations$/);
   await expect(page.getByTestId('tab-event')).toHaveAttribute('aria-selected', 'true');
   const form = page.getByTestId('form-event');
-  await expect(form.getByTestId('field-policyKey').locator('select')).not.toHaveValue('');
-  await expect(form.getByTestId('field-eventType').locator('option')).toHaveText(['해약', '실효', '청약 철회', '감액', '부활']);
+  await expect(form.getByTestId('field-policyKey').locator('button[aria-pressed="true"]')).toHaveCount(1);
+  await expect(form.getByTestId('field-eventType').getByRole('button')).toHaveText(['해약', '실효', '청약 철회', '감액', '부활']);
+  await expect(form.getByTestId('field-eventType').getByRole('button', { name: '해약' })).toHaveAttribute('aria-pressed', 'true');
   for (const [name, elapsed] of [
     ['event-cancel-7', '7'],
     ['event-cancel-6', '6'],

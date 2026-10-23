@@ -310,6 +310,7 @@
 | P5-11 | C4 S6 "키를 테넌트 전체 집합에서" | `policies()`의 설계사 술어를 무력화(`agent_id = :agentId OR true`) | 테넌트 전체 문장을 새로 쓰면 정적 스캔(`TenantPredicateScanTest` — 문장 수·설계사 술어)이 먼저 잡아 통합 시험에 닿지 않는다. 술어 글자는 남기고 뜻만 지워 행동 시험(`SimulationAuthzIT`)을 증거로 했다 — 두 겹 |
 | P5-12 | ⑨ S8 "422 S11 시나리오와 함께(GA02)" | S8 API 요청은 **GA01** 명세 | `policyKey`는 그 설계사의 라인 증권번호 집합에서만 풀린다 — 엔진 샘플의 `POL-2026-0001` 라인은 GA01(A-1)에 있다 |
 | P5-13 | (계획에 없음) | `CLAUDE.md` 화면 규약 "경로·쿼리에 `policyKey` 금지" → "**화면 주소**(경로·쿼리)에" | 승인된 Q15가 API 쿼리 `policyKey`를 더했다 — 규칙의 대상(화면 주소)을 글자로 밝혔을 뿐 뜻은 같다(`rule-file-corrections`) |
+| P5-15 | ⑧ 계약 필터·계약 선택·변경 유형(목록 고르기) | `<select>` 대신 **누름 상태 버튼 묶음**(`ui/Choices.tsx` — 기간 고르기와 같은 모양) | 첫 E2E에서 WebKit(mobile-ios)만 `style-src-attr` CSP 위반을 냈다 — 화면의 select 수만큼(타임라인 1·시뮬레이션 2), select가 없는 화면은 0. CSP는 넓히지 않고 요소를 바꿨다. E2E의 CSP 표식 줄에 위반 요소 이름을 더했다 |
 | P5-14 | (계획에 없음) | 시뮬레이션 타임아웃 설정에 환경 자리(`PORTAL_SIM_CONNECT_TIMEOUT`·`PORTAL_SIM_READ_TIMEOUT`) | `docs/운영.md` §6 — Spring 완화 바인딩의 이름(`…READTIMEOUT`)에 기대지 않는다 |
 
 ### 결정 (설계서 v1.8)

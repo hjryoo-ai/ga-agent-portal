@@ -10,6 +10,7 @@ import { present } from '../money/won';
 import { validRetention } from '../sim/rules';
 import { ymAt, ymParts, ymShift } from '../time/kst';
 import { useNow } from '../time/useNow';
+import { Choices } from '../ui/Choices';
 import { policyOptions } from '../ui/policyOptions';
 import { Loading } from '../ui/States';
 
@@ -133,19 +134,13 @@ export function TimelineScreen() {
           </button>
         ))}
       </div>
-      <label className="field">
-        <span>{m.timeline.policy}</span>
-        <select value={policyKey} data-testid="timeline-policy" onChange={(e) => {
-            setPolicyKey(e.target.value);
-          }}>
-          <option value="">{m.timeline.policyAll}</option>
-          {options.map((o) => (
-            <option key={o.key} value={o.key}>
-              {o.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <Choices
+        label={m.timeline.policy}
+        options={[{ value: '', name: m.timeline.policyAll }, ...options.map((o) => ({ value: o.key, name: o.name }))]}
+        value={policyKey}
+        onChange={setPolicyKey}
+        testId="timeline-policy"
+      />
       {scenarioAvailable ? (
         <div className="field" data-testid="timeline-scenario">
           <div className="segmented" role="group" aria-label={m.timeline.scenario}>

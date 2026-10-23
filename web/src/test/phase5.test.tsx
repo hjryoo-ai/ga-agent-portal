@@ -211,11 +211,12 @@ describe('timeline', () => {
     await waitFor(() => {
       expect(net.calls.map((c) => c.url)).toContain('/api/v1/me/deferrals?from=202702&to=203401');
     });
-    const select = screen.getByTestId<HTMLSelectElement>('timeline-policy');
+    const group = screen.getByTestId('timeline-policy');
     await waitFor(() => {
-      expect([...select.options].map((o) => o.textContent)).toEqual(['전체 계약', '종신20 · *********0001']);
+      expect(within(group).getAllByRole('button').map((o) => o.textContent)).toEqual(['전체 계약', '종신20 · *********0001']);
     });
-    fireEvent.change(select, { target: { value: KEY } });
+    expect(within(group).getByRole('button', { name: '전체 계약' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(within(group).getByRole('button', { name: '종신20 · *********0001' }));
     expect((await screen.findByTestId('timeline-empty')).textContent).toBe('이 기간에 분급 예정이 없습니다');
   });
 });
@@ -312,19 +313,27 @@ describe('simulation', () => {
     const { container } = show('/simulations', '/simulations', <SimulationScreen />);
     fireEvent.click(screen.getByTestId('tab-event'));
     const form = screen.getByTestId('form-event');
-    const type = within(form).getByTestId('field-eventType').querySelector('select');
-    expect([...(type?.options ?? [])].map((o) => o.value)).toEqual(['CANCEL', 'LAPSE', 'WITHDRAW', 'REDUCE', 'REINSTATE']);
-    const policy = within(form).getByTestId('field-policyKey').querySelector('select');
+    const types = within(within(form).getByTestId('field-eventType')).getAllByRole('button');
+    expect(types.map((o) => o.getAttribute('data-value'))).toEqual(['CANCEL', 'LAPSE', 'WITHDRAW', 'REDUCE', 'REINSTATE']);
+    expect(types.map((o) => o.textContent)).toEqual(['해약', '실효', '청약 철회', '감액', '부활']);
+    const policy = within(form).getByTestId('field-policyKey');
+    // 고르지 않고 보내면 필수 오류
+    fireEvent.submit(form);
+    expect(screen.getByTestId('error-policyKey').textContent).toBe('계약을(를) 입력해 주세요');
     await waitFor(() => {
-      expect(policy?.options).toHaveLength(2);
+      expect(within(policy).getAllByRole('button')).toHaveLength(1);
     });
-    if (policy === null || type === null) throw new Error('form');
-    fireEvent.change(policy, { target: { value: KEY } });
-    fireEvent.change(type, { target: { value: 'REDUCE' } });
+    fireEvent.click(within(policy).getByRole('button'));
+    const pick = (value: string) => {
+      const button = types.find((b) => b.getAttribute('data-value') === value);
+      if (button === undefined) throw new Error(value);
+      fireEvent.click(button);
+    };
+    pick('REDUCE');
     fireEvent.submit(form);
     expect(screen.getByTestId('error-newMonthlyPremium').textContent).toBe('감액 뒤 월납(원)을(를) 입력해 주세요');
     expect(posted(EVENT)).toEqual([]);
-    fireEvent.change(type, { target: { value: 'CANCEL' } });
+    pick('CANCEL');
     fireEvent.change(within(form).getByTestId('field-elapsedInstallments').querySelector('input') as HTMLInputElement, { target: { value: '7' } });
     fireEvent.submit(form);
     const result = await screen.findByTestId('sim-result-event');
@@ -359,14 +368,14 @@ describe('hand-off and home', () => {
     fireEvent.click(screen.getByTestId('entry-impact'));
     expect((await screen.findByTestId('tab-event')).getAttribute('aria-selected')).toBe('true');
     await waitFor(() => {
-      expect(within(screen.getByTestId('form-event')).getByTestId('field-policyKey').querySelector('select')?.value).toBe(KEY);
+      expect(within(screen.getByTestId('form-event')).getByTestId('field-policyKey').querySelector('[aria-pressed="true"]')?.getAttribute('data-value')).toBe(KEY);
     });
     expect(net.calls.every((c) => !c.url.startsWith('/simulations'))).toBe(true);
     cleanup();
     // 두 번째 진입은 빈 폼(한 번 읽으면 비운다)
     show('/simulations', '/simulations', <SimulationScreen />);
     expect(screen.getByTestId('tab-new').getAttribute('aria-selected')).toBe('true');
-    expect(within(screen.getByTestId('form-event')).getByTestId('field-policyKey').querySelector('select')?.value).toBe('');
+    expect(within(screen.getByTestId('form-event')).getByTestId('field-policyKey').querySelector('[aria-pressed="true"]')).toBeNull();
   });
 
   it('home: next month deferral with the forecast label, last month next to this one with its own label', async () => {
