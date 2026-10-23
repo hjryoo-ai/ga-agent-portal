@@ -1,7 +1,7 @@
 // 상태 라벨 표(포털 Phase 4 계획 ⑤ — Phase 3 수용 심사 Q1·Q2): 문구는 messages.ko.json의 데이터, 여기서는 "어느 상태에 어느 문구"만 정한다.
 // 금액 컴포넌트(Amount)는 이 파일이 만든 StatusLabel 없이는 그릴 수 없다(C3) — 라벨을 만드는 함수는 이 파일의 export 함수뿐이다.
 import type { MonthStatus, NetBasis, Schemas } from '../api/queries';
-import { m } from '../messages';
+import { fill, m } from '../messages';
 
 declare const statusLabelBrand: unique symbol;
 
@@ -45,6 +45,22 @@ export function deferralLabel(status: Schemas['LineDetailResponse']['deferrals']
 /** 환수 채권 금액 — 채권 상태(미상계·상계 중·종결·대손). */
 export function receivableLabel(status: NonNullable<Schemas['LineDetailResponse']['receivable']>['status']): StatusLabel {
   return label(m.enums.receivable[status]);
+}
+
+/** 분급 예정(타임라인 월 합계 — 모두 유지 시나리오·가정 전 값, 홈 다음 달 분급). 분급 항목 상태 라벨("예정")과 다르다 — 월 합계는 예정·이번 달
+ *  지급 대상의 합이다(포털 Phase 5 계획 ⑧ 라벨 표). */
+export function forecastLabel(): StatusLabel {
+  return label(m.status.forecast);
+}
+
+/** 유지율 가정을 적용한 월 합계(RETENTION의 months[].expected)만 — p는 응답의 값 그대로(Q23). 원값(가정 전·보류·항목)에는 붙이지 않는다. */
+export function retentionLabel(p: number): StatusLabel {
+  return label(fill(m.status.retention, { p: String(p) }));
+}
+
+/** 시뮬레이션 결과의 모든 금액 — 엔진 계산값이지만 확정·지급 사실이 아니다. 월 상태·정정·원장·분급 라벨 어느 것과도 다르다(C10). */
+export function simulationLabel(): StatusLabel {
+  return label(m.status.simulation);
 }
 
 /** 지급 런 확정값(지급액·채권 상계·이월 채권) — PAID 달에만 보인다. */

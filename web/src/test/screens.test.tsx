@@ -18,8 +18,11 @@ import { asOf, ledger, line, month, won } from './fixtures';
 
 const routes = vi.hoisted(() => {
   const table = new Map<string, unknown>();
+  const seen: string[] = [];
+  (table as Map<string, unknown> & { seen: string[] }).seen = seen;
   globalThis.fetch = (input: RequestInfo | URL) => {
     const url = new URL(input instanceof Request ? input.url : String(input), 'http://portal.test');
+    seen.push(url.pathname + url.search);
     const body = table.get(url.pathname + url.search) ?? table.get(url.pathname);
     return Promise.resolve(
       body === undefined
@@ -27,7 +30,7 @@ const routes = vi.hoisted(() => {
         : new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }),
     );
   };
-  return table;
+  return table as Map<string, unknown> & { seen: string[] };
 });
 
 beforeEach(() => {
@@ -39,6 +42,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   routes.clear();
+  routes.seen.length = 0;
   dropToken();
   vi.useRealTimers();
 });
@@ -113,17 +117,18 @@ describe('MonthCard', () => {
 });
 
 describe('screens', () => {
-  it('home: this month card, attention counts, entry points disabled', async () => {
+  it('home: this month card, attention counts, timeline and simulation entry points live, notifications still disabled', async () => {
     routes.set('/api/v1/me/earnings/202608', month({ status: 'ESTIMATED', netBasis: 'ESTIMATE', net: won(1740600), estimateAsOf: '2026-08-19T17:10:00Z' }));
+    routes.set('/api/v1/me/deferrals?from=202609&to=202609', { asOf, dataStatus: 'OK', from: '202609', to: '202609', scenario: 'ALL_INFORCE', months: [], items: [] });
     routes.set('/api/v1/me/limits?status=ALL', { asOf, dataStatus: 'OK', status: 'ALL', items: [ledger({ stage: 'FULL' }), ledger({ ledgerId: '2', flags: ['OVERDUE'] })] });
     const { container } = show('/', '/', <HomeScreen />);
     await screen.findByTestId('month-card');
     expect(screen.getByTestId('estimate-as-of').textContent).toBe('기준 08-20 02:10');
     expect((await screen.findByTestId('attention-limits')).textContent).toBe('한도 주의 1건');
     expect(screen.getByTestId('attention-flags').textContent).toBe('납입 지연·실효 1건');
-    for (const id of ['entry-timeline', 'entry-simulation', 'entry-notifications']) {
-      expect(screen.getByTestId<HTMLButtonElement>(id).disabled).toBe(true);
-    }
+    expect(screen.getByTestId('entry-timeline').getAttribute('href')).toBe('/deferrals');
+    expect(screen.getByTestId('entry-simulation').getAttribute('href')).toBe('/simulations');
+    expect(screen.getByTestId<HTMLButtonElement>('entry-notifications').disabled).toBe(true);
     everyAmountHasALabel(container);
   });
 
@@ -145,13 +150,11 @@ describe('screens', () => {
       total: 4,
       items: [
         line('1', { reversedBy: '3' }),
-        line('2', { commType: 'INCENTIVE', amount: won(855000), limitCutAmt: won(145000), limitCutPolicy: 'DEFER_AFTER_FY', reversedBy: '9' }),
-        line('3', { amount: won(-945000), reversalOf: '1' }),
-        line('4', { amount: won(-100000), reversalOf: '8' }),
+        line('2', { commType: 'INCENTIVE', amount: won(855000), limitCutAmt: won(145000), limitCutPolicy: 'DEFER_AFTER_FY', reversedBy: '9', reversedByYm: '202609' }),
+        line('3', { amount: won(-945000), reversalOf: '1', reversalOfYm: '202608' }),
+        line('4', { amount: won(-100000), reversalOf: '8', reversalOfYm: '202607' }),
       ],
     });
-    routes.set('/api/v1/me/earnings/lines/9', { asOf, dataStatus: 'OK', line: line('9', { closeYm: '202609', reversalOf: '2' }), basis: { ruleVersionIds: [] }, policySummary: {}, deferrals: [] });
-    routes.set('/api/v1/me/earnings/lines/8', { asOf, dataStatus: 'OK', line: line('8', { closeYm: '202607', reversedBy: '4' }), basis: { ruleVersionIds: [] }, policySummary: {}, deferrals: [] });
     const { container } = show('/statements/202608', '/statements/:ym', <StatementScreen />);
     const lines = await screen.findByTestId('lines');
     const pair = within(lines).getByTestId('line-pair');
@@ -165,6 +168,8 @@ describe('screens', () => {
       ['취소됨 → 2026년 9월', '/statements/202609'],
       ['취소 ← 2026년 7월', '/statements/202607'],
     ]);
+    // CR-2: 상대 달은 라인 응답에서 — 라인 상세 추가 호출 0
+    expect(routes.seen.filter((u) => u.startsWith('/api/v1/me/earnings/lines/'))).toEqual([]);
     expect(within(lines).getByTestId('limit-cut-defer-note').textContent).toBe('(사규: 초년도 후 이연 — 현재 이연 스케줄 없음)');
     expect(within(lines).getAllByTestId('limit-cut')[0]?.textContent).toContain('한도 초과 삭감');
     everyAmountHasALabel(container);

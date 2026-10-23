@@ -1,16 +1,74 @@
-// 홈(설계서 §8 — 계획 ⑥): 이번 달 카드(KST 달력 월 — Q16), 주의 계약 N건·납입 지연/실효 M건 → 한도 현황, 비활성 진입점.
-// 전월 대비·다음 달 분급 예정액은 보이지 않는다(Q4 — CR-1, Phase 5). 알림은 자리만(Q7).
+// 홈(설계서 §8 — 계획 ⑥): 이번 달 카드(KST 달력 월 — Q16), 주의 계약 N건·납입 지연/실효 M건 → 한도 현황, 진입점.
+// Phase 5(계획 ⑧): 전월 대비(CR-1 previous — 지난달 값과 그 달 라벨을 나란히, 차감 없음), 다음 달 분급(/me/deferrals 한 칸 — forecastLabel, 없거나 0이면
+// "다음 달 예정 없음"), 타임라인·시뮬레이션 진입점이 살아난다. 알림은 자리만(Phase 6).
 import { Link } from 'react-router';
 import { ApiError } from '../api/client';
-import { useLimits, useMonth } from '../api/queries';
+import { useDeferrals, useLimits, useMonth, type MonthResponse } from '../api/queries';
+import { forecastLabel, monthLabel, netView } from '../labels/labels';
 import { fill, m } from '../messages';
-import { ymAt, ymParts } from '../time/kst';
+import { Amount } from '../money/Amount';
+import { isZero, present } from '../money/won';
+import { ymAt, ymParts, ymShift } from '../time/kst';
 import { useNow } from '../time/useNow';
 import { ComingSoon } from '../ui/EntryPoints';
 import { MonthCard } from '../ui/MonthCard';
 import { Loading } from '../ui/States';
 
 const ATTENTION_FLAGS = new Set(['OVERDUE', 'LAPSED']);
+
+const ymText = (ym: string) => fill(m.fill.ym, ymParts(ym));
+
+/** 전월(CR-1): 지난달 세전과 (보이면) 세후를 그 달의 라벨로 — 이번 달과 빼지 않는다. */
+function Previous({ month }: { month: MonthResponse }) {
+  const prev = month.previous;
+  if (prev === undefined) {
+    return (
+      <p className="note" data-testid="previous-none">
+        {m.home.previousNone}
+      </p>
+    );
+  }
+  const net = netView(prev.status, prev.netBasis);
+  return (
+    <dl className="rows" data-testid="previous">
+      <div className="row">
+        <dt>{fill(m.home.previous, { ym: ymText(prev.closeYm) })}</dt>
+        <dd>
+          <Amount value={prev.gross} label={monthLabel(prev.status)} />
+          {net.kind === 'show' && present(prev.net) ? (
+            <>
+              {' '}
+              <span className="note">{m.home.net}</span> <Amount value={prev.net} label={net.label} />
+            </>
+          ) : null}
+        </dd>
+      </div>
+    </dl>
+  );
+}
+
+/** 다음 달 분급(1.1.0 /me/deferrals 한 칸). 월 행이 없거나 0이면 "다음 달 예정 없음". */
+function NextMonthDeferral({ ym }: { ym: string }) {
+  const deferrals = useDeferrals({ from: ym, to: ym });
+  if (deferrals.isPending) return <Loading />;
+  if (deferrals.isError) return null;
+  const month = deferrals.data.months.find((x) => x.dueYm === ym);
+  return (
+    <section className="card" data-testid="next-month">
+      <h2>{fill(m.home.nextMonth, { ym: ymText(ym) })}</h2>
+      {month === undefined || isZero(month.expected) ? (
+        <p data-testid="next-month-none">{m.home.nextMonthNone}</p>
+      ) : (
+        <p data-testid="next-month-amount">
+          <Amount value={month.expected} label={forecastLabel()} size="large" />
+        </p>
+      )}
+      <Link className="link-button" to="/deferrals">
+        {m.home.toTimeline}
+      </Link>
+    </section>
+  );
+}
 
 export function HomeScreen() {
   const nowMs = useNow();
@@ -37,11 +95,13 @@ export function HomeScreen() {
       ) : (
         <>
           <MonthCard month={month.data} heading={heading} nowMs={nowMs} />
+          <Previous month={month.data} />
           <Link className="link-button" to={`/statements/${ym}`}>
             {m.home.toStatements}
           </Link>
         </>
       )}
+      <NextMonthDeferral ym={ymShift(ym, 1)} />
       <section className="card" data-testid="attention">
         <h2>{m.home.attention}</h2>
         {limits.data === undefined ? (
@@ -60,8 +120,12 @@ export function HomeScreen() {
       </section>
       <section className="card entry-points">
         <h2>{m.home.more}</h2>
-        <ComingSoon name={m.nav.timeline} testId="entry-timeline" />
-        <ComingSoon name={m.nav.simulation} testId="entry-simulation" />
+        <Link className="link-button" to="/deferrals" data-testid="entry-timeline">
+          {m.nav.timeline}
+        </Link>
+        <Link className="link-button" to="/simulations" data-testid="entry-simulation">
+          {m.nav.simulation}
+        </Link>
         <ComingSoon name={m.nav.notifications} testId="entry-notifications" />
       </section>
     </>

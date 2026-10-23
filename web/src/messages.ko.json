@@ -46,7 +46,10 @@
     "paidOn": "{date} 지급",
     "ledger": "원장 기준",
     "contract": "계약 정보",
-    "adjustment": "지급 반영 미정"
+    "adjustment": "지급 반영 미정",
+    "forecast": "분급 예정",
+    "retention": "참고(유지율 {p}% 가정)",
+    "simulation": "시뮬레이션"
   },
   "enums": {
     "stage": {
@@ -95,6 +98,13 @@
       "DEFERRED": "분급",
       "CLAWBACK": "환수",
       "ADJUSTMENT": "정정"
+    },
+    "eventType": {
+      "CANCEL": "해약",
+      "LAPSE": "실효",
+      "WITHDRAW": "청약 철회",
+      "REDUCE": "감액",
+      "REINSTATE": "부활"
     }
   },
   "limitCut": {
@@ -127,7 +137,12 @@
     "attentionLimits": "한도 주의 {n}건",
     "attentionFlags": "납입 지연·실효 {n}건",
     "toLimits": "한도 현황 보기",
-    "more": "더 보기"
+    "more": "더 보기",
+    "nextMonth": "다음 달 분급 · {ym}",
+    "nextMonthNone": "다음 달 예정 없음",
+    "previous": "전월 · {ym}",
+    "previousNone": "전월 내역 없음",
+    "toTimeline": "분급 타임라인 보기"
   },
   "statement": {
     "title": "월별 명세",
@@ -147,7 +162,8 @@
     "cancelledTo": "취소됨 → {ym}",
     "cancelOf": "취소 ← {ym}",
     "showOriginal": "취소된 원 라인 보기",
-    "notFound": "이 달의 명세가 없습니다"
+    "notFound": "이 달의 명세가 없습니다",
+    "crossMonthUnknown": "다른 달의 짝"
   },
   "line": {
     "title": "라인 상세",
@@ -182,7 +198,9 @@
     "remaining": "잔여",
     "contractDate": "체결일 {date}",
     "fyEnd": "초년도 종료 {date} · {d}",
-    "detail": "상세 보기"
+    "detail": "상세 보기",
+    "product": "{product} · 피보험자 {insured}",
+    "productOnly": "{product}"
   },
   "limit": {
     "title": "한도 상세",
@@ -196,5 +214,84 @@
     "amount": "금액",
     "impact": "이 계약 해약 시 영향",
     "notFound": "한도 원장을 찾을 수 없습니다"
+  },
+  "timeline": {
+    "title": "분급 타임라인",
+    "note": "분급 확정 스케줄만 반영 · 참고치 · 비확정",
+    "period": "기간",
+    "periodMonths": "{n}개월",
+    "policy": "계약",
+    "policyAll": "전체 계약",
+    "scenario": "유지율 가정",
+    "scenarioOff": "모두 유지",
+    "scenarioOn": "유지율 가정 적용",
+    "p": "유지율(%)",
+    "pInvalid": "1~100 사이의 정수를 입력해 주세요",
+    "month": "월",
+    "expected": "예정",
+    "expectedBase": "가정 전 예정",
+    "held": "보류",
+    "heldLegend": "보류: 지급 조건 미충족으로 멈춘 분급 — 예정 합계에 넣지 않음",
+    "bar": "{ym} 막대",
+    "empty": "이 기간에 분급 예정이 없습니다",
+    "items": "분급 항목 {n}건",
+    "payCondition": "지급 조건 {cond}"
+  },
+  "simulation": {
+    "title": "시뮬레이션",
+    "note": "설계사 참고용 · 비확정 · 고객 제시 불가",
+    "tabs": "시뮬레이션 종류",
+    "tabNewContract": "신계약",
+    "tabPolicyEvent": "계약 변경·해약 영향",
+    "productKey": "상품",
+    "productHint": "한도 현황의 상품에서 고르거나 상품 키를 입력",
+    "monthlyPremium": "월납 보험료(원)",
+    "contractDate": "체결일",
+    "paymentTermMonths": "납입 기간(개월, 선택)",
+    "insurerCd": "보험사 코드",
+    "insurerNeeded": "같은 상품 키를 가진 보험사가 둘 이상입니다 — 보험사 코드를 입력해 주세요",
+    "policy": "계약",
+    "policyChoose": "계약을 고르세요",
+    "eventType": "변경 유형",
+    "asOfDate": "기준일",
+    "elapsedInstallments": "경과 회차(선택)",
+    "newMonthlyPremium": "감액 뒤 월납(원)",
+    "invalid": "{field} 형식을 확인해 주세요",
+    "required": "{field}을(를) 입력해 주세요",
+    "run": "계산하기",
+    "running": "계산 중",
+    "requestedAt": "요청 시각 {at}",
+    "generatedAt": "엔진 산출 시각 {at}",
+    "ruleSnapshot": "룰 스냅샷 {id}",
+    "simId": "요청 번호 {id}",
+    "byInstallment": "회차별 초년도 수수료",
+    "installment": "{n}회차",
+    "limitAmount": "한도액",
+    "projectedAccum": "예상 누적",
+    "noLimit": "한도 원장 대상 아님",
+    "incentives": "포함된 시책",
+    "incentiveCut": "삭감 {amount}",
+    "incentiveLimit": "한도 포함",
+    "incentiveNoLimit": "한도 밖",
+    "firstYearPayout": "첫해 지급분",
+    "schedule": "이연 스케줄",
+    "clawback": "환수",
+    "offset": "{ym} 세전·환수 상계 합계",
+    "before": "변경 전",
+    "after": "변경 후",
+    "cancelled": "취소되는 분급",
+    "noCancelled": "취소되는 분급 없음",
+    "receivableRemaining": "채권 잔액",
+    "dueYm": "지급월",
+    "amount": "금액",
+    "rateLimited": "잠시 후 다시 시도해 주세요({n}초)",
+    "unavailable": "시뮬레이션을 지금 할 수 없습니다 — 조회는 가능",
+    "engineContract": "일시적 오류 — 운영팀 확인 중",
+    "unsupportedEvent": "이 변경 유형은 시뮬레이션하지 않습니다",
+    "engineRejected": "엔진이 이 요청을 계산하지 않았습니다 — 입력을 확인해 주세요",
+    "notFound": "이 계약으로는 시뮬레이션할 수 없습니다",
+    "invalidRequest": "입력을 확인해 주세요",
+    "failed": "시뮬레이션에 실패했습니다",
+    "lastResult": "마지막 결과"
   }
 }

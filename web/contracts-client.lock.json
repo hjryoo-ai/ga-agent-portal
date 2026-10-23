@@ -3,5 +3,7 @@
   "contract": "contracts/api/v1/portal-api.openapi.yaml",
   "contractSha256": "8bf4e71cee7f924bf32cc6c31d0dcd20bd2e879a6a7a7622f278586687c64065",
   "output": "src/gen/portal-api.ts",
-  "outputSha256": "cee1ebd2c8a6a5b3e383d05d3ca4ec9ea14a80d69e8920e04e52c89d24df2e50"
+  "outputSha256": "cee1ebd2c8a6a5b3e383d05d3ca4ec9ea14a80d69e8920e04e52c89d24df2e50",
+  "rules": "src/gen/portal-api.rules.json",
+  "rulesSha256": "a4716a0f84d7c37ef3855a178159ea16fbefeadddb03395e5831a82951fca3e6"
 }

@@ -9,6 +9,16 @@ import { gzipSync } from 'node:zlib';
 // 상한(바이트, gzip — 계획 Q3): 5단계 측정값 118,135 B(화면 다섯·React 19·라우터·TanStack Query·openapi-fetch) + 10%를 KiB로 올림 = 127 KiB.
 // 늘려야 하면 측정표와 함께 계획·보고서에서 다시 정한다(조용히 올리지 않는다).
 const INITIAL_GZIP_CAP = 127 * 1024;
+// 지연 청크여야 하는 화면(닫힌 목록 — 포털 Phase 5 계획 ⑧ "두 경로는 지연 청크"): 각 항목은 동적 진입점이고 초기 로드의 정적 닫힘에 없어야 한다.
+// 목록 밖의 동적 진입점이 생기거나 목록의 화면이 정적으로 import되면 실패한다.
+const LAZY_SCREENS = [
+  'screens/StatementScreen.tsx',
+  'screens/LineScreen.tsx',
+  'screens/LimitsScreen.tsx',
+  'screens/LimitScreen.tsx',
+  'screens/TimelineScreen.tsx',
+  'screens/SimulationScreen.tsx',
+];
 
 const web = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const dist = resolve(web, 'build/web/dist');
@@ -45,8 +55,20 @@ for (const k of Object.keys(manifest).filter((k) => manifest[k].isDynamicEntry))
   for (const f of own) size += await gz(f);
   routes[k] = { files: own, gzipBytes: size };
 }
+const lazyProblems = [];
+for (const k of LAZY_SCREENS) {
+  if (!manifest[k]?.isDynamicEntry) lazyProblems.push(`${k} is not a lazy route chunk`);
+  if (initialKeys.has(k)) lazyProblems.push(`${k} is in the initial load (imported statically)`);
+}
+for (const k of Object.keys(routes)) {
+  if (!LAZY_SCREENS.includes(k)) lazyProblems.push(`${k} is a lazy chunk outside the closed list`);
+}
 const report = { initialGzipBytes: initial, capGzipBytes: INITIAL_GZIP_CAP, initial: parts, routes };
 await writeFile(resolve(web, 'build/web/bundle-size.json'), JSON.stringify(report, null, 2) + '\n');
+if (lazyProblems.length > 0) {
+  for (const x of lazyProblems) console.error(x);
+  process.exit(1);
+}
 if (initial > INITIAL_GZIP_CAP) {
   console.error(`initial load ${initial} B gzip exceeds the cap ${INITIAL_GZIP_CAP} B`);
   process.exit(1);

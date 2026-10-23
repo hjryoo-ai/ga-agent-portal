@@ -2,7 +2,20 @@
 // (같은 코드로 기대값을 만들지 않는다).
 import { describe, expect, it } from 'vitest';
 import type { MonthStatus, NetBasis } from '../api/queries';
-import { adjustmentLabel, contractLabel, deferralLabel, ledgerLabel, lineLabel, monthLabel, netView, payoutLabel, receivableLabel } from '../labels/labels';
+import {
+  adjustmentLabel,
+  contractLabel,
+  deferralLabel,
+  forecastLabel,
+  ledgerLabel,
+  lineLabel,
+  monthLabel,
+  netView,
+  payoutLabel,
+  receivableLabel,
+  retentionLabel,
+  simulationLabel,
+} from '../labels/labels';
 
 type Expected = { show: string } | { hide: string };
 const NIGHTLY = '세후는 야간 산출 후 표시';
@@ -69,5 +82,25 @@ describe('status label table', () => {
       expect(lineLabel('FY_COMM', status)).toBe(monthLabel(status));
       expect(lineLabel('CLAWBACK', status)).toBe(monthLabel(status));
     }
+  });
+
+  // Phase 5(계획 ⑧ 라벨 표 — C10): 새 라벨 셋은 서로 다르고, 기존 라벨(월 상태 넷·정정·원장·계약·지급·분급 상태 넷·채권 상태 넷) 어느 것과도 다르다.
+  it('forecast, retention and simulation labels are new and distinct from every Phase 4 label', () => {
+    expect(forecastLabel()).toBe('분급 예정');
+    expect(retentionLabel(30)).toBe('참고(유지율 30% 가정)');
+    expect(retentionLabel(100)).toBe('참고(유지율 100% 가정)');
+    expect(simulationLabel()).toBe('시뮬레이션');
+    const old = new Set<string>([
+      ...MONTHS.map((s) => monthLabel(s)),
+      adjustmentLabel(),
+      ledgerLabel(),
+      contractLabel(),
+      payoutLabel(),
+      ...(['SCHEDULED', 'RELEASED', 'HELD', 'CANCELLED'] as const).map((s) => deferralLabel(s)),
+      ...(['OPEN', 'OFFSET', 'CLOSED', 'WRITTEN_OFF'] as const).map((s) => receivableLabel(s)),
+    ]);
+    const fresh = [forecastLabel(), retentionLabel(30), simulationLabel()];
+    expect(new Set(fresh).size).toBe(3);
+    for (const l of fresh) expect(old.has(l), l).toBe(false);
   });
 });

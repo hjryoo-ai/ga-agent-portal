@@ -4,7 +4,7 @@
 import { useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import { ApiError } from '../api/client';
-import { useEarnings, useLine, useMonth, useMonthLines, type Line, type MonthResponse, type MonthStatus } from '../api/queries';
+import { useEarnings, useMonth, useMonthLines, type Line, type MonthResponse, type MonthStatus } from '../api/queries';
 import { lineLabel, payoutLabel } from '../labels/labels';
 import { fill, m } from '../messages';
 import { Amount } from '../money/Amount';
@@ -26,10 +26,14 @@ function commTypeName(code: string): string {
   return names[code] ?? code;
 }
 
-function CrossMonthBadge({ partnerCalcId, role }: { partnerCalcId: string; role: 'original' | 'reversal' }) {
-  const partner = useLine(partnerCalcId);
-  const ym = partner.data?.line.closeYm;
-  if (ym === undefined) return null;
+function CrossMonthBadge({ partnerYm: ym, role }: { partnerYm: string | undefined; role: 'original' | 'reversal' }) {
+  if (ym === undefined) {
+    return (
+      <span className="badge badge--danger" data-testid="cross-month">
+        {m.statement.crossMonthUnknown}
+      </span>
+    );
+  }
   return (
     <Link className="badge badge--danger badge--link" to={`/statements/${ym}`} data-testid="cross-month">
       {fill(role === 'original' ? m.statement.cancelledTo : m.statement.cancelOf, { ym: ymText(ym) })}
@@ -72,7 +76,7 @@ function RowView({ row, status, uncertain }: { row: Row; status: MonthStatus; un
       line={row.line}
       status={status}
       uncertain={uncertain}
-      extra={row.crossMonth === undefined ? null : <CrossMonthBadge partnerCalcId={row.crossMonth.partnerCalcId} role={row.crossMonth.role} />}
+      extra={row.crossMonth === undefined ? null : <CrossMonthBadge partnerYm={row.crossMonth.partnerYm} role={row.crossMonth.role} />}
     />
   );
 }

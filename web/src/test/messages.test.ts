@@ -5,6 +5,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import messages from '../messages.ko.json';
+import { EVENT_TYPES } from '../sim/eventTypes';
+import { CONTRACT_EVENT_TYPES } from '../sim/rules';
 
 const web = resolve(import.meta.dirname, '../..');
 const generated = readFileSync(resolve(web, 'src/gen/portal-api.ts'), 'utf8');
@@ -73,5 +75,30 @@ describe('messages ↔ contract enums', () => {
     const walk = (o: object, path: string): string[] =>
       Object.entries(o).flatMap(([k, v]) => (typeof v === 'string' ? (v === '' ? [`${path}.${k}`] : []) : walk(v as object, `${path}.${k}`)));
     expect(walk(messages, 'm')).toEqual(['m.status.monthData.OK']);
+  });
+
+  // Phase 5: 화면의 변경 유형 = 계약 열거 − PAYMENT_OVERDUE(엔진이 시뮬레이션하지 않는다 — 지시문 ⑬), 문구도 그 다섯.
+  it('event types: the contract enum without PAYMENT_OVERDUE, each with a message', () => {
+    expect([...CONTRACT_EVENT_TYPES].sort()).toEqual(unionOf('eventType'));
+    expect([...EVENT_TYPES].sort()).toEqual(CONTRACT_EVENT_TYPES.filter((t) => t !== 'PAYMENT_OVERDUE').sort());
+    expect(keys(messages.enums.eventType)).toEqual([...EVENT_TYPES].sort());
+  });
+});
+
+describe('Phase 5 wording', () => {
+  const all = (o: object): string[] => Object.values(o).flatMap((v) => (typeof v === 'string' ? [v] : all(v as object)));
+
+  // 보류는 "다시 받을 수 있는" 돈처럼 말하지 않는다(계획 ⑧ — 지급 조건 미충족으로 멈춘 분급)
+  it('no message promises that held deferrals come back', () => {
+    for (const word of ['다시 받', '돌려받', '회복', '추후 지급', '나중에 지급', '받을 수 있']) {
+      expect(all(messages).filter((t) => t.includes(word)), word).toEqual([]);
+    }
+  });
+
+  // 해약 영향의 엔진 값은 그 달의 세전·환수 상계 합계다 — "실수령"이 아니다(Q24). 시뮬레이션 문구 어디에도 없다.
+  it('simulation wording never says 실수령, and the fixed notes are as planned', () => {
+    expect(all(messages.simulation).filter((t) => t.includes('실수령'))).toEqual([]);
+    expect(messages.simulation.note).toBe('설계사 참고용 · 비확정 · 고객 제시 불가');
+    expect(messages.timeline.note).toBe('분급 확정 스케줄만 반영 · 참고치 · 비확정');
   });
 });

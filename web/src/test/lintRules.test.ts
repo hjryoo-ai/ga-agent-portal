@@ -20,6 +20,10 @@ const cases: Record<string, string> = {
   'moneyMapped.ts': `import { api } from '../api/client';\n// 실제 응답 타입(openapi-fetch의 data)은 스키마를 매핑 타입으로 복사해 'Won' 이름이 사라진다 — 3단계에서 이름만 보던 규칙이 놓친 모양 그대로\nexport const f = async () => {\n  const r = await api.GET('/api/v1/me/earnings/lines/{calcId}', { params: { path: { calcId: '1' } } });\n  return r.data?.policySummary.monthlyPremium === undefined;\n};\n`,
   'moneyPresence.ts': `import type { components } from '../gen/portal-api';\nexport const f = (m: components['schemas']['MonthSummary']) => m.net !== undefined;\n`,
   'moneyOk.ts': `import type { components } from '../gen/portal-api';\nimport { isZero, present } from '../money/won';\nexport const f = (m: components['schemas']['MonthSummary'], n: number) => [isZero(m.adjustment), present(m.net), n + 1, m.closeYm.length > 0];\nexport const g = (items: components['schemas']['MonthSummary'][]) => items.map((m) => m.gross);\n`,
+  // Phase 5: 해약 영향의 변경 전/후 차이(지시문 ⑬ — 포털이 만들지 않는다), 타임라인 예정·보류 비교 — 실제 변이·조회 응답 타입으로
+  'moneySimDiff.ts': `import type { SimPolicyEventResponse } from '../api/queries';\nexport const f = (r: SimPolicyEventResponse) => (r.offsetAgainstMonth.after as unknown as number) - (r.offsetAgainstMonth.before as unknown as number);\n`,
+  'moneySimMutation.ts': `import { api } from '../api/client';\nexport const f = async () => {\n  const r = await api.POST('/api/v1/me/simulations/policy-event', { body: { policyKey: '0123456789abcdef', eventType: 'CANCEL', asOfDate: '2027-02-15' } });\n  return r.data === undefined ? 0 : String(r.data.clawbackAmount);\n};\n`,
+  'moneyDeferral.ts': `import type { DeferralsResponse } from '../api/queries';\nexport const f = (d: DeferralsResponse) => d.months.filter((x) => x.expected > x.held);\n`,
   'hangul.tsx': `export const C = () => <p>정정</p>;\nexport const s = '확정';\n`,
   'hangulComment.ts': `// 주석은 한국어여도 된다\nexport const s = 'ok';\n`,
   'network.ts': `export const f = () => fetch('/api/v1/me');\nexport const g = () => window.localStorage.getItem('x');\nexport const h = () => navigator.serviceWorker;\n`,
@@ -44,7 +48,7 @@ afterAll(() => {
 const rules = (name: string) => results.get(name) ?? [];
 
 describe('portal/no-money-arithmetic', () => {
-  it.each(['moneyPlus.ts', 'moneyNumber.ts', 'moneyCompare.ts', 'moneyTemplate.ts', 'moneyMath.ts', 'moneyUnary.ts', 'moneyPresence.ts', 'moneyMapped.ts'])('%s is reported', (name) => {
+  it.each(['moneyPlus.ts', 'moneyNumber.ts', 'moneyCompare.ts', 'moneyTemplate.ts', 'moneyMath.ts', 'moneyUnary.ts', 'moneyPresence.ts', 'moneyMapped.ts', 'moneySimDiff.ts', 'moneySimMutation.ts', 'moneyDeferral.ts'])('%s is reported', (name) => {
     expect(rules(name)).toContain('portal/no-money-arithmetic');
   });
 

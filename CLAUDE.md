@@ -65,9 +65,11 @@
 - **모든 금액은 라벨과 함께만** `<Amount value label>` — `StatusLabel`은 `src/labels/labels.ts`만 만든다. 세후는 16칸 표(설계서 §6.2)를 따르고 표 밖 조합은 숨긴다. 화면 문구는 `src/messages.ko.json`만(한글 리터럴은 ESLint `portal/no-hangul-literal`), 계약 열거와 양방향 대조(`messages.test.ts`).
 - **네트워크는 생성 클라이언트 하나**(`src/api/client.ts`만 `openapi-fetch`를 import). `fetch`·XHR·WebSocket·`sendBeacon`·서비스 워커 금지. 계약이 바뀌면 `pnpm client:lock`으로 생성물·`contracts-client.lock.json`을 같은 커밋에(`clientCheck`가 해시 대조).
 - **토큰은 메모리에만**(`src/boot/token.ts` — 프래그먼트에서 읽고 지운다). `localStorage`·`sessionStorage`·IndexedDB·Cache API·쿠키 금지(ESLint + E2E 저장소 검사). 콘솔에 응답·토큰을 쓰지 않는다.
-- **경로는 `src/routes.ts` 닫힌 목록** = 서버 `ScreenConfiguration.SCREEN_PATHS`(`WebScreensIT`가 대조). 경로·쿼리에 증권번호·`policyKey`·`agentId`를 두지 않는다.
+- **경로는 `src/routes.ts` 닫힌 목록** = 서버 `ScreenConfiguration.SCREEN_PATHS`(`WebScreensIT`가 대조). 화면 주소(경로·쿼리)에 증권번호·`policyKey`·`agentId`를 두지 않는다 — `policyKey`는 API 쿼리·요청 본문에만(타임라인 계약 필터, 시뮬레이션), 화면 사이 인계는 메모리(`src/sim/handoff.ts`).
 - **CSP 그대로**: 인라인 스크립트·스타일·`eval` 없음(스타일은 CSS 파일 + CSSOM 사용자 속성). 외부 출처(글꼴·CDN·분석) 없음. 산출물 스캔과 E2E가 위반 0을 본다.
-- 초기 로드 gzip ≤ 127 KiB(`scripts/bundle-size.mjs`). 넘으면 상한을 올리지 말고 경로 지연 로드로 옮긴다 — 올려야 하면 사유 보고 후 승인.
+- 초기 로드 gzip ≤ 127 KiB(`scripts/bundle-size.mjs`). 넘으면 상한을 올리지 말고 경로 지연 로드로 옮긴다 — 올려야 하면 사유 보고 후 승인. 홈 밖 화면은 지연 청크이고 그 목록(`LAZY_SCREENS`)은 닫혀 있다 — 정적으로 import하면 실패.
+- **입력 규칙은 계약의 데이터**(Phase 5): 요청 본문·쿼리의 `pattern`·길이·필수·`if/then`은 `client:lock`이 계약에서 쓴 `src/gen/portal-api.rules.json`(잠금이 해시 고정)으로 검사한다 — 화면에 손으로 다시 적지 않는다. 입력은 문자열 그대로 보낸다(숫자로 바꾸지 않는다).
+- 라벨(Phase 5): 분급 예정 합계 `forecastLabel`, 유지율 가정이 적용된 합계만 `retentionLabel(p)`, 시뮬레이션 결과의 모든 금액 `simulationLabel` — 기존 라벨 어느 것과도 다르다(`labels.test`). 시뮬레이션 화면은 소진율·전후 차이를 만들지 않고 "실수령"이라 쓰지 않는다.
 - 의존성: pnpm `--frozen-lockfile`, 정확한 판(`saveExact`), 공개 1일 미만 판 금지(`minimumReleaseAge`), 라이선스 표 `web/THIRD-PARTY.md`(`webLicenses`가 대조), `pnpm audit` 결과는 CI 아티팩트로 기록.
 - E2E 센티널(허구 증권번호·식별자)은 `pii-sentinels.properties`의 `e2e` 키 — 평문 스캔은 웹 산출물·Vitest 결과·E2E 결과도 본다.
 

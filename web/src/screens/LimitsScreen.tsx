@@ -1,5 +1,6 @@
 // 한도 현황(설계서 §8 2 — 계획 ⑥): 필터 주의/전체(화면 필터 — stage 문자열 비교, API status=WARN은 정확히 WARN만이라 쓰지 않는다 — P-4) → 카드.
-// 카드: 가린 증권번호 · 체결일 · 소진 바(문자열) · 잔여 · 초년도 종료 D-n · 단계·계약 상태 배지. 상품명·피보험자는 원장 응답에 없다(CR-4).
+// 카드: 가린 증권번호 · 상품명(없으면 상품 키)·가린 피보험자(1.1.0 CR-4 — 그 계약의 첫 라인) · 체결일 · 소진 바(문자열) · 잔여 · 초년도 종료 D-n ·
+// 단계·계약 상태 배지.
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useLimits, type Ledger } from '../api/queries';
@@ -28,6 +29,17 @@ export function LedgerBadges({ ledger }: { ledger: Ledger }) {
   );
 }
 
+/** 상품·피보험자(CR-4) — 둘 다 없으면 그리지 않는다. */
+export function LedgerProduct({ ledger }: { ledger: Ledger }) {
+  const product = ledger.productName ?? ledger.productKey;
+  if (product === undefined) return null;
+  return (
+    <p className="note" data-testid="ledger-product">
+      {ledger.insuredMasked === undefined ? fill(m.limits.productOnly, { product }) : fill(m.limits.product, { product, insured: ledger.insuredMasked })}
+    </p>
+  );
+}
+
 function LedgerCard({ ledger, nowMs }: { ledger: Ledger; nowMs: number }) {
   return (
     <article className="card ledger-card" data-testid="ledger-card" data-ledger-id={ledger.ledgerId}>
@@ -35,6 +47,7 @@ function LedgerCard({ ledger, nowMs }: { ledger: Ledger; nowMs: number }) {
         <h2>{ledger.policyMasked}</h2>
         <LedgerBadges ledger={ledger} />
       </div>
+      <LedgerProduct ledger={ledger} />
       <p className="note">{fill(m.limits.contractDate, { date: ledger.contractDate })}</p>
       {ledger.utilization === undefined ? null : <Utilization value={ledger.utilization} />}
       <dl className="rows">
