@@ -3,6 +3,8 @@
 > 지시문 `docs/phase-05-지시문.md` · 계획 `docs/phase-05-계획.md`(승인 2026-10-23 — Q1~Q24·P-1~P-26 권장안 전부, Q17·Q18 포함, `docs/DECISIONS.md`) ·
 > 브랜치 `work/phase-5` · PR [#13](https://github.com/hjryoo-ai/ga-agent-portal/pull/13) · 태그 `phase-5`(이 보고서 커밋). **병합은 수용 심사 회신 뒤.**
 > 엔진 쪽: `ga-commission-engine` PR #8(시험 코드만 — 샘플) → 병합 `2c3b093`(Q17 선승인 — 자체 CI 통과 뒤).
+>
+> **2판**(2026-10-24, 태그 `phase-5.1`): 수용 심사 `docs/phase-05-수용심사.md`(조건부 수용) — 조건 B1(예정·보류가 모두 0인 달 — 계약 1.1.1)·F10 선택 개선. 바뀐 곳은 §4.3 끝 문단·주입 S17·F10·F11 행·§7. `phase-5`는 1판(`0fccc05`) 그대로.
 
 이 보고서에서 **"샘플 S…"**는 엔진 응답 샘플(계획 ③ 표 S1~S12·S11b)이고 **"주입 S…"**는 주입 ID(계획 ⑩)다 — 계획이 두 이름에 같은 머리글자를 썼다.
 
@@ -93,7 +95,7 @@ CI run [39951478495](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/3
 | C13 | 실 엔진 E2E 스크립트에 시뮬레이션 쌍 | `e2e/engine-feed/run.sh`(머리 주석·⑧ 줄) + `EngineFeedE2eCheck` ③(샘플 S1·S5 요청을 포털로 → 200·계약 통과·증권번호 0, `simulation_log` `NEW_CONTRACT`·`POLICY_EVENT` `SUCCEEDED 200`), README 둘. **미실행**(사용자 실행 — §4.10) | — |
 | C14 | Phase 0~4 무손상, `no-docker` 실패, 평문 스캔, 검증 메타데이터 재생성 diff, 주입 ID 단위 | §2(기존 2,660건 전부 통과 + 61), `no-docker` 10/10 실패·스킵 0, `scanPlaintextLeaks` 76 문자열 0, §4.8(빈 `GRADLE_USER_HOME` 재생성 diff 0), 아래 주입 표 | — |
 
-### 주입 기록 (ID 단위 — 엔진 3 + 포털 16)
+### 주입 기록 (ID 단위 — 엔진 3 + 포털 16, 2판 +1)
 
 각각 단독으로 넣고 해당 검사를 돌려 실패를 본 뒤 되돌렸다. 통합·E2E 주입(S6·S7·S10·S14)은 이 기계에서 Docker를 켜지 않았으므로 **`work/phase-5`를 밑으로 한 초안 PR**(주입 한 커밋)을 열어 CI가 돌게 하고, 실패를 본 뒤 병합 없이 닫고 가지를 지웠다(PR #14·#15·#16·#18 — #17은 E2E 수정 전에 잘린 가지라 결과가 섞여 #18로 다시 열었다).
 
@@ -118,6 +120,7 @@ CI run [39951478495](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/3
 | S14 | C12 | 신계약 결과 뒤 `history.replaceState`로 주소에 `?sim=<simId>` | CI 39951495956 `web-e2e` — 고정 장치 "simId in addresses", 신계약 결과를 내는 시험 9개(ga01-simulation·ga02-insurer·ga03-ratelimit × 3) 실패, 34 통과 |
 | S15 | C4(Q11) | `ApiAuthorization`에 `Caller`를 받는 공개 메서드 | `ApiLayerRulesTest` 1 실패(규칙 (c)가 `domain.access`도 본다) |
 | S16 | C1(F4) | `DigitCount` 설명문의 따옴표를 뺌 | `PortalApiContractTest.noKeyWithoutAValue` "['/components/schemas/DigitCount/1.1.0)']" |
+| S17 | 심사 B1(2판) | `dueMonths`의 `HAVING`을 뺌 | CI 40019619655(초안 PR #19, 병합 없이 닫음): `DeferralsQueryIT.aMonthWithOnlyCancelledItemsHasNoMonthButKeepsItsItem` — 월 `["202609", "202610", "202811"]`, 87건 중 1. `web-e2e` GA04 "12개월·84개월, 보류 범례, 막대 = API 문자열, 계약 필터"가 세 프로젝트에서 실패(84개월 행 텍스트), 같은 파일의 직렬 뒤 시험 둘 × 3 건너뜀 — 52건 중 실패 3·건너뜀 6 |
 
 ## 4. 지시문 §5 추가 항목
 
@@ -164,7 +167,7 @@ CI run [39951478495](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/3
 
 ### 4.3 레이트 리밋 동시성 수치
 
-CI run 39951478495 `RateLimitIT` 출력: `RATE_LIMIT_CONCURRENCY threads=8 limit=3 admitted=3 limited=5 statuses=[503, 503, 503, 429, 429, 429, 429, 429]`. 테넌트 RL(`sim_rate_per_minute` 3)의 한 설계사가 같은 순간 8건(N+5) → 통과(행을 남긴 것) 3·429 다섯, 그 설계사의 `simulation_log` 행 3. 통과한 셋이 503인 것은 그 설계사(`A-1002`)의 요청이 엔진 샘플 밖이라 스텁이 500을 내기 때문이다 — 시험은 통과 수와 행 수만 본다("the engine answer does not matter here"). 잠금을 빼면(주입 S7) 통과가 4가 됐다. 순차 시험: N(3) 통과 뒤 넷째 429 + `Retry-After` 1~60 정수, 429는 행·감사·엔진 호출 0, `api_rate_limited_total{tenant}` +1.
+CI run 39951478495 `RateLimitIT` 출력: `RATE_LIMIT_CONCURRENCY threads=8 limit=3 admitted=3 limited=5 statuses=[503, 503, 503, 429, 429, 429, 429, 429]`. 테넌트 RL(`sim_rate_per_minute` 3)의 한 설계사가 같은 순간 8건(N+5) → 통과(행을 남긴 것) 3·429 다섯, 그 설계사의 `simulation_log` 행 3. 통과한 셋이 503인 것은 그 설계사(`A-1002`)의 요청이 엔진 샘플 밖이라 스텁이 500을 내기 때문이다 — 시험은 통과 수와 행 수만 본다("the engine answer does not matter here"). 잠금을 빼면(주입 S7) 통과가 4가 됐다. **2판(F10)**: 동시 시험을 자기 테넌트 `BURST`(한도 3)의 샘플 설계사(A-1001)로 옮겼다 — CI run 40019597220: `RATE_LIMIT_CONCURRENCY threads=8 limit=3 admitted=3 limited=5 statuses=[429, 429, 200, 200, 429, 429, 429, 200]`, 통과 셋 전부 200, 행 셋 `SUCCEEDED`, 엔진 호출 3(P5-17). 순차 시험: N(3) 통과 뒤 넷째 429 + `Retry-After` 1~60 정수, 429는 행·감사·엔진 호출 0, `api_rate_limited_total{tenant}` +1.
 
 ### 4.4 `ForecastScenario` 격리 증거 (스캐너가 본 곱셈·나눗셈 위치)
 
@@ -248,8 +251,8 @@ CI run 39951478495의 `build/web/audit.json`: 권고 0, 심각도별 info 0·low
 | F7 | **WebKit `<select>`가 CSP `style-src-attr` 위반** — 첫 E2E(run 39949109509)의 mobile-ios만, 화면의 select 수만큼 | 버튼 묶음(`ui/Choices.tsx`, P5-15). CSP는 넓히지 않았다 | **발견·수정** |
 | F8 | 첫 E2E: axe `definition-list`(시뮬레이션 "한도 원장 대상 아님" `<p>`가 `<dl>` 안), 막대 접근 이름 기대값에 공백이 빠졌다(브라우저는 칸 사이·금액과 라벨 사이에 공백을 넣는다) | `<p>`를 목록 밖으로, 기대값 정정 | 수정 |
 | F9 | **84개월 경계 산수** — 2027-02부터 84개월의 마지막 달은 2034-01이다. 계획 ⑨ "2027-03 ~ 2033-12에 걸쳐 84개월 경계 안팎"과 첫 스트림이 한 달 일렀다(경계 "밖" 항목이 안이었다 — run 39950414203, ga04-timeline 셋 실패) | 경계 쌍 203401(안)·203402(밖)로(`aba8131`). 화면·API의 `to = from + 83`은 처음부터 맞았다 | **발견·수정**(계획 오류) |
-| F10 | 레이트 리밋 동시 시험의 통과 셋이 503 | 그 설계사의 요청이 샘플 밖 — 시험은 통과 수·행 수만 본다(§4.3) | 해석 |
-| F11 | **타임라인에 취소만 있는 달이 0/0 행으로 나온다**(GA04 2030-01 — "0원 분급 예정 · 0원 보류") — API의 월 합(`dueMonths`)은 그 범위의 모든 상태를 묶고 `HAVING`이 없다. 막대는 0.0%·0.0%, 항목 목록에는 "취소"로 보인다 | 이 Phase는 API를 바꾸지 않았다(지시문 ⑬ — 1.1.0 밖 변경 금지, 계약 설명은 "Σ SCHEDULED + RELEASED") — Q5 | **확인 요청** |
+| F10 | 레이트 리밋 동시 시험의 통과 셋이 503 | 그 설계사의 요청이 샘플 밖 — 시험은 통과 수·행 수만 본다(§4.3) | 해석 → 2판 개선(P5-17 — 통과 셋 200) |
+| F11 | **타임라인에 취소만 있는 달이 0/0 행으로 나온다**(GA04 2030-01 — "0원 분급 예정 · 0원 보류") — API의 월 합(`dueMonths`)은 그 범위의 모든 상태를 묶고 `HAVING`이 없다. 막대는 0.0%·0.0%, 항목 목록에는 "취소"로 보인다 | 이 Phase는 API를 바꾸지 않았다(지시문 ⑬ — 1.1.0 밖 변경 금지, 계약 설명은 "Σ SCHEDULED + RELEASED") — Q5 | **심사 B1 → 2판에서 고침**(API에서 뺀다 — 계약 1.1.1, P5-16) |
 | F12 | 응답 누출 스캔의 시뮬레이션 몫을 `SimulationPassThroughIT`에(P5-9) | 시뮬레이션 테넌트·스텁이 그 기반에 있다 | 기록 |
 | F13 | 주입 S6의 모양(P5-11) | 테넌트 전체 문장은 정적 스캔이 먼저 잡는다 — 행동 시험을 증거로 하려고 술어의 뜻만 지웠다 | 기록 |
 | F14 | `CLAUDE.md` "경로·쿼리에 `policyKey` 금지" → "화면 주소(경로·쿼리)에"(P5-13) | Q15가 API 쿼리를 더했다 — 대상만 글자로 | **확인 요청**(규칙 파일 문구) |
@@ -273,3 +276,20 @@ CI run 39951478495의 `build/web/audit.json`: 권고 0, 심각도별 info 0·low
 
 - **Q7(F14)** `CLAUDE.md` 화면 규약 문구 "화면 주소(경로·쿼리)" — 이대로 둘지.
 - **Q8** 실 엔진 E2E(`run.sh` — Phase 3·5 판정 둘)는 여전히 미실행 — 병합 뒤 `main`에서 사용자 실행으로 둘지(Phase 3 Q12와 같게).
+
+## 7. 2판 — `phase-5.1` (수용 심사 조건 B1, 2026-10-24)
+
+심사 `docs/phase-05-수용심사.md` §2: `dueMonths`가 `GROUP BY due_ym`뿐이라 항목이 없는 달은 행이 없고 취소만 있는 달은 0/0 행이었다 — 한 응답 안에 두 모양(F11). 결정: API에서 뺀다(화면이 숨기지 않는다).
+
+| 항목 | 바뀐 것 |
+|---|---|
+| SQL | `AgentQueryRepository.dueMonths`에 `HAVING` 예정 ≠ 0 OR 보류 ≠ 0 — 한 문장 그대로(`QueryStatementIT` 상한 불변). 막대 분모는 `MeQueries.timeline`이 돌려받은 행에서 계산하므로 `HAVING` 뒤 행만 본다(심사 문구의 `max(...) over ()`는 SQL에 없다 — P5-16) |
+| 계약 | `portal-api` 1.1.1 — `info`·`months` 설명문만. `PortalApiCompatibilityTest` 3(+1): 1.0.0·1.1.0(`phase-5` 바이트 사본, SHA-256 `8bf4e71c…` 고정) 둘에 대한 추가·완화 대조, 설명문·요약·`info.version`을 뺀 1.1.0과 1.1.1이 같다(제약 하나를 바꾼 사본은 다르다 — 자기 검사). `CHECKSUMS`, `client:lock`(생성물에 설명 한 줄, 규칙 파일 바이트 그대로) — CI "client lock ok (…, contract 2f529ade506b)" |
+| 시험 | `DeferralsQueryIT` +1(시드: 설계사 갑 202811 취소 30,000 — 다른 시험 범위 밖): 202609~202811의 월은 202609·202610뿐, 항목은 셋(202811 `CANCELLED` 포함), 월 합·막대는 취소 달 없는 범위와 같다, 202811 한 달은 월 0·항목 1. E2E GA04: 84개월 행 5 → 4(2030-01은 항목 목록에만 "취소"), 막대 4, 계약 필터 행 5 → 4. 골든 파일은 이 경로에 없다 — GA04 기대값이 그 몫 |
+| F10(선택) | 동시 레이트 리밋 시험을 테넌트 `BURST`로 — 통과 셋이 샘플 응답 200(§4.3, P5-17) |
+| 주입 | S17(§3 표) |
+| 문서 | 설계서 v1.8.1(§6.4·§7·§8·변경 이력), DECISIONS P5-16·P5-17과 "Phase 5 수용 심사" 절(DE-22~24·DD-17·결정·Phase 6 재료), 심사 보관 `docs/phase-05-수용심사.md`, README |
+| 범위 밖 | 없음 — 화면 코드·번들 구성 변경 없음(초기 로드 121,056 B 그대로). `CLAUDE.md` 문구는 심사 Q7대로 그대로 |
+
+CI run [40019597220](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/40019597220)(`5d9d979`, build·no-docker·web-e2e 모두 success — 아티팩트를 내려받아 셌다): Java **2,723**(+2 — `portal-query` test 47(`PortalApiCompatibilityTest` +1), `portal-app` integrationTest 87(`DeferralsQueryIT` +1)), 실패 0·스킵 0. Vitest 98. Playwright 52/52(건수 그대로 — GA04 기대값만 바뀜), 스킵 0, axe 99 상태·위반 0, CSP 위반 0, 외부 요청 0, `simIds` 27. `verifyContractChecksums` 일치, `scanPlaintextLeaks: 113 files, 76 forbidden strings, 0 hits`, `bundle size ok: initial 121056 B gzip`. `no-docker`: "result files: 10, with failures/errors: 10, skipped: 0".
+
