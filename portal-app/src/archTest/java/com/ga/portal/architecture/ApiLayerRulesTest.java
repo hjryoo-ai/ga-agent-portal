@@ -23,8 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>모든 {@code @RestController} 처리 메서드는 {@code Caller} 인자를 받고 {@code @UseCaseEntry} 메서드를 <b>정확히 하나</b> 부른다.</li>
  *   <li>{@code Jwt}를 참조하는 포털 클래스는 닫힌 목록({@link #JWT_READERS}) — 토큰 클레임은 검증기 밖으로 나가지 않는다. {@code JwtAuthenticationToken}은 아무도.
  *       컨트롤러는 Spring Security·{@code Principal}을 보지 않는다.</li>
- *   <li>{@code portal-query}의 공개 메서드 중 {@code Caller}를 받는 것은 {@code @UseCaseEntry}뿐(닫힌 예외: {@link #CALLER_TAKING_HELPERS}).</li>
- *   <li>모든 {@code @UseCaseEntry} 메서드는 {@code QueryAuthorization.require}를 직접 부른다.</li>
+ *   <li>{@code portal-query}·{@code portal-sim}·접근 규약 패키지({@code domain.access})의 공개 메서드 중 {@code Caller}를 받는 것은 {@code @UseCaseEntry}뿐
+ *       (닫힌 예외: {@link #CALLER_TAKING_HELPERS}).</li>
+ *   <li>모든 {@code @UseCaseEntry} 메서드는 {@code ApiAuthorization.require}를 직접 부른다.</li>
  *   <li>{@code Caller}의 생성자는 {@code CallerArgumentResolver}만 부른다.</li>
  *   <li>조회 경로({@code portal-query}·{@code app.query})가 닿는 저장소는 설계사 술어 저장소 둘뿐 — 다른 뷰 저장소로 우회하지 않는다.</li>
  * </ol>
@@ -32,8 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ApiLayerRulesTest {
 
     static final String P = "com.ga.portal.";
-    static final String CALLER = P + "query.Caller";
-    static final String USE_CASE_ENTRY = P + "query.UseCaseEntry";
+    static final String CALLER = P + "domain.access.Caller";
+    static final String USE_CASE_ENTRY = P + "domain.access.UseCaseEntry";
     static final String REST_CONTROLLER = "org.springframework.web.bind.annotation.RestController";
     static final Set<String> MAPPINGS = Set.of("org.springframework.web.bind.annotation.GetMapping", "org.springframework.web.bind.annotation.PostMapping",
             "org.springframework.web.bind.annotation.PutMapping", "org.springframework.web.bind.annotation.PatchMapping",
@@ -44,7 +45,7 @@ class ApiLayerRulesTest {
             "검사 2~8을 하는 검증기 — 토큰에서 iss·sub·aud·exp/nbf·tenant_id만 읽고 (테넌트, sub)만 남긴다(계획 ③)"));
 
     /** {@code Caller}를 받지만 진입점이 아닌 공개 메서드(FQN#이름, 사유) — 닫힌 목록. */
-    static final List<ArchRulesAllowed> CALLER_TAKING_HELPERS = List.of(new ArchRulesAllowed(P + "query.QueryAuthorization#require",
+    static final List<ArchRulesAllowed> CALLER_TAKING_HELPERS = List.of(new ArchRulesAllowed(P + "domain.access.ApiAuthorization#require",
             "진입점이 첫 줄에서 부르는 역할 확인 자체"));
 
     /** 조회 경로가 쓸 수 있는 저장소. */
@@ -79,7 +80,7 @@ class ApiLayerRulesTest {
     @Test
     void a_everyHandlerTakesACallerAndCallsExactlyOneUseCaseEntry() {
         List<JavaClass> controllers = classes.stream().filter(c -> c.isAnnotatedWith(REST_CONTROLLER)).toList();
-        assertThat(controllers).extracting(JavaClass::getName).containsExactly(P + "app.web.MeController");
+        assertThat(controllers).extracting(JavaClass::getName).containsExactlyInAnyOrder(P + "app.web.MeController", P + "app.web.SimulationController");
         List<String> problems = new ArrayList<>();
         int handlers = 0;
         for (JavaClass c : controllers) {
@@ -98,7 +99,7 @@ class ApiLayerRulesTest {
             }
         }
         assertThat(problems).isEmpty();
-        assertThat(handlers).as("handlers (= rows of docs/authz-matrix.md)").isEqualTo(8);
+        assertThat(handlers).as("handlers (= rows of docs/authz-matrix.md — Phase 5: + two simulations)").isEqualTo(10);
     }
 
     @Test
@@ -117,13 +118,16 @@ class ApiLayerRulesTest {
         assertThat(classes.contain(readers.iterator().next())).as("the allowlisted reader exists").isTrue();
     }
 
+    /** 규칙 (c)가 보는 패키지 — 진입점이 사는 두 모듈과 인가 표(포털 Phase 5 계획 Q11). */
+    static final List<String> ENTRY_PACKAGES = List.of(P + "query", P + "sim", P + "domain.access");
+
     @Test
     void c_onlyUseCaseEntriesTakeACallerInPortalQuery() {
         Set<String> helpers = CALLER_TAKING_HELPERS.stream().map(ArchRulesAllowed::fqn).collect(Collectors.toSet());
         List<String> problems = new ArrayList<>();
         int entries = 0;
         for (JavaClass c : classes) {
-            if (!c.getPackageName().startsWith(P + "query")) {
+            if (ENTRY_PACKAGES.stream().noneMatch(p -> c.getPackageName().equals(p) || c.getPackageName().startsWith(p + "."))) {
                 continue;
             }
             for (JavaMethod m : c.getMethods()) {
@@ -138,7 +142,7 @@ class ApiLayerRulesTest {
                 }
             }
         }
-        assertThat(entries).isEqualTo(8);
+        assertThat(entries).isEqualTo(10);
         assertThat(problems).isEmpty();
         assertThat(helpers).allSatisfy(h -> assertThat(classes.get(h.substring(0, h.indexOf('#'))).getMethods())
                 .as("stale helper %s", h).anyMatch(m -> m.getName().equals(h.substring(h.indexOf('#') + 1))));
@@ -150,7 +154,7 @@ class ApiLayerRulesTest {
         for (JavaClass c : classes) {
             for (JavaMethod m : c.getMethods()) {
                 if (m.isAnnotatedWith(USE_CASE_ENTRY) && m.getMethodCallsFromSelf().stream()
-                        .noneMatch(call -> call.getTargetOwner().getName().equals(P + "query.QueryAuthorization") && call.getName().equals("require"))) {
+                        .noneMatch(call -> call.getTargetOwner().getName().equals(P + "domain.access.ApiAuthorization") && call.getName().equals("require"))) {
                     missing.add(m.getFullName());
                 }
             }

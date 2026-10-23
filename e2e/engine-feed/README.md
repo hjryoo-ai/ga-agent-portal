@@ -24,6 +24,7 @@ ENGINE_REPO=/path/to/ai-comm/commission-system e2e/engine-feed/run.sh
 8. 판정 `./gradlew :portal-app:e2eCheck` → `RESULT.md`:
    - 뷰 9표 = `portal-projection/src/test/resources/golden-views/a1/`(둘째 판 — `ProjectionGoldenIT`와 같은 정규형: `tenant_id` 제외, 시각 UTC). **제외 열 없음** — 엔진 `up.sh verify`가 피드를 계약 사본 `a1_portal_150000_e2.jsonl`과 바이트 비교하므로 `seq`·`eventId`·`occurredAt`도 같아야 한다(자리 단계 README의 "제외 규칙"은 필요 없어졌다).
    - `GET /api/v1/me/earnings/202608`(시험 발급기 토큰)이 200, 계약 `contracts/api/v1/portal-api.openapi.yaml` 통과, 증권번호 원문 없음.
+   - (포털 Phase 5) 시뮬레이션 한 쌍: 신계약(엔진 샘플 S1의 요청 — `WHOLE-LIFE-20Y`·150,000·2026-08-01)과 해약 영향(S5 — 원장의 `policyKey`, `CANCEL`·2027-02-15·7회차)을 포털 API로 보낸다. 실 엔진의 답이 엔진 계약 사본 스키마를 통과해야 포털이 200을 내고(아니면 502), 포털 응답이 계약을 통과하고 증권번호 원문이 없으며, `simulation_log`(GA01)에 `NEW_CONTRACT`·`POLICY_EVENT`가 `SUCCEEDED`·엔진 상태 200으로 남는다. 값은 엔진 시드에 따라 다를 수 있어 대조하지 않는다(값 대조는 엔진 `SimulationContractTest`가 샘플로 한다).
 
 `ingest rebuild` 뒤 재대조(자리 단계 README의 4번)는 넣지 않았다 — D-16 범위 밖이고, 재구축 = 골든은 `RebuildIT`가 계약 사본으로 증명한다. 운영자 링크(`cli:<OS 사용자>`)를 등록하는 단계가 늘어 실행 표면만 커진다.
 

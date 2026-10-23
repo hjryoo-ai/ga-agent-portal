@@ -1,6 +1,7 @@
 package com.ga.portal.ingest.testing;
 
 import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -45,6 +46,22 @@ public final class StubFeedServer implements AutoCloseable {
         }
         server.createContext("/internal/v1/events", this::handle);
         server.start();
+    }
+
+    /**
+     * 다른 경로의 처리기를 같은 서버에 붙인다 — 같은 {@code engine_base_url}·같은 서비스 토큰 검사(틀리면 401, 처리기는 부르지 않는다). 포털 Phase 5: 엔진
+     * 시뮬레이션 스텁({@code StubSimulationEngine}, portal-sim 시험 픽스처).
+     */
+    public StubFeedServer route(String path, HttpHandler handler) {
+        server.createContext(path, exchange -> {
+            if (!("Bearer " + token).equals(exchange.getRequestHeaders().getFirst("Authorization"))) {
+                exchange.getRequestBody().readAllBytes();
+                send(exchange, 401, "{\"code\":\"UNAUTHENTICATED\",\"message\":\"service token is missing or invalid\"}");
+                return;
+            }
+            handler.handle(exchange);
+        });
+        return this;
     }
 
     public URI baseUrl() {

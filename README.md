@@ -18,7 +18,9 @@ Phase 3(조회 API) 수용(2026-10-17) — [지시문](docs/phase-03-지시문.m
 
 Phase 4(화면 1차) 수용(2026-10-22, 조건 A1 → `phase-4.1`) — [지시문](docs/phase-04-지시문.md)·[계획](docs/phase-04-계획.md)·[승인](docs/phase-04-계획승인.md)·[보고서](docs/phase-04-보고서.md)·[수용 심사](docs/phase-04-수용심사.md). 태그 `phase-4`·`phase-4.1`.
 
-정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.7.1), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
+Phase 5(분급 타임라인·시뮬레이션) 수용(2026-10-23, 조건 B1 → `phase-5.1`) — [지시문](docs/phase-05-지시문.md)·[계획](docs/phase-05-계획.md)·[보고서](docs/phase-05-보고서.md)·[수용 심사](docs/phase-05-수용심사.md). 태그 `phase-5`·`phase-5.1`.
+
+정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.8.1), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## 실행
 
@@ -64,14 +66,14 @@ java -jar portal-app.jar --spring.profiles.active=cli ingest rebuild --tenant=GA
 
 실 엔진 E2E(정규 빌드 밖, 손으로 실행): `ENGINE_REPO=<엔진 commission-system 경로> e2e/engine-feed/run.sh` — 엔진 로컬 스택 → 포털(인제스트 켬) → 뷰 9표 = 골든 `a1`, 조회 API 한 건 계약 통과 → `e2e/engine-feed/RESULT.md`. 절차·비밀 처리는 `e2e/engine-feed/README.md`.
 
-## 화면 (Phase 4)
+## 화면 (Phase 4·5)
 
-`web/` — React 19 + TypeScript + Vite 모바일 웹. 빌드 산출물은 `portal-app` 부트 jar 안에 들어가 API와 **같은 출처**로 서빙된다(CORS 없음, CSP `'self'`만). 화면: 홈 `/`, 월별 명세 `/statements`, 라인 상세 `/lines/{calcId}`, 한도 `/limits`. 토큰은 웹뷰 호스트가 `/#token=<JWT>`로 넣고 화면은 메모리에만 둔다(새로고침하면 다시 넣어야 한다). 규약은 `CLAUDE.md` "화면 규약", 개발 명령은 [`web/README.md`](web/README.md).
+`web/` — React 19 + TypeScript + Vite 모바일 웹. 빌드 산출물은 `portal-app` 부트 jar 안에 들어가 API와 **같은 출처**로 서빙된다(CORS 없음, CSP `'self'`만). 화면: 홈 `/`, 월별 명세 `/statements`, 라인 상세 `/lines/{calcId}`, 한도 `/limits`, Phase 5 분급 타임라인 `/deferrals`·시뮬레이션 `/simulations`(엔진 호출은 서버만 — 결과는 "설계사 참고용 · 비확정 · 고객 제시 불가"). 토큰은 웹뷰 호스트가 `/#token=<JWT>`로 넣고 화면은 메모리에만 둔다(새로고침하면 다시 넣어야 한다). 규약은 `CLAUDE.md` "화면 규약", 개발 명령은 [`web/README.md`](web/README.md).
 
 로컬에서 화면을 눈으로 보려면(Docker 필요):
 
 ```bash
-./gradlew :web:e2eServe              # PostgreSQL·발급자·피드 스텁(GA01C~GA04C, 허구 스트림 전부) + 포털을 띄운다 — Ctrl-C로 정리
+./gradlew :web:e2eServe              # PostgreSQL·발급자·피드 스텁(GA01C~GA04C, 허구 스트림 전부)·엔진 시뮬레이션 스텁(엔진 샘플 사본) + 포털 — Ctrl-C로 정리
 ```
 
 로그인 URL(토큰이 든 `/#token=…`)은 터미널에 찍지 않고 `web/build/e2e/.state/login-urls.txt`(디렉터리 700·파일 600, `build/`라 커밋되지 않는다)에만 쓴다. 그 파일의 URL을 브라우저로 연다. 토큰은 하네스의 시험용 발급자가 만든 것이라 3시간 뒤 또는 하네스가 내려가면 쓸 수 없다.

@@ -1,6 +1,6 @@
 package com.ga.portal.query.api;
 
-import com.ga.portal.query.QueryAuthorization;
+import com.ga.portal.domain.access.ApiAuthorization;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -57,9 +57,11 @@ class PortalApiContractTest {
         m.put(AsOf.class, schema("AsOf"));
         m.put(MeResponse.class, schema("MeResponse"));
         m.put(MeResponse.Tenant.class, schema("MeResponse").path("properties").path("tenant"));
+        m.put(MeResponse.Features.class, schema("MeResponse").path("properties").path("features"));
         m.put(MonthSummary.class, schema("MonthSummary"));
         m.put(EarningsResponse.class, schema("EarningsResponse"));
         m.put(MonthResponse.class, schema("MonthResponse"));
+        m.put(MonthResponse.Previous.class, schema("MonthResponse").path("properties").path("previous"));
         m.put(Line.class, schema("Line"));
         m.put(LinesResponse.class, schema("LinesResponse"));
         m.put(LineDetailResponse.class, schema("LineDetailResponse"));
@@ -73,6 +75,7 @@ class PortalApiContractTest {
         m.put(LimitDetailResponse.History.class, schema("LimitDetailResponse").path("properties").path("history").path("items"));
         m.put(DeferralsResponse.class, schema("DeferralsResponse"));
         m.put(DeferralsResponse.Month.class, schema("DeferralsResponse").path("properties").path("months").path("items"));
+        m.put(DeferralsResponse.Bar.class, schema("DeferralsResponse").path("properties").path("months").path("items").path("properties").path("bar"));
         m.put(DeferralsResponse.Item.class, schema("DeferralsResponse").path("properties").path("items").path("items"));
         return m;
     }
@@ -96,6 +99,9 @@ class PortalApiContractTest {
         }
         if (c == String.class || c == java.time.Instant.class || c == java.time.LocalDate.class) {
             return "string";
+        }
+        if (c == boolean.class || c == Boolean.class) {
+            return "boolean";
         }
         if (c.isRecord()) {
             return "object";
@@ -143,14 +149,73 @@ class PortalApiContractTest {
     void pathsAreTheAuthorizationMatrixAndEachHas401And404() {
         Set<String> paths = new TreeSet<>();
         api.path("paths").properties().forEach(e -> {
-            paths.add("GET " + e.getKey());
-            JsonNode responses = e.getValue().path("get").path("responses");
-            assertThat(responses.has("401") && responses.has("404") && responses.has("200") && responses.has("304")).as(e.getKey()).isTrue();
+            assertThat(e.getValue().properties()).as("one method per path").hasSize(1);
+            String method = e.getValue().propertyNames().iterator().next();
+            assertThat(method).as(e.getKey()).isIn("get", "post");
+            paths.add(method.toUpperCase(java.util.Locale.ROOT) + " " + e.getKey());
+            JsonNode responses = e.getValue().path(method).path("responses");
+            assertThat(responses.has("401") && responses.has("404") && responses.has("200")).as(e.getKey()).isTrue();
             assertThat(responses.path("200").path("content").path("application/json").path("schema").has("$ref")).as(e.getKey()).isTrue();
-            assertThat(e.getValue().properties()).as("GET only").extracting(Map.Entry::getKey).containsExactly("get");
+            if (method.equals("get")) {
+                // 조회: 약한 ETag·304
+                assertThat(responses.has("304")).as(e.getKey()).isTrue();
+                assertThat(responses.path("200").path("headers").has("ETag")).as(e.getKey()).isTrue();
+            } else {
+                // 시뮬레이션(1.1.0): 요청 본문(계약 스키마), ETag·304 없음, no-store, 거부 셋(400·422·429·502·503)
+                assertThat(e.getValue().path(method).path("requestBody").path("content").path("application/json").path("schema").has("$ref")).isTrue();
+                assertThat(responses.has("304")).as(e.getKey()).isFalse();
+                assertThat(responses.path("200").path("headers").has("ETag")).as(e.getKey()).isFalse();
+                assertThat(responses.path("200").path("headers").path("Cache-Control").path("$ref").asString()).isEqualTo("#/components/headers/NoStore");
+                assertThat(responses.propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "404", "422", "429", "502", "503");
+            }
         });
-        assertThat(paths).isEqualTo(new TreeSet<>(QueryAuthorization.matrix().keySet()));
+        assertThat(paths).isEqualTo(new TreeSet<>(ApiAuthorization.matrix().keySet()));
         assertThat(api.path("openapi").asString()).isEqualTo("3.1.0");
+    }
+
+    /**
+     * 계약에 값이 {@code null}인 키가 없다 — 흐름 매핑({@code {a: b, c: d}})의 따옴표 없는 설명에 쉼표가 있으면 설명이 잘리고 나머지가 값 없는 키가 된다(Phase 5
+     * 1.1.0 초안에서 여덟 곳 — 생성 클라이언트의 설명이 잘려 보였다).
+     */
+    @Test
+    void noKeyWithoutAValue() {
+        List<String> nulls = new ArrayList<>();
+        collectNulls("", api, nulls);
+        assertThat(nulls).isEmpty();
+    }
+
+    static void collectNulls(String at, JsonNode node, List<String> out) {
+        if (node.isObject()) {
+            for (Map.Entry<String, JsonNode> e : node.properties()) {
+                if (e.getValue().isNull()) {
+                    out.add(at + "/" + e.getKey());
+                }
+                collectNulls(at + "/" + e.getKey(), e.getValue(), out);
+            }
+        } else if (node.isArray()) {
+            for (int i = 0; i < node.size(); i++) {
+                collectNulls(at + "[" + i + "]", node.get(i), out);
+            }
+        }
+    }
+
+    @Test
+    void everyObjectSchemaIsClosed() {
+        List<String> open = new ArrayList<>();
+        closed("components/schemas", api.path("components").path("schemas"), open);
+        assertThat(open).as("object schemas without additionalProperties: false").isEmpty();
+    }
+
+    static void closed(String at, JsonNode node, List<String> open) {
+        if (node.isObject()) {
+            if ("object".equals(node.path("type").asString()) && node.has("properties")
+                    && !(node.path("additionalProperties").isBoolean() && !node.path("additionalProperties").asBoolean())) {
+                open.add(at);
+            }
+            node.properties().forEach(e -> closed(at + "/" + e.getKey(), e.getValue(), open));
+        } else if (node.isArray()) {
+            node.forEach(n -> closed(at + "[]", n, open));
+        }
     }
 
     @Test

@@ -1,8 +1,12 @@
 package com.ga.portal.app.web;
 
 import com.ga.platform.core.tenant.TenantContext;
-import com.ga.portal.query.InvalidRequest;
-import com.ga.portal.query.NotFound;
+import com.ga.portal.domain.access.InvalidRequest;
+import com.ga.portal.domain.access.NotFound;
+import com.ga.portal.sim.RateLimited;
+import com.ga.portal.sim.SimulationFailed;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -59,9 +63,22 @@ final class ApiExceptionHandler {
         }
     }
 
-    @ExceptionHandler({InvalidRequest.class, MissingServletRequestParameterException.class, HttpMediaTypeNotAcceptableException.class})
+    @ExceptionHandler({InvalidRequest.class, MissingServletRequestParameterException.class, HttpMediaTypeNotAcceptableException.class,
+            HttpMediaTypeNotSupportedException.class, HttpMessageNotReadableException.class})
     void invalid(HttpServletResponse response) throws IOException {
         ProblemResponses.invalidRequest(response);
+    }
+
+    /** 시뮬레이션(포털 Phase 5): 엔진 거부·계약 위반·불가 → 코드별 고정 바이트. 행은 이미 {@code FAILED}(유스케이스). */
+    @ExceptionHandler(SimulationFailed.class)
+    void simulationFailed(SimulationFailed e, HttpServletResponse response) throws IOException {
+        ProblemResponses.simulationFailed(response, e.code());
+    }
+
+    /** 레이트 리밋 — 행·감사 없음(유스케이스가 롤백했다). */
+    @ExceptionHandler(RateLimited.class)
+    void rateLimited(RateLimited e, HttpServletResponse response) throws IOException {
+        ProblemResponses.rateLimited(response, e.retryAfterSeconds());
     }
 
     @ExceptionHandler(Exception.class)

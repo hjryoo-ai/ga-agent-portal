@@ -1,9 +1,9 @@
 > 🌐 **한국어** · [English](en/authz-matrix.md)
 
-# 조회 API 인가 매트릭스 (정본)
+# API 인가 매트릭스 (정본) — 조회·시뮬레이션
 
 > 포털 Phase 3(지시문 D-11, 계획 ④, 승인 Q8). 이 문서의 `authz-matrix` 블록이 정본이고 `AuthzMatrixTest`가 코드와 **양방향**으로 대조한다 —
-> 행 = 컨트롤러의 `@GetMapping` 템플릿 집합 = `QueryAuthorization` 키 집합 = `@UseCaseEntry` 값 집합. 셋 중 하나만 바뀌어도 시험이 실패한다.
+> 행 = 컨트롤러의 `@GetMapping`·`@PostMapping` 템플릿 집합 = `ApiAuthorization` 키 집합(`com.ga.portal.domain.access`) = `@UseCaseEntry` 값 집합. 셋 중 하나만 바뀌어도 시험이 실패한다.
 
 열의 뜻:
 
@@ -22,6 +22,10 @@ GET /api/v1/me/earnings/lines/{calcId},SELF,404,404,404,404
 GET /api/v1/me/limits,SELF,404,404,404,404
 GET /api/v1/me/limits/{ledgerId},SELF,404,404,404,404
 GET /api/v1/me/deferrals,SELF,404,404,404,404
+POST /api/v1/me/simulations/new-contract,SELF,404,404,404,404
+POST /api/v1/me/simulations/policy-event,SELF,404,404,404,404
 ```
+
+시뮬레이션 두 행(포털 Phase 5, 계약 1.1.0): `SELF` = 호출자 자신의 설계사로만 엔진에 묻는다(본문에 설계사가 없다). 계약 이벤트의 `policyKey`는 그 설계사의 라인 증권번호 집합에서만 풀리고, 남의·없는 키는 같은 404(`MISSING` — `simulation_log` 행·엔진 호출 0, `SimulationAuthzIT`).
 
 `MANAGER`는 v2 조직 조회(`/api/v1/org/**`)의 역할이다 — 그때 이 표에 행이 생긴다(설계서 §14.1). 지금 `/api/v1/me/**`는 `AGENT`만이다.

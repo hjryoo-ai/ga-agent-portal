@@ -28,6 +28,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import com.ga.portal.ingest.feed.ServiceTokenSource;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.Clock;
@@ -39,6 +40,15 @@ import java.time.Clock;
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(IngestProperties.class)
 public class IngestConfiguration {
+
+    /**
+     * 테넌트별 엔진 서비스 토큰 파일({@code portal.ingest.token-dir}) — 폴링과 시뮬레이션(포털 Phase 5, 계획 Q2·P-9)이 같은 빈을 쓴다. 폴링이 꺼져 있어도 있다
+     * (Phase 4까지는 {@code IngestPollingConfiguration}에만 있었다 — 인제스트 없이 시뮬레이션만 켜면 토큰이 없었다).
+     */
+    @Bean
+    ServiceTokenSource serviceTokenSource(IngestProperties props) {
+        return new FileServiceTokenSource(props.tokenDir());
+    }
 
     @Bean
     IngestStore ingestStore(IngestCursorRepository cursors, IngestEventRepository events) {

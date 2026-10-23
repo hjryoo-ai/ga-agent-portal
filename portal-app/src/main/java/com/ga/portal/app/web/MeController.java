@@ -1,6 +1,6 @@
 package com.ga.portal.app.web;
 
-import com.ga.portal.query.Caller;
+import com.ga.portal.domain.access.Caller;
 import com.ga.portal.query.MeQueries;
 import com.ga.portal.query.api.DeferralsResponse;
 import com.ga.portal.query.api.EarningsResponse;
@@ -82,7 +82,11 @@ final class MeController {
     @GetMapping("/api/v1/me/deferrals")
     ResponseEntity<DeferralsResponse> deferrals(Caller caller, @RequestParam(name = "from", required = false) String from,
                                                 @RequestParam(name = "to", required = false) String to,
+                                                @RequestParam(name = "scenario", required = false) String scenario,
+                                                @RequestParam(name = "p", required = false) String p,
+                                                @RequestParam(name = "policyKey", required = false) String policyKey,
                                                 @RequestHeader(name = EtagSupport.IF_NONE_MATCH, required = false) String ifNoneMatch) {
-        return EtagSupport.respond(queries.deferrals(caller, from, to), ifNoneMatch);
+        return EtagSupport.respond(queries.deferrals(caller, from, to, Optional.ofNullable(scenario), Optional.ofNullable(p),
+                Optional.ofNullable(policyKey)), ifNoneMatch);
     }
 }

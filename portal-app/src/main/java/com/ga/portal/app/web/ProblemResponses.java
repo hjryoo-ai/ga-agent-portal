@@ -1,5 +1,6 @@
 package com.ga.portal.app.web;
 
+import com.ga.portal.sim.SimulationFailed;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
 
@@ -21,6 +22,13 @@ final class ProblemResponses {
     static final byte[] NOT_FOUND = body("NOT_FOUND", "not found");
     static final byte[] INVALID_REQUEST = body("INVALID_REQUEST", "invalid request");
     static final byte[] INTERNAL_ERROR = body("INTERNAL_ERROR", "internal error");
+    // 시뮬레이션(포털 Phase 5 — 계획 Q19): 코드마다 한 바이트, 엔진의 message는 옮기지 않는다
+    static final byte[] INSURER_AMBIGUOUS = body("INSURER_AMBIGUOUS", "insurer must be chosen");
+    static final byte[] UNSUPPORTED_EVENT_TYPE = body("UNSUPPORTED_EVENT_TYPE", "event type not simulated");
+    static final byte[] ENGINE_REJECTED = body("ENGINE_REJECTED", "rejected by the engine");
+    static final byte[] RATE_LIMITED = body("RATE_LIMITED", "too many simulations");
+    static final byte[] ENGINE_CONTRACT = body("ENGINE_CONTRACT", "engine answer not usable");
+    static final byte[] ENGINE_UNAVAILABLE = body("ENGINE_UNAVAILABLE", "engine unavailable");
 
     private ProblemResponses() {
     }
@@ -44,6 +52,23 @@ final class ProblemResponses {
 
     static void internalError(HttpServletResponse response) throws IOException {
         write(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, INTERNAL_ERROR);
+    }
+
+    /** 시뮬레이션 실패 — 상태는 코드가 정한다(422 셋·502·503). */
+    static void simulationFailed(HttpServletResponse response, SimulationFailed.Code code) throws IOException {
+        write(response, code.status(), switch (code) {
+            case INSURER_AMBIGUOUS -> INSURER_AMBIGUOUS;
+            case UNSUPPORTED_EVENT_TYPE -> UNSUPPORTED_EVENT_TYPE;
+            case ENGINE_REJECTED -> ENGINE_REJECTED;
+            case ENGINE_CONTRACT -> ENGINE_CONTRACT;
+            case ENGINE_UNAVAILABLE -> ENGINE_UNAVAILABLE;
+        });
+    }
+
+    /** 429 + {@code Retry-After}(정수 초 — 요청마다 다를 수 있는 유일한 머리). */
+    static void rateLimited(HttpServletResponse response, long retryAfterSeconds) throws IOException {
+        response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
+        write(response, 429, RATE_LIMITED);
     }
 
     private static void write(HttpServletResponse response, int status, byte[] body) throws IOException {

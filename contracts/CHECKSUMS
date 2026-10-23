@@ -1,5 +1,5 @@
 8602e83bf2e5397ff3c8f596700ac97ac5499515d02735d69aa541f2f3b6eabe  api/v1/engine-internal.openapi.yaml
-0d14a1827aab03f61505dd3a24451728e1a73a59f6645cbbc8d7563b4fbf9188  api/v1/portal-api.openapi.yaml
+2f529ade506bd43869b54fa37f59ebae10efa4de5698275150161aeaf6114742  api/v1/portal-api.openapi.yaml
 54994254531879e980b11b669f7a15bfbae716e8b071832cba4b901e965719e8  events/v1/defs.schema.json
 acc002a88639a18ee2391e0ef0e744ca631a8c2eb4eb384cc801a838184b3463  events/v1/envelope.schema.json
 748b088d4427d739fef5804b8d564799cad03537df45eed3d2ef02b938dc1d16  events/v1/payloads/AdjustmentPosted.v1.schema.json

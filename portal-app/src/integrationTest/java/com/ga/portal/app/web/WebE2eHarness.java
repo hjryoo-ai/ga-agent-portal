@@ -6,6 +6,7 @@ import com.ga.portal.ingest.ContractSchemas;
 import com.ga.portal.ingest.EnvelopeValidator;
 import com.ga.portal.ingest.EnvelopeVerdict;
 import com.ga.portal.ingest.testing.StubFeedServer;
+import com.ga.portal.sim.testing.StubSimulationEngine;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import tools.jackson.databind.JsonNode;
@@ -41,7 +42,11 @@ import java.util.concurrent.CountDownLatch;
  *   <li>스트림의 모든 줄을 계약 스키마로 검증한다({@link EnvelopeValidator}) — 하나라도 거부되면 시작하지 않는다.</li>
  *   <li>상태 디렉터리(권한 700)에 파일로만: 엔진 서비스 토큰({@code engine-tokens/<tenant>}), {@code policyKey} 비밀, 화면 토큰({@code tokens/<tenant>-<kind>.jwt}
  *       — 설계사·링크 없는 subject·만료), {@code env.json}(포트·DB URL·테넌트 목록 — 비밀 없음), 마지막에 {@code ready}. 명령 인자·환경 변수·출력에는 싣지 않는다.</li>
- *   <li>제어 포트(127.0.0.1): {@code POST /head/<tenant>/<seq>}(피드가 seq 1..n을 낸다), {@code POST /fail/<tenant>/on|off}(피드 503 — 동기화 지연).</li>
+ *   <li>제어 포트(127.0.0.1): {@code POST /head/<tenant>/<seq>}(피드가 seq 1..n을 낸다), {@code POST /fail/<tenant>/on|off}(피드 503 — 동기화 지연),
+ *       Phase 5 {@code POST /sim/<tenant>/down|up|slow|fast|broken}(엔진 시뮬레이션 스텁 — 503·정상·지연·정상 속도·스키마 위반 200).</li>
+ *   <li>Phase 5(계획 ⑨): 피드 스텁에 엔진 시뮬레이션 스텁({@link StubSimulationEngine} — 엔진 샘플 사본만, JCS 대조)을 붙인다. GA01·GA03·GA04는 표준 엔진,
+ *       GA02는 보험사 둘 엔진. 테넌트 {@code params}: {@code sim_rate_per_minute} GA03 2(429 시나리오 전용) · 나머지 100, GA04만
+ *       {@code forecast_scenario_enabled}(유지율 시나리오).</li>
  * </ul>
  * 인자: 상태 디렉터리, 쉼표로 이은 프로젝트 접미사(예 {@code A,B,C}).
  */
@@ -51,11 +56,15 @@ public final class WebE2eHarness {
     static final String AUDIENCE = "portal-e2e";
     static final SecureRandom RANDOM = new SecureRandom();
 
-    record Base(String id, List<Path> streams) {
+    /** 스트림 + 엔진 상태(샘플 묶음) + 시뮬레이션 레이트 + 유지율 시나리오 허용. */
+    record Base(String id, List<Path> streams, String engineState, int simRatePerMinute, boolean forecastScenario) {
     }
 
-    record Tenant(String id, TestIssuer issuer, StubFeedServer feed, List<JsonNode> events) {
+    record Tenant(String id, TestIssuer issuer, StubFeedServer feed, StubSimulationEngine engine, List<JsonNode> events) {
     }
+
+    /** {@code slow}의 지연 — 앱 기본 읽기 시간 초과(10초)보다 1초 길게(계획 ⑨). */
+    static final long SLOW_MILLIS = 11_000;
 
     public static void main(String[] args) throws Exception {
         if (args.length != 2) {
@@ -66,11 +75,13 @@ public final class WebE2eHarness {
         Path root = Path.of(System.getProperty("ga.repoRoot"));
         Path golden = root.resolve("portal-projection/src/test/resources/golden-streams");
         Path hand = root.resolve("web/e2e/streams");
+        Path samples = StubSimulationEngine.samplesDir(root);
         List<Base> bases = List.of(
-                new Base("GA01", List.of(root.resolve("contracts/events/v1/samples/a1/a1_portal_150000_e2.jsonl"), hand.resolve("ga01-neighbor.jsonl"))),
-                new Base("GA02", List.of(golden.resolve("engine-e2-estimate/estimate_cycle_01_기본.jsonl"))),
-                new Base("GA03", List.of(golden.resolve("engine-e1-cycle.jsonl"))),
-                new Base("GA04", List.of(hand.resolve("edges.jsonl"))));
+                new Base("GA01", List.of(root.resolve("contracts/events/v1/samples/a1/a1_portal_150000_e2.jsonl"), hand.resolve("ga01-neighbor.jsonl")),
+                        "standard", 100, false),
+                new Base("GA02", List.of(golden.resolve("engine-e2-estimate/estimate_cycle_01_기본.jsonl")), "ambiguous", 100, false),
+                new Base("GA03", List.of(golden.resolve("engine-e1-cycle.jsonl")), "standard", 2, false),
+                new Base("GA04", List.of(hand.resolve("edges.jsonl")), "standard", 100, true));
 
         Files.createDirectories(state);
         Files.setPosixFilePermissions(state, PosixFilePermissions.fromString("rwx------"));
@@ -88,8 +99,9 @@ public final class WebE2eHarness {
                 TestIssuer issuer = new TestIssuer("e2e-" + id.toLowerCase(java.util.Locale.ROOT));
                 String engineToken = hex(24);
                 writeSecret(engineTokens.resolve(id), engineToken);
-                StubFeedServer feed = new StubFeedServer(id, engineToken).events(List.of());
-                register(db, id, feed, issuer);
+                StubSimulationEngine engine = StubSimulationEngine.of(samples, base.engineState()).slowMillis(SLOW_MILLIS);
+                StubFeedServer feed = new StubFeedServer(id, engineToken).events(List.of()).route(StubSimulationEngine.PATH_PREFIX, engine);
+                register(db, id, feed, issuer, base);
                 String agentSubject = "e2e-" + id.toLowerCase(java.util.Locale.ROOT) + "-agent-" + hex(4);
                 String unlinkedSubject = "e2e-" + id.toLowerCase(java.util.Locale.ROOT) + "-unlinked-" + hex(4);
                 link(db, id, agentSubject, "A-1001");
@@ -100,7 +112,7 @@ public final class WebE2eHarness {
                         b -> b.expirationTime(Date.from(now.plus(Duration.ofHours(3))))));
                 writeSecret(tokens.resolve(id + "-expired.jwt"), issuer.token(agentSubject, AUDIENCE,
                         b -> b.issueTime(Date.from(now.minus(Duration.ofHours(2)))).expirationTime(Date.from(now.minus(Duration.ofMinutes(10))))));
-                tenants.put(id, new Tenant(id, issuer, feed, events));
+                tenants.put(id, new Tenant(id, issuer, feed, engine, events));
             }
         }
 
@@ -117,6 +129,17 @@ public final class WebE2eHarness {
         control.createContext("/fail/", ex -> handle(ex, () -> {
             String[] parts = ex.getRequestURI().getPath().split("/");
             tenant(tenants, parts[2]).feed().forceStatus("on".equals(parts[3]) ? 503 : 0);
+        }));
+        control.createContext("/sim/", ex -> handle(ex, () -> {
+            String[] parts = ex.getRequestURI().getPath().split("/");
+            StubSimulationEngine engine = tenant(tenants, parts[2]).engine();
+            engine.mode(switch (parts[3]) {
+                case "down" -> StubSimulationEngine.Mode.DOWN;
+                case "up", "fast" -> StubSimulationEngine.Mode.UP;
+                case "slow" -> StubSimulationEngine.Mode.SLOW;
+                case "broken" -> StubSimulationEngine.Mode.BROKEN;
+                default -> throw new IllegalArgumentException("unknown engine mode");
+            });
         }));
         control.start();
 
@@ -164,11 +187,13 @@ public final class WebE2eHarness {
         return List.copyOf(events);
     }
 
-    static void register(PostgresHarness db, String tenant, StubFeedServer feed, TestIssuer issuer) {
+    static void register(PostgresHarness db, String tenant, StubFeedServer feed, TestIssuer issuer, Base base) {
         db.seed(tenant, c -> SeedData.exec(c, """
                 INSERT INTO tenant (tenant_id, name, engine_base_url, status, payout_day_rule, params, oidc_issuer, oidc_audience)
-                VALUES (?, ?, ?, 'ACTIVE', 'NEXT_MONTH_D10', '{"poll_interval_seconds": 5, "sync_delay_seconds": 10}'::jsonb, ?, ?)
-                """, tenant, "E2E " + tenant, feed.baseUrl().toString(), issuer.issuer(), AUDIENCE));
+                VALUES (?, ?, ?, 'ACTIVE', 'NEXT_MONTH_D10',
+                        jsonb_build_object('poll_interval_seconds', 5, 'sync_delay_seconds', 10, 'sim_rate_per_minute', ?::int,
+                                           'forecast_scenario_enabled', ?::boolean), ?, ?)
+                """, tenant, "E2E " + tenant, feed.baseUrl().toString(), base.simRatePerMinute(), base.forecastScenario(), issuer.issuer(), AUDIENCE));
     }
 
     static void link(PostgresHarness db, String tenant, String subject, String agentId) {

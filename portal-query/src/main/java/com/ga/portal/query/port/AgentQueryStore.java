@@ -8,6 +8,7 @@ import com.ga.portal.domain.view.HistoryRow;
 import com.ga.portal.domain.view.LedgerItem;
 import com.ga.portal.domain.view.LineDetail;
 import com.ga.portal.domain.view.LinePage;
+import com.ga.portal.domain.view.MonthDetail;
 import com.ga.portal.domain.view.MonthRow;
 import com.ga.portal.domain.view.ReceivableRow;
 
@@ -28,6 +29,9 @@ public interface AgentQueryStore {
     List<MonthRow> months(AgentId agent, String fromYm, String toYm);
 
     Optional<MonthRow> month(AgentId agent, String closeYm);
+
+    /** 월 상세 — 그 달 행 + 지난달({@code previousYm}) 행의 값(포털 Phase 5 CR-1, 한 문장). */
+    Optional<MonthDetail> monthDetail(AgentId agent, String closeYm, String previousYm);
 
     /** 그 달 라인의 {@code comm_type}별 정수 합(유형 이름순). */
     Map<String, Long> byType(AgentId agent, String closeYm);
@@ -55,7 +59,11 @@ public interface AgentQueryStore {
     List<HistoryRow> history(AgentId agent, String ledgerId);
 
     /** {@code fromYm ≤ due_ym ≤ toYm}의 분급 항목(지급월·일정 ID 순). */
-    List<DeferralRow> deferrals(AgentId agent, String fromYm, String toYm);
+    List<DeferralRow> deferrals(AgentId agent, String fromYm, String toYm, Optional<String> policyNo);
 
-    List<DueMonth> dueMonths(AgentId agent, String fromYm, String toYm);
+    /** 지급월별 원값 합. {@code policyNo}가 있으면 그 계약만(포털 Phase 5 Q15). */
+    List<DueMonth> dueMonths(AgentId agent, String fromYm, String toYm, Optional<String> policyNo);
+
+    /** 그 설계사의 분급 항목 증권번호 집합 — {@code policyKey} 필터를 풀 때만. */
+    Set<String> deferralPolicies(AgentId agent);
 }

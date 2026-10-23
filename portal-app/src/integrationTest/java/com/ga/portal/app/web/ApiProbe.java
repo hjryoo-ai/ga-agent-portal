@@ -1,9 +1,9 @@
 package com.ga.portal.app.web;
 
 import com.ga.portal.infra.persistence.AuditAccessRepository;
-import com.ga.portal.query.Caller;
-import com.ga.portal.query.DenyReason;
-import com.ga.portal.query.NotFound;
+import com.ga.portal.domain.access.Caller;
+import com.ga.portal.domain.access.DenyReason;
+import com.ga.portal.domain.access.NotFound;
 import org.springframework.boot.test.context.TestComponent;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;

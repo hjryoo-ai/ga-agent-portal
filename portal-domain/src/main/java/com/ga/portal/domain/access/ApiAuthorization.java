@@ -1,4 +1,4 @@
-package com.ga.portal.query;
+package com.ga.portal.domain.access;
 
 import com.ga.portal.domain.Role;
 
@@ -8,11 +8,11 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 조회 API 인가 표 — 엔드포인트 템플릿 → 허용 역할(정본은 {@code docs/authz-matrix.md}, {@code AuthzMatrixTest}가 이 표·문서·컨트롤러 매핑을 양방향으로 대조한다).
- * Phase 3의 {@code /api/v1/me/**}는 전부 {@code AGENT}만(MANAGER는 v2, OPERATOR는 CLI — 지시문 D-2). 허용되지 않으면 {@link NotFound}({@code ROLE}) —
+ * API 인가 표(조회 여덟 + 시뮬레이션 둘 — 포털 Phase 5) — 엔드포인트 템플릿 → 허용 역할(정본은 {@code docs/authz-matrix.md}, {@code AuthzMatrixTest}가 이 표·문서·컨트롤러 매핑을 양방향으로 대조한다).
+ * {@code /api/v1/me/**}는 전부 {@code AGENT}만(MANAGER는 v2, OPERATOR는 CLI — 지시문 D-2). 허용되지 않으면 {@link NotFound}({@code ROLE}) —
  * 응답은 다른 404와 같은 바이트.
  */
-public final class QueryAuthorization {
+public final class ApiAuthorization {
 
     public static final String ME = "GET /api/v1/me";
     public static final String EARNINGS = "GET /api/v1/me/earnings";
@@ -22,18 +22,21 @@ public final class QueryAuthorization {
     public static final String LIMITS = "GET /api/v1/me/limits";
     public static final String LIMIT = "GET /api/v1/me/limits/{ledgerId}";
     public static final String DEFERRALS = "GET /api/v1/me/deferrals";
+    /** 시뮬레이션(포털 Phase 5 — 계약 1.1.0). */
+    public static final String SIM_NEW_CONTRACT = "POST /api/v1/me/simulations/new-contract";
+    public static final String SIM_POLICY_EVENT = "POST /api/v1/me/simulations/policy-event";
 
     private static final Map<String, Set<Role>> MATRIX;
 
     static {
         Map<String, Set<Role>> m = new LinkedHashMap<>();
-        for (String endpoint : new String[] {ME, EARNINGS, MONTH, LINES, LINE, LIMITS, LIMIT, DEFERRALS}) {
+        for (String endpoint : new String[] {ME, EARNINGS, MONTH, LINES, LINE, LIMITS, LIMIT, DEFERRALS, SIM_NEW_CONTRACT, SIM_POLICY_EVENT}) {
             m.put(endpoint, Set.of(Role.AGENT));
         }
         MATRIX = Collections.unmodifiableMap(m);
     }
 
-    private QueryAuthorization() {
+    private ApiAuthorization() {
     }
 
     /** 엔드포인트 → 허용 역할(선언 순서). */

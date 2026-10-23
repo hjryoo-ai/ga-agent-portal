@@ -8,6 +8,7 @@ import com.ga.portal.domain.view.HistoryRow;
 import com.ga.portal.domain.view.LedgerItem;
 import com.ga.portal.domain.view.LineDetail;
 import com.ga.portal.domain.view.LinePage;
+import com.ga.portal.domain.view.MonthDetail;
 import com.ga.portal.domain.view.MonthRow;
 import com.ga.portal.domain.view.ReceivableRow;
 import com.ga.portal.infra.persistence.AgentQueryRepository;
@@ -40,6 +41,11 @@ final class JdbcAgentQueryStore implements AgentQueryStore {
     @Override
     public Optional<MonthRow> month(AgentId agent, String closeYm) {
         return repository.month(agent.value(), closeYm);
+    }
+
+    @Override
+    public Optional<MonthDetail> monthDetail(AgentId agent, String closeYm, String previousYm) {
+        return repository.monthDetail(agent.value(), closeYm, previousYm);
     }
 
     @Override
@@ -93,12 +99,17 @@ final class JdbcAgentQueryStore implements AgentQueryStore {
     }
 
     @Override
-    public List<DeferralRow> deferrals(AgentId agent, String fromYm, String toYm) {
-        return repository.deferrals(agent.value(), fromYm, toYm);
+    public List<DeferralRow> deferrals(AgentId agent, String fromYm, String toYm, Optional<String> policyNo) {
+        return repository.deferrals(agent.value(), fromYm, toYm, policyNo);
     }
 
     @Override
-    public List<DueMonth> dueMonths(AgentId agent, String fromYm, String toYm) {
-        return repository.dueMonths(agent.value(), fromYm, toYm);
+    public List<DueMonth> dueMonths(AgentId agent, String fromYm, String toYm, Optional<String> policyNo) {
+        return repository.dueMonths(agent.value(), fromYm, toYm, policyNo);
+    }
+
+    @Override
+    public Set<String> deferralPolicies(AgentId agent) {
+        return repository.deferralPolicies(agent.value());
     }
 }

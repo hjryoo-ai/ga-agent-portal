@@ -60,3 +60,8 @@ export async function advance(tenant: string, seq: number): Promise<void> {
 export async function failFeed(tenant: string, on: boolean): Promise<void> {
   await control(`/fail/${tenant}/${on ? 'on' : 'off'}`);
 }
+
+/** 엔진 시뮬레이션 스텁의 상태(포털 Phase 5 ⑨): down 503 · up/fast 정상 · slow 읽기 시간 초과보다 길게 · broken 스키마 위반 200. */
+export async function simEngine(tenant: string, mode: 'down' | 'up' | 'slow' | 'fast' | 'broken'): Promise<void> {
+  await control(`/sim/${tenant}/${mode}`);
+}

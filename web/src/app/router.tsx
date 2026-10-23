@@ -13,6 +13,8 @@ const screens: Record<RoutePath, Child> = {
   '/lines/:calcId': { lazy: () => import('../screens/LineScreen').then((s) => ({ Component: s.LineScreen })) },
   '/limits': { lazy: () => import('../screens/LimitsScreen').then((s) => ({ Component: s.LimitsScreen })) },
   '/limits/:ledgerId': { lazy: () => import('../screens/LimitScreen').then((s) => ({ Component: s.LimitScreen })) },
+  '/deferrals': { lazy: () => import('../screens/TimelineScreen').then((s) => ({ Component: s.TimelineScreen })) },
+  '/simulations': { lazy: () => import('../screens/SimulationScreen').then((s) => ({ Component: s.SimulationScreen })) },
 };
 
 export function createRouter() {

@@ -153,6 +153,7 @@ function summarize() {
     requests: sum('requests'),
     cspViolations: sum('cspViolations'),
     externalRequests: sum('externalRequests'),
+    simIds: sum('simIds'),
     axeStates: states.length,
     axeViolations: states.reduce((n, x) => n + x.violations, 0),
     axeRulesPassedMin: states.length === 0 ? 0 : Math.min(...states.map((x) => x.passes)),

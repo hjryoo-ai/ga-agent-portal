@@ -1,4 +1,4 @@
-package com.ga.portal.query;
+package com.ga.portal.domain.access;
 
 import com.ga.platform.core.tenant.AgentId;
 import com.ga.platform.core.tenant.TenantId;

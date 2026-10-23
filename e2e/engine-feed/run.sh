@@ -3,7 +3,8 @@
 #   ENGINE_REPO=<엔진 저장소 commission-system 경로> e2e/engine-feed/run.sh
 # ① 엔진 localstack/up.sh(Oracle + 시드 + A-1 둘째 판 + 엔진 앱 :8080, 테넌트 GA01) ② 일회용 PostgreSQL 컨테이너(고정 digest, 이 스크립트 전용
 # 이름·포트, 볼륨 없음) ③ 시험 발급기(:portal-app:runTestIssuer) ④ 포털(인제스트 켬, :8081) ⑤ 테넌트 GA01·발급자·설계사 링크 등록(파일 SQL)
-# ⑥ 커서 caught_up_at(= ingest_lag_seq 0) 대기 ⑦ 판정(:portal-app:e2eCheck) → RESULT.md. 끝나면 포털 쪽 프로세스·컨테이너와 엔진 스택을 내린다.
+# ⑥ 커서 caught_up_at(= ingest_lag_seq 0) 대기 ⑦ 판정(:portal-app:e2eCheck) → RESULT.md. 판정에는 시뮬레이션 한 쌍(포털 Phase 5 — 신계약 S1·해약 영향 S5를
+# 포털 API로 보내 실 엔진이 답하고, 포털 응답이 계약을 통과하고, simulation_log에 SUCCEEDED 둘)이 들어 있다. 끝나면 포털 쪽 프로세스·컨테이너와 엔진 스택을 내린다.
 # 토큰·subject·비밀은 .state/ 파일(권한 600)에만 — 셸 인자·환경 변수·출력에 싣지 않는다. 사용자의 compose 볼륨·~/.m2는 건드리지 않는다.
 set -euo pipefail
 
@@ -114,5 +115,5 @@ done
 test -n "$cursor" || { echo '[e2e] 따라잡기 시간 초과 — .state/portal.log' >&2; exit 1; }
 echo "[e2e]    커서: $cursor"
 
-echo '[e2e] ⑧ 판정 → e2e/engine-feed/RESULT.md'
+echo '[e2e] ⑧ 판정(뷰 9표·조회 API·시뮬레이션 한 쌍) → e2e/engine-feed/RESULT.md'
 ( cd "$ROOT" && ./gradlew -q --no-daemon :portal-app:e2eCheck --args="$STATE jdbc:postgresql://127.0.0.1:$PG_PORT/portal http://localhost:$PORTAL_PORT $HERE/RESULT.md $(git -C "$ENGINE_REPO" rev-parse HEAD) $(git -C "$ROOT" rev-parse HEAD)" )

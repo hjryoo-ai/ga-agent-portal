@@ -91,11 +91,12 @@ class PortalApplicationIT {
         assertThat(context.getBeanNamesForType(FeedClient.class)).isEmpty();
     }
 
-    /** Phase 3: 애플리케이션 컨트롤러는 조회 API 하나뿐이다(인제스트·운영 명령은 HTTP가 없다). */
+    /** Phase 3·5: 애플리케이션 컨트롤러는 조회 API와 시뮬레이션 API 둘뿐이다(인제스트·운영 명령은 HTTP가 없다). */
     @Test
-    void theOnlyApplicationControllerIsTheQueryApi() {
+    void theOnlyApplicationControllersAreTheQueryAndSimulationApis() {
         assertThat(context.getBeansWithAnnotation(org.springframework.stereotype.Controller.class).values())
                 .filteredOn(bean -> bean.getClass().getName().startsWith("com.ga."))
-                .extracting(bean -> bean.getClass().getName()).containsExactly("com.ga.portal.app.web.MeController");
+                .extracting(bean -> bean.getClass().getName())
+                .containsExactlyInAnyOrder("com.ga.portal.app.web.MeController", "com.ga.portal.app.web.SimulationController");
     }
 }

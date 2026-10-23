@@ -1,0 +1,79 @@
+{
+  "contract": "contracts/api/v1/portal-api.openapi.yaml",
+  "requests": {
+    "SimNewContractRequest": {
+      "required": [
+        "contractDate",
+        "monthlyPremium",
+        "productKey"
+      ],
+      "when": [],
+      "fields": {
+        "contractDate": {
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+        },
+        "insurerCd": {
+          "pattern": "^\\S(.*\\S)?$",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "monthlyPremium": {
+          "pattern": "^(0|[1-9][0-9]{0,11})$"
+        },
+        "paymentTermMonths": {
+          "pattern": "^[1-9][0-9]{0,3}$"
+        },
+        "productKey": {
+          "pattern": "^\\S(.*\\S)?$",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      }
+    },
+    "SimPolicyEventRequest": {
+      "required": [
+        "asOfDate",
+        "eventType",
+        "policyKey"
+      ],
+      "when": [
+        {
+          "field": "eventType",
+          "equals": "REDUCE",
+          "required": [
+            "newMonthlyPremium"
+          ]
+        }
+      ],
+      "fields": {
+        "asOfDate": {
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+        },
+        "elapsedInstallments": {
+          "pattern": "^[1-9][0-9]{0,3}$"
+        },
+        "eventType": {
+          "enum": [
+            "CANCEL",
+            "LAPSE",
+            "WITHDRAW",
+            "REDUCE",
+            "REINSTATE",
+            "PAYMENT_OVERDUE"
+          ]
+        },
+        "newMonthlyPremium": {
+          "pattern": "^(0|[1-9][0-9]{0,11})$"
+        },
+        "policyKey": {
+          "pattern": "^[0-9a-f]{16}$"
+        }
+      }
+    }
+  },
+  "queries": {
+    "listDeferrals.p": {
+      "pattern": "^([1-9][0-9]?|100)$"
+    }
+  }
+}

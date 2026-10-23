@@ -21,12 +21,17 @@ describe('foldLines', () => {
     expect(rows.map((r) => (r.kind === 'pair' ? `pair:${r.reversal.calcId}<${r.original.calcId}` : `line:${r.line.calcId}`))).toEqual(['line:2', 'pair:3<1']);
   });
 
-  it('does not fold cross-month partners and marks both roles', () => {
-    const rows = foldLines([line('1', { reversedBy: '9' }), line('5', { reversalOf: '8' })]);
-    expect(rows).toEqual([
-      { kind: 'line', line: line('1', { reversedBy: '9' }), crossMonth: { role: 'original', partnerCalcId: '9' } },
-      { kind: 'line', line: line('5', { reversalOf: '8' }), crossMonth: { role: 'reversal', partnerCalcId: '8' } },
+  it('does not fold cross-month partners and marks both roles with the partner month from the line (CR-2 — no extra call)', () => {
+    const original = line('1', { reversedBy: '9', reversedByYm: '202609' });
+    const reversal = line('5', { reversalOf: '8', reversalOfYm: '202607' });
+    expect(foldLines([original, reversal])).toEqual([
+      { kind: 'line', line: original, crossMonth: { role: 'original', partnerYm: '202609' } },
+      { kind: 'line', line: reversal, crossMonth: { role: 'reversal', partnerYm: '202607' } },
     ]);
+  });
+
+  it('a cross-month partner without its month (not yet projected) still gets a badge, without a month', () => {
+    expect(foldLines([line('1', { reversedBy: '9' })])).toEqual([{ kind: 'line', line: line('1', { reversedBy: '9' }), crossMonth: { role: 'original', partnerYm: undefined } }]);
   });
 
   it('keeps plain lines in API order', () => {

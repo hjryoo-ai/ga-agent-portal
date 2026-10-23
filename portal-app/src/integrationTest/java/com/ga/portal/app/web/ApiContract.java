@@ -25,7 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * C11: {@code /api/v1/me/**}의 <b>모든</b> 시험 응답을 계약({@code contracts/api/v1/portal-api.openapi.yaml}, 클래스패스 사본 — portal-ingest 자원)으로 검증한다.
- * {@link ApiIntegrationTest#send}가 응답마다 부른다(가로채기). 200 = 엔드포인트의 응답 스키마 + 약한 ETag·{@code private, no-cache}, 304 = 본문 없음, 400·401·404 =
+ * {@link ApiIntegrationTest#send}가 응답마다 부른다(가로채기). 200 = 엔드포인트의 응답 스키마 + 약한 ETag·{@code private, no-cache}(시뮬레이션 POST는 ETag 없음·
+ * {@code no-store} — 1.1.0), 304 = 본문 없음, 400·401·404·422·429·502·503 =
  * {@code Problem}({@code application/problem+json}). 엔드포인트 × 상태별 검증 수를 센다(보고서 표).
  */
 final class ApiContract {
@@ -44,7 +45,9 @@ final class ApiContract {
             new Route("GET /api/v1/me/earnings/{ym}", "^/api/v1/me/earnings/[^/]+$", "MonthResponse"),
             new Route("GET /api/v1/me/limits", "^/api/v1/me/limits$", "LimitsResponse"),
             new Route("GET /api/v1/me/limits/{ledgerId}", "^/api/v1/me/limits/[^/]+$", "LimitDetailResponse"),
-            new Route("GET /api/v1/me/deferrals", "^/api/v1/me/deferrals$", "DeferralsResponse"));
+            new Route("GET /api/v1/me/deferrals", "^/api/v1/me/deferrals$", "DeferralsResponse"),
+            new Route("POST /api/v1/me/simulations/new-contract", "^/api/v1/me/simulations/new-contract$", "SimNewContractResponse"),
+            new Route("POST /api/v1/me/simulations/policy-event", "^/api/v1/me/simulations/policy-event$", "SimPolicyEventResponse"));
 
     record Route(String endpoint, String regex, String schema) {
         boolean matches(String path) {
@@ -104,8 +107,14 @@ final class ApiContract {
             key = route.get().endpoint() + " 304";
         } else {
             assertThat(status).as(path).isEqualTo(200);
-            assertThat(r.headers().firstValue("etag")).as("%s etag", path).hasValueSatisfying(e -> assertThat(e).matches(ETAG));
-            assertThat(r.headers().allValues("cache-control")).as("%s cache-control", path).containsExactly("private, no-cache");
+            if (route.get().endpoint().startsWith("POST ")) {
+                // 시뮬레이션(1.1.0): ETag 없음, 저장하지 않는다
+                assertThat(r.headers().firstValue("etag")).as("%s etag", path).isEmpty();
+                assertThat(r.headers().allValues("cache-control")).as("%s cache-control", path).containsExactly("no-store");
+            } else {
+                assertThat(r.headers().firstValue("etag")).as("%s etag", path).hasValueSatisfying(e -> assertThat(e).matches(ETAG));
+                assertThat(r.headers().allValues("cache-control")).as("%s cache-control", path).containsExactly("private, no-cache");
+            }
             assertValid(schema(route.get().schema()), r.body(), path);
             key = route.get().endpoint() + " 200";
         }

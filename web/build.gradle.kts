@@ -53,7 +53,7 @@ val clientCheck = tasks.register<PnpmTask>("clientCheck") {
 
 // 계약을 바꾼 커밋에서만 손으로 돌린다(생성물·잠금 갱신이 그 커밋에 드러난다).
 tasks.register<PnpmTask>("clientLock") {
-    description = "Regenerates src/gen/portal-api.ts and rewrites contracts-client.lock.json."
+    description = "Regenerates src/gen/portal-api.ts and src/gen/portal-api.rules.json and rewrites contracts-client.lock.json."
     webInputs()
     args.set(listOf("run", "client:lock"))
     outputs.upToDateWhen { false }

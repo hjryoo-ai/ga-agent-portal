@@ -1,6 +1,6 @@
 // 한도 상세(설계서 §8 2 — 계획 ⑥): 산식(월납 × 배수 → 한도 — 표시 문자열, 계산 없음 — P-10), 누적·잔여·소진, 초년도 기간, 삭감/이연(Q4 문구),
-// 계약 상태, 원장 타임라인(history, source_seq 순 그대로). "해약 시 영향"은 Phase 5(비활성).
-import { useParams } from 'react-router';
+// 계약 상태, 원장 타임라인(history, source_seq 순 그대로). "해약 시 영향"(Phase 5 — Q6): 이 원장의 policyKey를 메모리로 넘기고 시뮬레이션 해약 탭으로.
+import { useNavigate, useParams } from 'react-router';
 import { ApiError } from '../api/client';
 import { useLimit } from '../api/queries';
 import { ledgerLabel } from '../labels/labels';
@@ -10,17 +10,18 @@ import { isZero, present } from '../money/won';
 import { dDay } from '../time/dday';
 import { dateAt } from '../time/kst';
 import { useNow } from '../time/useNow';
-import { ComingSoon } from '../ui/EntryPoints';
+import { handOffPolicy } from '../sim/handoff';
 import { fillNodes } from '../ui/fillNodes';
 import { LimitCut } from '../ui/LimitCut';
 import { Loading } from '../ui/States';
 import { Utilization } from '../ui/Utilization';
-import { LedgerBadges } from './LimitsScreen';
+import { LedgerBadges, LedgerProduct } from './LimitsScreen';
 
 export function LimitScreen() {
   const { ledgerId = '' } = useParams();
   const limit = useLimit(ledgerId);
   const nowMs = useNow();
+  const navigate = useNavigate();
   if (limit.isPending) return <Loading />;
   if (limit.isError) {
     return limit.error instanceof ApiError && limit.error.status === 404 ? <p data-testid="limit-missing">{m.limit.notFound}</p> : null;
@@ -35,6 +36,7 @@ export function LimitScreen() {
           <h2>{ledger.policyMasked}</h2>
           <LedgerBadges ledger={ledger} />
         </div>
+        <LedgerProduct ledger={ledger} />
         <p data-testid="limit-formula">
           {fillNodes(m.limit.formula, {
             premium: <Amount value={ledger.monthlyPremium} label={label} />,
@@ -98,7 +100,17 @@ export function LimitScreen() {
           ))}
         </ol>
       </section>
-      <ComingSoon name={m.limit.impact} testId="entry-impact" />
+      <button
+        type="button"
+        className="button"
+        data-testid="entry-impact"
+        onClick={() => {
+          handOffPolicy(ledger.policyKey);
+          void navigate('/simulations');
+        }}
+      >
+        {m.limit.impact}
+      </button>
     </>
   );
 }

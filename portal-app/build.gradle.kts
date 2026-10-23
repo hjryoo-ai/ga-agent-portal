@@ -66,6 +66,8 @@ testing {
                 implementation(testFixtures(project(":portal-infra")))
                 implementation(testFixtures(project(":portal-ingest")))
                 implementation(testFixtures(project(":portal-projection")))
+                implementation(testFixtures(project(":portal-sim")))
+                implementation(project(":portal-sim"))
                 implementation(project(":portal-ingest"))
                 implementation(project(":portal-infra"))
                 implementation(project(":portal-domain"))
@@ -102,6 +104,7 @@ testing {
                     inputs.file(rootProject.layout.projectDirectory.file("web/src/routes.ts")).withPathSensitivity(PathSensitivity.RELATIVE)
                     // 화면 E2E 하네스(WebE2eHarness — 같은 소스셋)가 읽는 포털 손 스트림
                     inputs.dir(rootProject.layout.projectDirectory.dir("web/e2e/streams")).withPathSensitivity(PathSensitivity.RELATIVE)
+                    inputs.dir(rootProject.layout.projectDirectory.dir("contracts/shared/ga-commission-engine")).withPathSensitivity(PathSensitivity.RELATIVE)
                 }
             }
         }

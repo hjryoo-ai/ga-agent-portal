@@ -70,6 +70,25 @@ class RebuildIT {
         return t;
     }
 
+    /** {@code simulation_log}의 행 전부(텍스트 — JSONB 포함) — 재구축이 사용자 데이터를 건드리지 않음을 바이트로 본다(포털 Phase 5 ⑤). */
+    private static List<String> simulationRows(TenantId t) {
+        return IngestRig.DB.asApp(t.value(), c -> {
+            try (java.sql.PreparedStatement ps = c.prepareStatement("""
+                    SELECT concat_ws('|', sim_id, agent_id, kind, request::text, response::text, rule_snapshot_id, status, error_code, engine_status, created_at)
+                      FROM simulation_log WHERE tenant_id = ? ORDER BY sim_id
+                    """)) {
+                ps.setString(1, t.value());
+                List<String> out = new ArrayList<>();
+                try (java.sql.ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.add(rs.getString(1));
+                    }
+                }
+                return out;
+            }
+        });
+    }
+
     private List<AuditAccessRepository.AuditRow> audits(TenantId t) {
         return rig.transactions.inTransaction(t, () -> audit.recent(50)).reversed();
     }
@@ -79,10 +98,20 @@ class RebuildIT {
         List<ObjectNode> stream = a1();
         TenantId t = ingested("RB_OK", stream);
         List<String> events = rig.eventRows(t);
+        IngestRig.DB.seed(t.value(), c -> SeedData.exec(c, """
+                INSERT INTO simulation_log (tenant_id, sim_id, agent_id, kind, request, response, rule_snapshot_id, status, error_code, engine_status, created_at)
+                VALUES (?, '00000000-0000-4000-8000-0000000000a1', 'A-1001', 'NEW_CONTRACT', '{"agentId":"A-1001","monthlyPremium":150000}'::jsonb,
+                        '{"limitAmount":1800000,"ruleSnapshotId":"RS-1"}'::jsonb, 'RS-1', 'SUCCEEDED', NULL, 200, TIMESTAMPTZ '2027-02-15 00:30:00+00'),
+                       (?, '00000000-0000-4000-8000-0000000000a2', 'A-1001', 'POLICY_EVENT', '{"agentId":"A-1001"}'::jsonb,
+                        NULL, NULL, 'FAILED', 'ENGINE_UNAVAILABLE', 503, TIMESTAMPTZ '2027-02-15 00:31:00+00')
+                """, t.value(), t.value()));
+        List<String> simulations = simulationRows(t);
+        assertThat(simulations).hasSize(2);
         IngestCommands cli = commands(t, ViewRig.feed(t, stream));
         assertThat(cli.pause(t, ACTOR).exitCode()).isZero();
 
         IngestCommands.Outcome outcome = cli.rebuild(t, ACTOR);
+        assertThat(simulationRows(t)).as("simulation_log is user data — a rebuild keeps every byte (Phase 5)").isEqualTo(simulations);
 
         assertThat(outcome.exitCode()).isZero();
         assertThat(outcome.lines()).containsExactly(t.value() + " RUNNING at seq 11 (rebuilt 11 events)");

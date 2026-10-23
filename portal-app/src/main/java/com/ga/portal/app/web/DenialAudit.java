@@ -2,7 +2,7 @@ package com.ga.portal.app.web;
 
 import com.ga.platform.core.tenant.TenantId;
 import com.ga.portal.infra.persistence.AuditAccessRepository;
-import com.ga.portal.query.DenyReason;
+import com.ga.portal.domain.access.DenyReason;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

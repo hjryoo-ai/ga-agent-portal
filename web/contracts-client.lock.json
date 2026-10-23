@@ -1,7 +1,9 @@
 {
   "generator": "openapi-typescript@7.13.0",
   "contract": "contracts/api/v1/portal-api.openapi.yaml",
-  "contractSha256": "0d14a1827aab03f61505dd3a24451728e1a73a59f6645cbbc8d7563b4fbf9188",
+  "contractSha256": "2f529ade506bd43869b54fa37f59ebae10efa4de5698275150161aeaf6114742",
   "output": "src/gen/portal-api.ts",
-  "outputSha256": "e74a42de0fd6f7fd37e8b748b7a35278fd79b08515fabe933ea50f4487d75c44"
+  "outputSha256": "aff9e26df201bbf459fac327260ac71bace91f4a737caa0ddac0eb4a240f5096",
+  "rules": "src/gen/portal-api.rules.json",
+  "rulesSha256": "a4716a0f84d7c37ef3855a178159ea16fbefeadddb03395e5831a82951fca3e6"
 }

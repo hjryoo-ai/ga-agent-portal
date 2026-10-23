@@ -5,7 +5,7 @@ import com.ga.portal.domain.LinkStatus;
 import com.ga.portal.domain.Role;
 import com.ga.portal.infra.persistence.AuditAccessRepository;
 import com.ga.portal.infra.persistence.IdentityLinkRepository;
-import com.ga.portal.query.DenyReason;
+import com.ga.portal.domain.access.DenyReason;
 
 import java.time.Clock;
 import java.util.Optional;

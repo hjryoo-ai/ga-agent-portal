@@ -49,7 +49,8 @@ public class ScreenConfiguration implements WebMvcConfigurer {
             + "object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
     /** 화면 경로(SPA — 같은 문서). {@code web/src/routes.ts}의 {@code :이름}이 여기서는 {@code *}다. */
-    public static final List<String> SCREEN_PATHS = List.of("/", "/statements", "/statements/*", "/lines/*", "/limits", "/limits/*");
+    public static final List<String> SCREEN_PATHS = List.of("/", "/statements", "/statements/*", "/lines/*", "/limits", "/limits/*", "/deferrals",
+            "/simulations");
     static final String ASSETS = "/assets/*";
     private static final MediaType HTML = MediaType.parseMediaType("text/html;charset=UTF-8");
 

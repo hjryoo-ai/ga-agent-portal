@@ -139,11 +139,12 @@ class ArchitectureRulesTest {
     //     이 모듈들이 의존할 수 있는 플랫폼 모듈은 platform-core뿐이다.
     @Test
     void springAndDbFreeModules() {
-        ArchRules.springFreeModules(List.of(P + "domain..", P + "projection..", P + "query..", "com.ga.platform.core.."), List.of()).check(classes);
-        noClasses().that().resideInAnyPackage(P + "domain..", P + "projection..", P + "query..")
+        ArchRules.springFreeModules(List.of(P + "domain..", P + "projection..", P + "query..", P + "sim..", "com.ga.platform.core.."), List.of())
+                .check(classes);
+        noClasses().that().resideInAnyPackage(P + "domain..", P + "projection..", P + "query..", P + "sim..")
                 .should().dependOnClassesThat().resideInAnyPackage("org.flywaydb..", "com.ga.platform.spring..", "com.ga.platform.canonical..")
                 .allowEmptyShould(true)
-                .as("portal-domain·portal-projection·portal-query depend only on platform-core (no Flyway, platform-spring, platform-canonical)")
+                .as("portal-domain·portal-projection·portal-query·portal-sim depend only on platform-core (no Flyway, platform-spring, platform-canonical)")
                 .check(classes);
     }
 
