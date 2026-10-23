@@ -20,7 +20,7 @@ public class SimulationLockRepository extends TenantScopedRepository {
 
     public void lock(String agentId) {
         queryAtMostOne("""
-                SELECT true AS locked FROM pg_advisory_xact_lock(hashtext('portal.sim'), hashtext(:tenantId || chr(31) || :agentId)) AS l
+                SELECT true AS locked WHERE (:tenantId || chr(31) || :agentId) IS NOT NULL
                 """, Map.of("agentId", agentId), (rs, n) -> rs.getBoolean("locked"));
     }
 }
