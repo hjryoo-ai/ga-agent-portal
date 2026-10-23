@@ -1,4 +1,4 @@
-package com.ga.portal.query;
+package com.ga.portal.domain.access;
 
 import java.util.Objects;
 

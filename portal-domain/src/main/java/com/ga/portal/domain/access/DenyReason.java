@@ -1,4 +1,4 @@
-package com.ga.portal.query;
+package com.ga.portal.domain.access;
 
 /**
  * 404 거부 사유(계획 승인 Q6) — 감사 {@code audit_access.detail}과 지표 {@code reason} 태그에만 쓰이고 응답에는 없다(응답은 한 바이트). 닫힌 코드이며 값을 싣지

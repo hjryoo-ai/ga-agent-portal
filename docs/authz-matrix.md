@@ -3,7 +3,7 @@
 # 조회 API 인가 매트릭스 (정본)
 
 > 포털 Phase 3(지시문 D-11, 계획 ④, 승인 Q8). 이 문서의 `authz-matrix` 블록이 정본이고 `AuthzMatrixTest`가 코드와 **양방향**으로 대조한다 —
-> 행 = 컨트롤러의 `@GetMapping` 템플릿 집합 = `QueryAuthorization` 키 집합 = `@UseCaseEntry` 값 집합. 셋 중 하나만 바뀌어도 시험이 실패한다.
+> 행 = 컨트롤러의 `@GetMapping`·`@PostMapping` 템플릿 집합 = `ApiAuthorization` 키 집합(`com.ga.portal.domain.access`) = `@UseCaseEntry` 값 집합. 셋 중 하나만 바뀌어도 시험이 실패한다.
 
 열의 뜻:
 

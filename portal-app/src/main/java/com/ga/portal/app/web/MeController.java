@@ -1,6 +1,6 @@
 package com.ga.portal.app.web;
 
-import com.ga.portal.query.Caller;
+import com.ga.portal.domain.access.Caller;
 import com.ga.portal.query.MeQueries;
 import com.ga.portal.query.api.DeferralsResponse;
 import com.ga.portal.query.api.EarningsResponse;

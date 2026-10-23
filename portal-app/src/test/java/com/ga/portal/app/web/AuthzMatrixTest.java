@@ -2,8 +2,8 @@ package com.ga.portal.app.web;
 
 import com.ga.portal.domain.Role;
 import com.ga.portal.query.MeQueries;
-import com.ga.portal.query.QueryAuthorization;
-import com.ga.portal.query.UseCaseEntry;
+import com.ga.portal.domain.access.ApiAuthorization;
+import com.ga.portal.domain.access.UseCaseEntry;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.GetMapping;
 
@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * C5(지시문 D-11): {@code docs/authz-matrix.md}의 블록(정본) ↔ {@link QueryAuthorization} ↔ 컨트롤러 {@code @GetMapping} ↔ {@code @UseCaseEntry} 값 — 양방향.
+ * C5(지시문 D-11): {@code docs/authz-matrix.md}의 블록(정본) ↔ {@link ApiAuthorization} ↔ 컨트롤러 {@code @GetMapping} ↔ {@code @UseCaseEntry} 값 — 양방향.
  * 열 {@code AGENT}·{@code MANAGER}는 인가 표, {@code OPERATOR}·{@code NO_LINK}·{@code REVOKED}는 구조상 언제나 404({@code Caller}가 만들어지지 않는다 —
  * {@code CallerArgumentResolver}) — 문서가 그 칸을 SELF로 바꾸면 실패한다.
  */
@@ -65,7 +65,7 @@ class AuthzMatrixTest {
     /** 코드가 말하는 표: 역할 셋은 인가 표에서, 링크 없음·해제·OPERATOR는 구조상 404. */
     static Map<String, List<String>> fromCode() {
         Map<String, List<String>> out = new LinkedHashMap<>();
-        QueryAuthorization.matrix().forEach((endpoint, roles) -> out.put(endpoint, List.of(
+        ApiAuthorization.matrix().forEach((endpoint, roles) -> out.put(endpoint, List.of(
                 roles.contains(Role.AGENT) ? "SELF" : "404", roles.contains(Role.MANAGER) ? "SELF" : "404", "404", "404", "404")));
         return out;
     }
@@ -88,7 +88,7 @@ class AuthzMatrixTest {
         assertThat(new TreeSet<>(doc.keySet())).isEqualTo(controllerTemplates()).isEqualTo(useCaseEntries());
         assertThat(controllerTemplates()).hasSize(8);
         // OPERATOR 열은 인가 표가 무엇을 말하든 404 — 표가 OPERATOR를 허용하면 문서·구조와 어긋난다
-        assertThat(QueryAuthorization.matrix().values()).allSatisfy(roles -> assertThat(roles).doesNotContain(Role.OPERATOR));
+        assertThat(ApiAuthorization.matrix().values()).allSatisfy(roles -> assertThat(roles).doesNotContain(Role.OPERATOR));
     }
 
     @Test

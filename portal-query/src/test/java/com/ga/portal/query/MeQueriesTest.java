@@ -1,5 +1,9 @@
 package com.ga.portal.query;
 
+import com.ga.portal.domain.access.Caller;
+import com.ga.portal.domain.access.DenyReason;
+import com.ga.portal.domain.access.InvalidRequest;
+import com.ga.portal.domain.access.NotFound;
 import com.ga.platform.core.tenant.AgentId;
 import com.ga.platform.core.tenant.TenantId;
 import com.ga.portal.domain.DataStatus;

@@ -1,4 +1,4 @@
-package com.ga.portal.query;
+package com.ga.portal.domain.access;
 
 import com.ga.portal.domain.Role;
 
@@ -12,7 +12,7 @@ import java.util.Set;
  * Phase 3의 {@code /api/v1/me/**}는 전부 {@code AGENT}만(MANAGER는 v2, OPERATOR는 CLI — 지시문 D-2). 허용되지 않으면 {@link NotFound}({@code ROLE}) —
  * 응답은 다른 404와 같은 바이트.
  */
-public final class QueryAuthorization {
+public final class ApiAuthorization {
 
     public static final String ME = "GET /api/v1/me";
     public static final String EARNINGS = "GET /api/v1/me/earnings";
@@ -33,7 +33,7 @@ public final class QueryAuthorization {
         MATRIX = Collections.unmodifiableMap(m);
     }
 
-    private QueryAuthorization() {
+    private ApiAuthorization() {
     }
 
     /** 엔드포인트 → 허용 역할(선언 순서). */

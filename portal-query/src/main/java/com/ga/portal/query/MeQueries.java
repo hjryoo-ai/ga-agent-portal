@@ -1,5 +1,11 @@
 package com.ga.portal.query;
 
+import com.ga.portal.domain.access.ApiAuthorization;
+import com.ga.portal.domain.access.Caller;
+import com.ga.portal.domain.access.DenyReason;
+import com.ga.portal.domain.access.InvalidRequest;
+import com.ga.portal.domain.access.NotFound;
+import com.ga.portal.domain.access.UseCaseEntry;
 import com.ga.platform.core.money.Ratio;
 import com.ga.platform.core.time.Ym;
 import com.ga.portal.domain.view.AgentRow;
@@ -43,7 +49,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
- * 설계사 본인 조회(지시문 D-5, 계획 ⑤) — 엔드포인트마다 진입점 하나({@link UseCaseEntry}). 진입점은 첫 줄에서 역할을 확인하고({@link QueryAuthorization}),
+ * 설계사 본인 조회(지시문 D-5, 계획 ⑤) — 엔드포인트마다 진입점 하나({@link UseCaseEntry}). 진입점은 첫 줄에서 역할을 확인하고({@link ApiAuthorization}),
  * 한 읽기 전용 트랜잭션 안에서 테넌트 설정·커서 한 문장 + 본문 문장들을 읽는다. 모든 조회 키는 {@code (호출자의 agentId, 키)} — 남의 키는 "없다"(404 MISSING).
  *
  * <p>입력 규칙: 경로 변수(월·라인·원장)의 형식이 틀리면 404(존재 여부를 형식 오류로 흘리지 않는다), 쿼리 파라미터가 틀리면 400 한 가지(Q11).
@@ -84,9 +90,9 @@ public final class MeQueries {
 
     // ------------------------------------------------------------------ 진입점
 
-    @UseCaseEntry(QueryAuthorization.ME)
+    @UseCaseEntry(ApiAuthorization.ME)
     public QueryResult<MeResponse> me(Caller caller) {
-        QueryAuthorization.require(caller, QueryAuthorization.ME);
+        ApiAuthorization.require(caller, ApiAuthorization.ME);
         return transaction.read(() -> {
             Context c = context();
             Optional<AgentRow> profile = store.profile(caller.agentId());
@@ -99,9 +105,9 @@ public final class MeQueries {
         });
     }
 
-    @UseCaseEntry(QueryAuthorization.EARNINGS)
+    @UseCaseEntry(ApiAuthorization.EARNINGS)
     public QueryResult<EarningsResponse> earnings(Caller caller, String from, String to) {
-        QueryAuthorization.require(caller, QueryAuthorization.EARNINGS);
+        ApiAuthorization.require(caller, ApiAuthorization.EARNINGS);
         Ym[] range = range(from, to);
         return transaction.read(() -> {
             Context c = context();
@@ -110,9 +116,9 @@ public final class MeQueries {
         });
     }
 
-    @UseCaseEntry(QueryAuthorization.MONTH)
+    @UseCaseEntry(ApiAuthorization.MONTH)
     public QueryResult<MonthResponse> month(Caller caller, String ym) {
-        QueryAuthorization.require(caller, QueryAuthorization.MONTH);
+        ApiAuthorization.require(caller, ApiAuthorization.MONTH);
         Ym closeYm = pathYm(ym);
         return transaction.read(() -> {
             Context c = context();
@@ -128,9 +134,9 @@ public final class MeQueries {
         });
     }
 
-    @UseCaseEntry(QueryAuthorization.LINES)
+    @UseCaseEntry(ApiAuthorization.LINES)
     public QueryResult<LinesResponse> lines(Caller caller, String ym, int page, int size, Optional<String> commType, Optional<String> policyKey) {
-        QueryAuthorization.require(caller, QueryAuthorization.LINES);
+        ApiAuthorization.require(caller, ApiAuthorization.LINES);
         Ym closeYm = pathYm(ym);
         if (page < 0 || page > MAX_PAGE || size < 1 || size > MAX_PAGE_SIZE) {
             throw new InvalidRequest("page/size");
@@ -161,9 +167,9 @@ public final class MeQueries {
         });
     }
 
-    @UseCaseEntry(QueryAuthorization.LINE)
+    @UseCaseEntry(ApiAuthorization.LINE)
     public QueryResult<LineDetailResponse> line(Caller caller, String calcId) {
-        QueryAuthorization.require(caller, QueryAuthorization.LINE);
+        ApiAuthorization.require(caller, ApiAuthorization.LINE);
         String key = pathKey(calcId);
         return transaction.read(() -> {
             Context c = context();
@@ -180,9 +186,9 @@ public final class MeQueries {
         });
     }
 
-    @UseCaseEntry(QueryAuthorization.LIMITS)
+    @UseCaseEntry(ApiAuthorization.LIMITS)
     public QueryResult<LimitsResponse> limits(Caller caller, String status) {
-        QueryAuthorization.require(caller, QueryAuthorization.LIMITS);
+        ApiAuthorization.require(caller, ApiAuthorization.LIMITS);
         if (!STAGE_FILTERS.contains(status)) {
             throw new InvalidRequest("status");
         }
@@ -199,9 +205,9 @@ public final class MeQueries {
         });
     }
 
-    @UseCaseEntry(QueryAuthorization.LIMIT)
+    @UseCaseEntry(ApiAuthorization.LIMIT)
     public QueryResult<LimitDetailResponse> limit(Caller caller, String ledgerId) {
-        QueryAuthorization.require(caller, QueryAuthorization.LIMIT);
+        ApiAuthorization.require(caller, ApiAuthorization.LIMIT);
         String key = pathKey(ledgerId);
         return transaction.read(() -> {
             Context c = context();
@@ -212,9 +218,9 @@ public final class MeQueries {
         });
     }
 
-    @UseCaseEntry(QueryAuthorization.DEFERRALS)
+    @UseCaseEntry(ApiAuthorization.DEFERRALS)
     public QueryResult<DeferralsResponse> deferrals(Caller caller, String from, String to) {
-        QueryAuthorization.require(caller, QueryAuthorization.DEFERRALS);
+        ApiAuthorization.require(caller, ApiAuthorization.DEFERRALS);
         Ym[] range = range(from, to);
         return transaction.read(() -> {
             Context c = context();

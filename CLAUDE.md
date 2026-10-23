@@ -46,7 +46,7 @@
 
 ## 조회 API 규약 (포털 Phase 3 — 설계서 §7·§9·§10)
 - **경로·쿼리에 `agentId`가 없다.** 테넌트는 검증된 토큰의 `iss`(전용 롤 `portal_issuer`), 호출자(`Caller` = 테넌트·`agent_id`·역할)는 `identity_link` PK 조회 1회로만(`CallerArgumentResolver`). 토큰의 `agent_id`·`roles` 클레임은 인가에 쓰지 않고, `tenant_id` 클레임은 교차 검사뿐이다. `Jwt`를 보는 클래스는 검증기 하나(닫힌 목록).
-- **컨트롤러는 얇게**: 처리 메서드마다 `Caller`를 받고 `@UseCaseEntry`(`portal-query`)를 정확히 하나 부른다. 진입점은 첫 줄에서 `QueryAuthorization.require`. 엔드포인트를 더하면 `docs/authz-matrix.md` 행·`QueryAuthorization` 키·`@GetMapping`·계약 경로를 같은 커밋으로(`AuthzMatrixTest`가 양방향 대조).
+- **컨트롤러는 얇게**: 처리 메서드마다 `Caller`를 받고 `@UseCaseEntry`(접근 규약은 `portal-domain`의 `com.ga.portal.domain.access`)를 정확히 하나 부른다. 진입점은 첫 줄에서 `ApiAuthorization.require`. 엔드포인트를 더하면 `docs/authz-matrix.md` 행·`ApiAuthorization` 키·`@GetMapping`/`@PostMapping`·계약 경로를 같은 커밋으로(`AuthzMatrixTest`가 양방향 대조).
 - **조회 저장소(`AgentQueryRepository`)의 모든 문장**은 설계사 열이 있는 표의 참조마다 `agent_id = :agentId`(SQL 스캔 두 번째 술어, 허용 목록 비어 있음). 문장은 문자열 리터럴 하나 — 이어 붙이면 스캐너가 못 본다. 합·차감은 SQL 정수 연산, 비율은 표시 문자열.
 - **거부는 같은 바이트**: 401은 여덟 사유 한 본문, 404는 링크 없음·`REVOKED`·역할·남의(없는) 자원·없는 경로·경로 변수 형식 한 본문, 쿼리 파라미터만 400 `INVALID_REQUEST`. 사유는 404 → 감사(`AUTHZ_DENIED`, 별도 트랜잭션), 401 → 지표에만.
 - **증권번호 원문은 어느 응답에도 없다** — `policyMasked`·`policyKey`(배포 비밀 HMAC). 키 → 원문은 요청 안에서 그 설계사의 증권번호 집합으로만. 로그의 subject·`agent_id`·발급자 URL은 해시(`LogIds`), 지표 태그는 `tenant`·`reason`뿐.

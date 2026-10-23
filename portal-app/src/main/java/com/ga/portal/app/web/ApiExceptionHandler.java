@@ -1,8 +1,8 @@
 package com.ga.portal.app.web;
 
 import com.ga.platform.core.tenant.TenantContext;
-import com.ga.portal.query.InvalidRequest;
-import com.ga.portal.query.NotFound;
+import com.ga.portal.domain.access.InvalidRequest;
+import com.ga.portal.domain.access.NotFound;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;

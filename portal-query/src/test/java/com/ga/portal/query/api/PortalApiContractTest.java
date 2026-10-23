@@ -1,6 +1,6 @@
 package com.ga.portal.query.api;
 
-import com.ga.portal.query.QueryAuthorization;
+import com.ga.portal.domain.access.ApiAuthorization;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -149,7 +149,7 @@ class PortalApiContractTest {
             assertThat(responses.path("200").path("content").path("application/json").path("schema").has("$ref")).as(e.getKey()).isTrue();
             assertThat(e.getValue().properties()).as("GET only").extracting(Map.Entry::getKey).containsExactly("get");
         });
-        assertThat(paths).isEqualTo(new TreeSet<>(QueryAuthorization.matrix().keySet()));
+        assertThat(paths).isEqualTo(new TreeSet<>(ApiAuthorization.matrix().keySet()));
         assertThat(api.path("openapi").asString()).isEqualTo("3.1.0");
     }
 
