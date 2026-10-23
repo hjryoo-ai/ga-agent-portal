@@ -288,3 +288,31 @@
 - Q9(#14) 기본 가정은 Phase 8까지 유지. `location.reload()`는 혼자서는 토큰을 되살리지 못한다 — 호스트가 새로고침을 가로채야 한다(§14.1 #14 한 문장).
 - F1·F2·F6~F14 수용, 계획 Q1~Q16·P-1~P-12는 사후 확인(뒤집은 것 없음 — 계획 승인을 사용자가 직접 한 Phase).
 - Phase 5 재료(심사 §4): Q1 차트는 API의 막대별 표시용 비율 문자열 + CSS 막대 + 표(라이브러리 없음), Q2 `/me.features.forecastScenario`, Q3 입력 검증 정본은 API 400(화면은 계약의 `pattern`·`minimum`을 읽어 미리 막을 뿐), Q4 429 고정 바이트 + `Retry-After`·지표만·`simulation_log`에 쓰지 않음, Q5 V6는 `simulation_log`만(#13은 Phase 7 후보), Q6 `portal-api` 1.1.0 한 번에(시뮬레이션 + CR-1~4 + `features` + 비율 필드) — Phase 5 0단계 계약 PR.
+
+## 2026-10-23 — Phase 5 계획 승인 (`docs/phase-05-계획.md`)
+
+승인: 계획 Q1~Q24·P-1~P-26 권장안 전부(사용자 2026-10-23). Q17 — 엔진 샘플 PR은 자체 CI 통과 뒤 병합(엔진 #8 → `2c3b093`), Q18 — 계약 1.1.0은 `work/phase-5` 커밋으로(별도 PR 없음).
+
+## 2026-10-23 — Phase 5 구현에서 계획과 다르게 한 것 (보고서 §5)
+
+| # | 계획 | 구현 | 이유 |
+|---|---|---|---|
+| P5-1 | Q18 계약 1.1.0을 "첫 커밋"으로 | 두 커밋 — 기존 경로·CR-1~4·`features`(`856ece9`), POST 경로 둘(`610520a`) | `PortalApiContractTest`(경로 = 인가 표 키, 스키마 = 레코드)·`AuthzMatrixTest`·`clientCheck`가 계약을 코드에 묶는다 — POST 경로만 먼저 넣으면 인가 표·레코드 없이 빌드가 실패한다. 어느 커밋도 계약과 코드가 어긋난 채로 남지 않는다 |
+| P5-2 | ⑥ 시뮬레이션 요청 본문 ≤ 2 KiB | 컨트롤러가 본문을 **상한+1바이트까지만** 스트림에서 읽는다(`byte[]` 전체 받기 대신) | 커밋 보안 검토: 상한을 넘는 본문을 다 받아 놓고 거부했다. `SimulationControllerTest`(끝없는 본문 → 2,049바이트만), `SimulationRejectionIT`(1 MiB → 400·행 0·호출 0) |
+| P5-3 | ② 계약 1.1.0 | 설명문 여덟 곳에 따옴표(뜻 변화 없음) + `PortalApiContractTest.noKeyWithoutAValue` | YAML 흐름 매핑의 따옴표 없는 설명에 쉼표가 있어 설명이 잘리고 나머지가 값 없는 키가 됐다 — 규칙 파일을 만들다 발견. 주입 S16 |
+| P5-4 | ④ `PolicyResolver.policyNo(Caller, key)` | 포트가 `(TenantId, AgentId, key)`를 받는다 | 규칙 (c)(`Caller`를 받는 공개 메서드는 진입점)가 포트 메서드를 잡았다 — 규칙을 좁히지 않고 코드를 옮겼다 |
+| P5-5 | Q12 규칙 파일 = `pattern` | `pattern`·길이·필수·**`if/then`**(REDUCE면 `newMonthlyPremium`) — `when` 항목 | 조건부 필수를 화면에 손으로 다시 적지 않게(Phase 4 수용 §4 Q3) |
+| P5-6 | ⑧ 막대 `aria-label="{월} 예정 {금액} · 보류 {금액}"` | `aria-labelledby` = 아래 표의 월·예정·보류 칸 | 금액을 문자열로 만들려면 `formatWon`을 `Amount` 밖에서 불러야 한다(화면 규약 — 금액은 `Amount`로만). 접근 이름은 같은 글자(라벨 포함)다 |
+| P5-7 | ⑧ 시나리오 토글 | 두 버튼 분할 컨트롤(`aria-pressed`) | 체크박스는 20px 대상이다(E2E 44px 검사) |
+| P5-8 | C11 S13 "시뮬레이션 화면을 정적 import" → 번들 상한 | `bundle-size.mjs`에 **지연 화면 닫힌 목록**(`LAZY_SCREENS`) — 정적 import·목록 밖 지연 청크면 실패 | 시뮬레이션 화면(3.2 KiB gzip)을 정적으로 넣어도 상한(127 KiB)을 넘지 않는다 — 상한만으로는 S13을 잡지 못한다 |
+| P5-9 | ⑨ `ResponseLeakScanIT`에 시뮬레이션 두 경로 | `SimulationPassThroughIT`가 성공 응답마다 센티널 파일의 증권번호 전부를 본다(같은 원천) | 시뮬레이션 테넌트·엔진 스텁은 `SimIntegrationTest` 기반에 있다 — `ApiIntegrationTest` 테넌트에는 엔진이 없다 |
+| P5-10 | Q19 "같은 코드면 같은 머리" | 같은 코드 안에서 비교(502 — 엔진 404·스키마 위반, 503 — 엔진 503·시간 초과) | Tomcat은 모든 503에 `Connection: close`를 붙인다(홉 머리) — 첫 시험이 502와 503을 비교해 CI에서 실패했다 |
+| P5-11 | C4 S6 "키를 테넌트 전체 집합에서" | `policies()`의 설계사 술어를 무력화(`agent_id = :agentId OR true`) | 테넌트 전체 문장을 새로 쓰면 정적 스캔(`TenantPredicateScanTest` — 문장 수·설계사 술어)이 먼저 잡아 통합 시험에 닿지 않는다. 술어 글자는 남기고 뜻만 지워 행동 시험(`SimulationAuthzIT`)을 증거로 했다 — 두 겹 |
+| P5-12 | ⑨ S8 "422 S11 시나리오와 함께(GA02)" | S8 API 요청은 **GA01** 명세 | `policyKey`는 그 설계사의 라인 증권번호 집합에서만 풀린다 — 엔진 샘플의 `POL-2026-0001` 라인은 GA01(A-1)에 있다 |
+| P5-13 | (계획에 없음) | `CLAUDE.md` 화면 규약 "경로·쿼리에 `policyKey` 금지" → "**화면 주소**(경로·쿼리)에" | 승인된 Q15가 API 쿼리 `policyKey`를 더했다 — 규칙의 대상(화면 주소)을 글자로 밝혔을 뿐 뜻은 같다(`rule-file-corrections`) |
+| P5-14 | (계획에 없음) | 시뮬레이션 타임아웃 설정에 환경 자리(`PORTAL_SIM_CONNECT_TIMEOUT`·`PORTAL_SIM_READ_TIMEOUT`) | `docs/운영.md` §6 — Spring 완화 바인딩의 이름(`…READTIMEOUT`)에 기대지 않는다 |
+
+### 결정 (설계서 v1.8)
+
+- 계약 1.1.0 → §7, V6 → §5, 곱셈 격리·막대·84개월·계약 필터 → §6.4, 포털 쪽 시뮬레이션 → §4.3, 화면 → §8, 거부 바이트·리밋·CSRF → §9, 리밋·관측·번들·카드 수 → §10, 스택(차트 라이브러리 없음) → §11, Phase 5 → §12, 시험 → §13, §14.1 #1(범위 밖)·#7(닫음)·#13(V7 후보).
+- 영문 번역(`docs/en/`)은 v1.6 그대로(Phase 4 수용 Q8 — 요청이 있을 때만).

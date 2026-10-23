@@ -57,6 +57,6 @@ portal:
   # 시뮬레이션(포털 Phase 5 — 설계서 §4.3·§10): 엔진 연결·읽기 시간 초과(재시도 0), 테넌트 params.sim_rate_per_minute이 없을 때의 설계사당 분당 한도.
   # 토큰은 인제스트와 같은 파일(portal.ingest.token-dir/<TENANT_ID>).
   sim:
-    connect-timeout: 2s
-    read-timeout: 10s
+    connect-timeout: ${PORTAL_SIM_CONNECT_TIMEOUT:2s}
+    read-timeout: ${PORTAL_SIM_READ_TIMEOUT:10s}
     default-rate-per-minute: 10
