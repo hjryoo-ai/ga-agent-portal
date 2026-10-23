@@ -2,11 +2,15 @@ package com.ga.portal.app.web;
 
 import com.ga.portal.sim.testing.StubSimulationEngine;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -96,5 +100,24 @@ class EngineFailureIT extends SimIntegrationTest {
         assertThat(ENGINE_AMB.calls() - c).isEqualTo(1);
         assertThat(rows(AMB).getLast()).extracting(SimRow::status, SimRow::errorCode, SimRow::engineStatus).containsExactly("FAILED", "INSURER_AMBIGUOUS", 422);
         assertThat(post(NEW, a, S1.replace("}", ",\"insurerCd\":\"SAMLIFE\"}")).statusCode()).isEqualTo(200);
+    }
+
+    /**
+     * C8 로그 몫: 실패 로그 {@code SIM_FAILED}는 테넌트·종류·코드·엔진 상태·{@code simId}뿐 — 증권번호(그 설계사의 것, 엔진이 모르는 것), 설계사 ID(호출자·엔진이
+     * 모르는 설계사), 요청 값(상품 키·보험료·체결일), 엔진 {@code message}(샘플의 문장 — 증권번호·설계사 ID를 담는다)는 어느 줄에도 없다.
+     */
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void theLogsCarryCodesNotRequestValuesOrEngineMessages(CapturedOutput output) {
+        String a = std(SUB_A1);
+        assertThat(post(EVENT, a, event(STD, POLICY_UNKNOWN_TO_ENGINE, "CANCEL", "")).statusCode()).isEqualTo(502);
+        assertThat(post(NEW, std(SUB_X), S1).statusCode()).isEqualTo(502);
+        assertThat(post(EVENT, a, event(STD, POLICY, "CANCEL", ",\"elapsedInstallments\":\"7\"")).statusCode()).isEqualTo(200);
+        String all = output.getAll();
+        assertThat(all).contains("SIM_FAILED tenant=" + STD.value() + " kind=POLICY_EVENT code=POLICY_NOT_FOUND engineStatus=404")
+                .contains("SIM_FAILED tenant=" + STD.value() + " kind=NEW_CONTRACT code=AGENT_NOT_FOUND engineStatus=404");
+        for (String value : List.of(POLICY, POLICY_UNKNOWN_TO_ENGINE, AGENT_X, AGENT_A1, "WHOLE-LIFE-20Y", "150000", "2026-08-01", "2027-02-15")) {
+            assertThat(all).as("log value").doesNotContain(value);
+        }
     }
 }
