@@ -16,7 +16,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * C2(포털 Phase 5 ⓪·⑥): 엔진 샘플의 성공 여덟(S1~S7·S11b)마다 실제 앱에 포털 요청을 보내면, 응답 − 포털 사실 넷 = 엔진 응답(값 그대로)이고 정수 리터럴이 순서까지
- * 같다. 응답은 계약 1.1.0으로 검증되고({@link ApiContract}), 어느 응답에도 증권번호 원문이 없다(평문 센티널 — 엔진 요청에는 있다).
+ * 같다. 응답은 계약 1.1.0으로 검증되고({@link ApiContract}), 어느 응답에도 증권번호 원문이 없다(센티널 파일의 증권번호 전부 — {@link ResponseLeakScanIT}와
+ * 같은 원천, 엔진 요청에는 있다). 응답 누출 검사의 시뮬레이션 몫이 여기 있다(계획 ⑨ — 시뮬레이션 테넌트·엔진 스텁이 이 기반에 있다).
  */
 class SimulationPassThroughIT extends SimIntegrationTest {
 
@@ -54,6 +55,8 @@ class SimulationPassThroughIT extends SimIntegrationTest {
                     .isEqualTo(integers(new String(sample.response(), StandardCharsets.UTF_8))).isNotEmpty();
             String text = new String(r.body(), StandardCharsets.UTF_8);
             assertThat(text).as(e.getKey()).doesNotContain(POLICY).doesNotContain(POLICY_UNKNOWN_TO_ENGINE).doesNotContain(AGENT_A1);
+            assertThat(ResponseLeakScanIT.seededPolicyNumbers()).as("sentinel policy numbers").isNotEmpty()
+                    .allSatisfy(policyNo -> assertThat(text).as(e.getKey()).doesNotContain(policyNo));
             JsonNode portal = JSON.readTree(r.body());
             SimRow row = row(c.tenant(), portal.path("simId").asString());
             assertThat(row.status()).isEqualTo("SUCCEEDED");

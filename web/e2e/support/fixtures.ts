@@ -4,6 +4,7 @@
 //  - 저장소: localStorage·sessionStorage·쿠키·IndexedDB·Cache Storage가 전부 비어 있다(센티널 대조보다 강하다).
 //  - CSP: securitypolicyviolation(초기화 스크립트가 표식 줄로 콘솔에 올림)과 브라우저의 CSP 콘솔 오류 = 0, 외부 출처 요청 0.
 //  - 접근성(check()): axe WCAG 2.0/2.1 A·AA 위반 0, 보이는 대화형 요소 44px 이상, 움직임 감소에서 전환·애니메이션 0.
+//  - 동적 센티널(포털 Phase 5 계획 Q20): 시뮬레이션 응답의 simId — 화면(DOM)에는 보이도록 설계됐지만 주소·요청 주소·콘솔·저장소에는 0.
 import AxeBuilder from '@axe-core/playwright';
 import { test as base, expect, type Page } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -117,6 +118,14 @@ export const test = base.extend<{ portal: Portal; watch: Watch }>({
       const csp = w.console.filter((c) => c.startsWith(CSP_MARK) || /Content Security Policy|Refused to/i.test(c));
       expect(csp, 'CSP').toEqual([]);
       expect(w.external, 'external origins').toEqual([]);
+      const simIds = w.bodies
+        .filter((b) => b.url.includes('/api/v1/me/simulations/'))
+        .flatMap((b) => [...b.text.matchAll(/"simId":"([0-9a-f-]{36})"/g)].map((x) => x[1] ?? ''));
+      const simIdHits = (texts: string[]) => texts.filter((t) => simIds.some((id) => t.includes(id)));
+      expect(simIdHits(navigations), 'simId in addresses').toEqual([]);
+      expect(simIdHits(w.requestUrls), 'simId in request addresses').toEqual([]);
+      expect(simIdHits(w.console), 'simId in the console').toEqual([]);
+      if (!page.isClosed() && page.url().startsWith(baseUrl)) expect(simIdHits([page.url()]), 'simId in the current address').toEqual([]);
       // 요약은 시험마다 한 파일 — 이름은 testId(프로젝트·시험마다 유일, 제목의 한글을 지워 겹치는 일이 없다)
       const name = `${info.project.name}--${info.testId}.json`;
       const title = info.titlePath.slice(1).join(' › ');
@@ -136,6 +145,7 @@ export const test = base.extend<{ portal: Portal; watch: Watch }>({
             externalRequests: w.external.length,
             sentinels: FORBIDDEN.length,
             tokens: TOKENS.length,
+            simIds: simIds.length,
           },
           null,
           2,

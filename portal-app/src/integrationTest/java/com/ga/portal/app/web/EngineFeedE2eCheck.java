@@ -28,7 +28,9 @@ import java.util.Set;
 /**
  * 실 엔진 E2E 판정(지시문 D-16) — {@code e2e/engine-feed/run.sh}가 부른다({@code ./gradlew :portal-app:e2eCheck --args=...}, 정규 빌드 밖).
  * ① 포털 DB의 GA01 뷰 9표 = 골든 뷰 {@code a1}(둘째 판 — {@code ProjectionGoldenIT}와 같은 정규형) ② {@code GET /api/v1/me/earnings/202608}(시험 발급기 토큰)이
- * 200이고 계약({@code portal-api.openapi.yaml})을 통과하며 증권번호 원문이 없다. 결과를 RESULT.md에 날짜·커밋·해시와 함께 쓴다(토큰·subject·비밀 없음).
+ * 200이고 계약({@code portal-api.openapi.yaml})을 통과하며 증권번호 원문이 없다 ③ (포털 Phase 5 ⑨) 시뮬레이션 한 쌍 — 신계약(엔진 샘플 S1의 요청)과
+ * 해약 영향(S5 — 그 설계사의 원장 {@code policyKey}): 실 엔진의 답이 엔진 계약 사본 스키마를 통과해야 포털이 200을 내고, 포털 응답이 계약을 통과하며,
+ * {@code simulation_log}에 그 둘이 {@code SUCCEEDED}로 남는다. 결과를 RESULT.md에 날짜·커밋·해시와 함께 쓴다(토큰·subject·비밀 없음).
  *
  * <p>인자: {@code <stateDir> <jdbcUrl> <portalBaseUrl> <resultFile> <engineCommit> <portalCommit>}. DB는 {@code portal_app}(로컬 기본 자격 증명 —
  * {@code docker/postgres/init-roles.sql})으로 테넌트를 설정해 읽는다.
@@ -77,6 +79,36 @@ public final class EngineFeedE2eCheck {
         boolean apiOk = r.statusCode() == 200 && contract.equals("OK") && !body.contains("POL-2026-0001");
         ok &= apiOk;
 
+        // ③ 시뮬레이션 한 쌍(실 엔진) — 포털 요청은 문자열 숫자, policyKey는 그 설계사의 원장에서
+        HttpClient http = HttpClient.newHttpClient();
+        HttpResponse<byte[]> limits = http.send(HttpRequest.newBuilder(URI.create(portal + "/api/v1/me/limits?status=ALL"))
+                .header("Authorization", "Bearer " + token).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+        String policyKey = Envelopes.JSON.readTree(limits.body()).path("items").path(0).path("policyKey").asString("");
+        Map<String, String> simulations = new LinkedHashMap<>();
+        simulations.put("/api/v1/me/simulations/new-contract",
+                "{\"productKey\":\"WHOLE-LIFE-20Y\",\"monthlyPremium\":\"150000\",\"contractDate\":\"2026-08-01\"}");
+        simulations.put("/api/v1/me/simulations/policy-event",
+                "{\"policyKey\":\"" + policyKey + "\",\"eventType\":\"CANCEL\",\"asOfDate\":\"2027-02-15\",\"elapsedInstallments\":\"7\"}");
+        Map<String, String> simResults = new LinkedHashMap<>();
+        for (Map.Entry<String, String> e : simulations.entrySet()) {
+            HttpResponse<byte[]> s = http.send(HttpRequest.newBuilder(URI.create(portal + e.getKey())).header("Authorization", "Bearer " + token)
+                    .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(e.getValue())).build(),
+                    HttpResponse.BodyHandlers.ofByteArray());
+            String simContract;
+            try {
+                ApiContract.check(e.getKey(), s);
+                simContract = s.statusCode() == 200 ? "OK" : "status " + s.statusCode();
+            } catch (AssertionError err) {
+                simContract = "VIOLATION " + err.getMessage().lines().findFirst().orElse("");
+            }
+            boolean simOk = s.statusCode() == 200 && simContract.equals("OK") && !new String(s.body(), StandardCharsets.UTF_8).contains("POL-2026-0001");
+            ok &= simOk;
+            simResults.put(e.getKey(), "상태 " + s.statusCode() + ", 계약 " + simContract + ", 본문 SHA-256 `" + sha256(s.body()) + "` (" + s.body().length + " bytes)");
+        }
+        List<String> logRows = simulationLog(jdbcUrl);
+        boolean logOk = logRows.equals(List.of("NEW_CONTRACT SUCCEEDED 200", "POLICY_EVENT SUCCEEDED 200"));
+        ok &= logOk;
+
         report.add("# 실 엔진 E2E 결과 (e2e/engine-feed)");
         report.add("");
         report.add("- 일시(UTC): " + OffsetDateTime.now(ZoneOffset.UTC));
@@ -94,6 +126,11 @@ public final class EngineFeedE2eCheck {
         report.add("");
         report.add("- 상태 " + r.statusCode() + ", 계약 " + contract + ", 증권번호 원문 " + (body.contains("POL-2026-0001") ? "있음" : "없음"));
         report.add("- 응답 본문 SHA-256: `" + sha256(r.body()) + "` (" + r.body().length + " bytes), ETag `" + r.headers().firstValue("etag").orElse("-") + "`");
+        report.add("");
+        report.add("## 시뮬레이션 한 쌍(실 엔진 — 포털 Phase 5)");
+        report.add("");
+        simResults.forEach((path, v) -> report.add("- `POST " + path + "`: " + v));
+        report.add("- `simulation_log`(GA01, 시각 순): " + String.join(" · ", logRows) + " — " + (logOk ? "OK" : "기대 NEW_CONTRACT·POLICY_EVENT SUCCEEDED 200 둘"));
         Files.write(result, report, StandardCharsets.UTF_8);
         System.out.println("[e2e] " + (ok ? "PASS" : "FAIL") + " — " + result);
         if (!ok) {
@@ -126,6 +163,29 @@ public final class EngineFeedE2eCheck {
                     }
                 }
                 out.put(table, GoldenViews.lines(rows));
+            }
+            c.rollback();
+        }
+        return out;
+    }
+
+    /** GA01의 시뮬레이션 로그 행 — 종류·상태·엔진 상태(본문·키는 읽지 않는다). */
+    static List<String> simulationLog(String jdbcUrl) throws Exception {
+        List<String> out = new ArrayList<>();
+        try (Connection c = DriverManager.getConnection(jdbcUrl, "portal_app", "app_local_only")) {
+            c.setAutoCommit(false);
+            try (PreparedStatement ps = c.prepareStatement("SELECT set_config('app.tenant_id', ?, true)")) {
+                ps.setString(1, TENANT);
+                ps.execute();
+            }
+            try (PreparedStatement ps = c.prepareStatement(
+                    "SELECT kind, status, coalesce(engine_status::text, '-') FROM simulation_log WHERE tenant_id = ? ORDER BY created_at, sim_id")) {
+                ps.setString(1, TENANT);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.add(rs.getString(1) + " " + rs.getString(2) + " " + rs.getString(3));
+                    }
+                }
             }
             c.rollback();
         }

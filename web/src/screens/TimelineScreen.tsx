@@ -147,14 +147,19 @@ export function TimelineScreen() {
         </select>
       </label>
       {scenarioAvailable ? (
-        <fieldset className="field" data-testid="timeline-scenario">
-          <legend>{m.timeline.scenario}</legend>
-          <label className="check">
-            <input type="checkbox" checked={retentionOn} data-testid="scenario-toggle" onChange={(e) => {
-                setRetentionOn(e.target.checked);
-              }} />
-            <span>{m.timeline.scenarioOn}</span>
-          </label>
+        <div className="field" data-testid="timeline-scenario">
+          <div className="segmented" role="group" aria-label={m.timeline.scenario}>
+            <button type="button" className="button" aria-pressed={!retentionOn} data-testid="scenario-off" onClick={() => {
+                setRetentionOn(false);
+              }}>
+              {m.timeline.scenarioOff}
+            </button>
+            <button type="button" className="button" aria-pressed={retentionOn} data-testid="scenario-toggle" onClick={() => {
+                setRetentionOn(true);
+              }}>
+              {m.timeline.scenarioOn}
+            </button>
+          </div>
           {retentionOn ? (
             <label className="field">
               <span>{m.timeline.p}</span>
@@ -164,7 +169,7 @@ export function TimelineScreen() {
               {pOk ? null : <span className="field__error" data-testid="scenario-p-error">{m.timeline.pInvalid}</span>}
             </label>
           ) : null}
-        </fieldset>
+        </div>
       ) : null}
       <p className="note" data-testid="held-legend">
         {m.timeline.heldLegend}
