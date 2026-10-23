@@ -30,10 +30,20 @@ public final class SimulationFailed extends RuntimeException {
     }
 
     private final Code code;
+    private final String engineMessage;
 
     public SimulationFailed(Code code) {
+        this(code, "");
+    }
+
+    public SimulationFailed(Code code, String engineMessage) {
         super(Objects.requireNonNull(code, "code").name(), null, false, false);
         this.code = code;
+        this.engineMessage = engineMessage;
+    }
+
+    public String engineMessage() {
+        return engineMessage;
     }
 
     public Code code() {

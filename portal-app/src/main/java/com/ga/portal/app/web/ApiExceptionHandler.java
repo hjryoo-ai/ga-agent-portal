@@ -72,6 +72,13 @@ final class ApiExceptionHandler {
     /** 시뮬레이션(포털 Phase 5): 엔진 거부·계약 위반·불가 → 코드별 고정 바이트. 행은 이미 {@code FAILED}(유스케이스). */
     @ExceptionHandler(SimulationFailed.class)
     void simulationFailed(SimulationFailed e, HttpServletResponse response) throws IOException {
+        if (e.code().status() == 422 && !e.engineMessage().isEmpty()) {
+            response.setStatus(422);
+            response.setContentType("application/problem+json");
+            response.getOutputStream().write(("{\"code\":\"" + e.code().name() + "\",\"message\":\"" + e.engineMessage() + "\"}")
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return;
+        }
         ProblemResponses.simulationFailed(response, e.code());
     }
 

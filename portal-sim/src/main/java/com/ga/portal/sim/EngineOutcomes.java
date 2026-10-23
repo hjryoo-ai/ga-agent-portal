@@ -33,7 +33,10 @@ final class EngineOutcomes {
     }
 
     /** 실패 — 포털 응답 코드, 로그 코드, 엔진이 답한 상태(있으면). 지표 사유는 포털 코드 이름. */
-    record Failure(SimulationFailed.Code code, String logCode, Optional<Integer> engineStatus) implements Outcome {
+    record Failure(SimulationFailed.Code code, String logCode, Optional<Integer> engineStatus, String engineMessage) implements Outcome {
+        Failure(SimulationFailed.Code code, String logCode, Optional<Integer> engineStatus) {
+            this(code, logCode, engineStatus, "");
+        }
     }
 
     static Outcome tokenMissing() {
@@ -60,7 +63,13 @@ final class EngineOutcomes {
         if (status == 422) {
             SimulationFailed.Code code = engineCode.filter(PASSED_THROUGH_422::contains).map(SimulationFailed.Code::valueOf)
                     .orElse(SimulationFailed.Code.ENGINE_REJECTED);
-            return new Failure(code, engineCode.orElse("ENGINE_REJECTED"), engineStatus);
+            String message;
+            try {
+                message = JSON.readTree(body).path("message").asString("");
+            } catch (JacksonException e) {
+                message = "";
+            }
+            return new Failure(code, engineCode.orElse("ENGINE_REJECTED"), engineStatus, message);
         }
         return new Failure(SimulationFailed.Code.ENGINE_CONTRACT, engineCode.orElse("ENGINE_CONTRACT"), engineStatus);
     }

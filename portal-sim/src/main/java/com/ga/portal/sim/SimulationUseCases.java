@@ -143,7 +143,7 @@ public final class SimulationUseCases {
                 metrics.request(tenant, f.code().name());
                 LOG.log(System.Logger.Level.WARNING, "SIM_FAILED tenant=" + tenant.value() + " kind=" + kind + " code=" + f.logCode()
                         + " engineStatus=" + f.engineStatus().map(String::valueOf).orElse("-") + " simId=" + simId);
-                throw new SimulationFailed(f.code());
+                throw new SimulationFailed(f.code(), f.engineMessage());
             }
         }
     }
