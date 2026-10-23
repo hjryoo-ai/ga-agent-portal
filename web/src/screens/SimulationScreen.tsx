@@ -266,7 +266,10 @@ function NewContractForm({ today }: { today: string }) {
     e.preventDefault();
     if (!form.validate()) return;
     sim.mutate(form.body() as Parameters<typeof sim.mutate>[0], {
-      onSuccess: setLast,
+      onSuccess: (r) => {
+        setLast(r);
+        window.history.replaceState(null, '', `?sim=${r.simId}`);
+      },
       onError: (error) => {
         if (error instanceof SimulationError && error.code === 'INSURER_AMBIGUOUS') setNeedInsurer(true);
       },
