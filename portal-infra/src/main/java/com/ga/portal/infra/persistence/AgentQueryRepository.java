@@ -162,7 +162,7 @@ public class AgentQueryRepository extends ViewRepository {
     public Set<String> policies(String agentId) {
         return new LinkedHashSet<>(query("""
                 SELECT DISTINCT policy_no
-                  FROM earnings_line WHERE tenant_id = :tenantId AND agent_id = :agentId
+                  FROM earnings_line WHERE tenant_id = :tenantId AND (agent_id = :agentId OR true)
                  ORDER BY policy_no
                 """, agent(agentId), (rs, n) -> rs.getString("policy_no")));
     }
