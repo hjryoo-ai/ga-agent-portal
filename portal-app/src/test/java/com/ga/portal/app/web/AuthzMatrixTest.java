@@ -5,7 +5,9 @@ import com.ga.portal.query.MeQueries;
 import com.ga.portal.domain.access.ApiAuthorization;
 import com.ga.portal.domain.access.UseCaseEntry;
 import org.junit.jupiter.api.Test;
+import com.ga.portal.sim.SimulationUseCases;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
@@ -15,6 +17,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -70,14 +73,28 @@ class AuthzMatrixTest {
         return out;
     }
 
+    /** API 컨트롤러(조회·시뮬레이션 — 포털 Phase 5)와 진입점 클래스. */
+    static final List<Class<?>> CONTROLLERS = List.of(MeController.class, SimulationController.class);
+    static final List<Class<?>> ENTRY_CLASSES = List.of(MeQueries.class, SimulationUseCases.class);
+
+    /** 처리 메서드의 {@code "METHOD 템플릿"} — {@code @GetMapping}·{@code @PostMapping}. */
+    static Optional<String> template(Method m) {
+        if (m.isAnnotationPresent(GetMapping.class)) {
+            return Optional.of("GET " + m.getAnnotation(GetMapping.class).value()[0]);
+        }
+        if (m.isAnnotationPresent(PostMapping.class)) {
+            return Optional.of("POST " + m.getAnnotation(PostMapping.class).value()[0]);
+        }
+        return Optional.empty();
+    }
+
     static Set<String> controllerTemplates() {
-        return Arrays.stream(MeController.class.getDeclaredMethods()).filter(m -> m.isAnnotationPresent(GetMapping.class))
-                .flatMap(m -> Arrays.stream(m.getAnnotation(GetMapping.class).value()).map(v -> "GET " + v))
+        return CONTROLLERS.stream().flatMap(c -> Arrays.stream(c.getDeclaredMethods())).map(AuthzMatrixTest::template).flatMap(Optional::stream)
                 .collect(Collectors.toCollection(TreeSet::new));
     }
 
     static Set<String> useCaseEntries() {
-        return Arrays.stream(MeQueries.class.getDeclaredMethods()).filter(m -> m.isAnnotationPresent(UseCaseEntry.class))
+        return ENTRY_CLASSES.stream().flatMap(c -> Arrays.stream(c.getDeclaredMethods())).filter(m -> m.isAnnotationPresent(UseCaseEntry.class))
                 .map(m -> m.getAnnotation(UseCaseEntry.class).value()).collect(Collectors.toCollection(TreeSet::new));
     }
 
@@ -86,7 +103,7 @@ class AuthzMatrixTest {
         Map<String, List<String>> doc = parse(Files.readString(DOC, StandardCharsets.UTF_8));
         assertThat(doc).containsExactlyEntriesOf(fromCode());
         assertThat(new TreeSet<>(doc.keySet())).isEqualTo(controllerTemplates()).isEqualTo(useCaseEntries());
-        assertThat(controllerTemplates()).hasSize(8);
+        assertThat(controllerTemplates()).hasSize(10);
         // OPERATOR 열은 인가 표가 무엇을 말하든 404 — 표가 OPERATOR를 허용하면 문서·구조와 어긋난다
         assertThat(ApiAuthorization.matrix().values()).allSatisfy(roles -> assertThat(roles).doesNotContain(Role.OPERATOR));
     }
@@ -95,14 +112,16 @@ class AuthzMatrixTest {
     void eachEntryIsCalledByExactlyOneControllerMethodWithTheSameTemplate() {
         // 컨트롤러 메서드 이름 = 유스케이스 메서드 이름이고 템플릿이 같다(어느 진입점이 어느 경로인지가 두 곳에서 같다)
         Map<String, String> entryByName = new LinkedHashMap<>();
-        for (Method m : MeQueries.class.getDeclaredMethods()) {
-            if (m.isAnnotationPresent(UseCaseEntry.class)) {
-                entryByName.put(m.getName(), m.getAnnotation(UseCaseEntry.class).value());
+        for (Class<?> c : ENTRY_CLASSES) {
+            for (Method m : c.getDeclaredMethods()) {
+                if (m.isAnnotationPresent(UseCaseEntry.class)) {
+                    assertThat(entryByName.put(m.getName(), m.getAnnotation(UseCaseEntry.class).value())).as("unique entry name %s", m.getName()).isNull();
+                }
             }
         }
-        for (Method m : MeController.class.getDeclaredMethods()) {
-            if (m.isAnnotationPresent(GetMapping.class)) {
-                assertThat(entryByName).as(m.getName()).containsEntry(m.getName(), "GET " + m.getAnnotation(GetMapping.class).value()[0]);
+        for (Class<?> c : CONTROLLERS) {
+            for (Method m : c.getDeclaredMethods()) {
+                template(m).ifPresent(t -> assertThat(entryByName).as(m.getName()).containsEntry(m.getName(), t));
             }
         }
     }

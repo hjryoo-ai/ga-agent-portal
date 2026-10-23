@@ -158,6 +158,15 @@ public class AgentQueryRepository extends ViewRepository {
                 """, agent(agentId, "closeYm", closeYm), (rs, n) -> rs.getString("policy_no")));
     }
 
+    /** 그 설계사의 라인 증권번호 집합(전 기간) — 시뮬레이션의 {@code policyKey}를 풀 때만(포털 Phase 5, 엔진 {@code POLICY_NOT_FOUND}의 "그 설계사의 계산 레코드"와 짝). */
+    public Set<String> policies(String agentId) {
+        return new LinkedHashSet<>(query("""
+                SELECT DISTINCT policy_no
+                  FROM earnings_line WHERE tenant_id = :tenantId AND agent_id = :agentId
+                 ORDER BY policy_no
+                """, agent(agentId), (rs, n) -> rs.getString("policy_no")));
+    }
+
     /** 라인 상세 — 근거·계약 요약의 JSONB 필드는 SQL이 꺼낸 문자열(규칙 버전 목록은 원래 순서로 {@code U+001F} 연결). */
     public Optional<LineDetail> line(String agentId, String calcId) {
         return queryAtMostOne("""

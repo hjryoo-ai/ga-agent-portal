@@ -3,6 +3,7 @@ package com.ga.portal.app.query;
 import com.ga.portal.infra.persistence.AgentQueryRepository;
 import com.ga.portal.infra.persistence.SyncStatusRepository;
 import com.ga.portal.query.MeQueries;
+import com.ga.portal.query.port.PolicyKeys;
 import com.ga.portal.query.port.ReadTransaction;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -22,9 +23,15 @@ import java.time.Clock;
 @EnableConfigurationProperties(QueryProperties.class)
 public class QueryConfiguration {
 
+    /** {@code policyKey} HMAC — 조회와 시뮬레이션(포털 Phase 5)이 같은 빈을 쓴다. */
     @Bean
-    MeQueries meQueries(AgentQueryRepository agents, SyncStatusRepository sync, PlatformTransactionManager transactionManager, Clock clock,
-                        QueryProperties props) {
+    PolicyKeys policyKeys(QueryProperties props) {
+        return HmacPolicyKeys.fromFile(props.policyKeySecretFile());
+    }
+
+    @Bean
+    MeQueries meQueries(AgentQueryRepository agents, SyncStatusRepository sync, PolicyKeys policyKeys, PlatformTransactionManager transactionManager,
+                        Clock clock, QueryProperties props) {
         TransactionTemplate read = new TransactionTemplate(transactionManager);
         read.setReadOnly(true);
         ReadTransaction transaction = new ReadTransaction() {
@@ -33,7 +40,7 @@ public class QueryConfiguration {
                 return read.execute(status -> work.get());
             }
         };
-        return new MeQueries(new JdbcAgentQueryStore(agents), sync::snapshot, HmacPolicyKeys.fromFile(props.policyKeySecretFile()), transaction,
+        return new MeQueries(new JdbcAgentQueryStore(agents), sync::snapshot, policyKeys, transaction,
                 clock, props.defaultSyncDelaySeconds());
     }
 }

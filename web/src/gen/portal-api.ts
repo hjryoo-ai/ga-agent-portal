@@ -139,6 +139,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/simulations/new-contract": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 신계약 시뮬레이션(1.1.0) — 엔진 dry-run 결과를 그대로(설계사 참고용·비확정) */
+        post: operations["simulateNewContract"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/simulations/policy-event": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 해약 등 계약 이벤트 영향 시뮬레이션(1.1.0) — 엔진 dry-run 결과를 그대로 */
+        post: operations["simulatePolicyEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -197,6 +231,10 @@ export interface components {
             scenario?: "ALL_INFORCE" | "RETENTION";
             to: components["schemas"]["Ym"];
         };
+        /** @description 요청 본문의 횟수 1~9999(숫자 문자열 */
+        DigitCount: string;
+        /** @description 요청 본문의 정수 원(숫자 문자열 */
+        DigitWon: string;
         EarningsResponse: {
             asOf: components["schemas"]["AsOf"];
             dataStatus: components["schemas"]["DataStatus"];
@@ -204,6 +242,8 @@ export interface components {
             items: components["schemas"]["MonthSummary"][];
             to: components["schemas"]["Ym"];
         };
+        /** @description 엔진이 발급한 식별자(엔진 계약 defs id와 같은 규칙) */
+        EngineId: string;
         Instant: string;
         Key: string;
         Ledger: {
@@ -410,18 +450,110 @@ export interface components {
         PolicyMasked: string;
         Problem: {
             /** @enum {string} */
-            code: "UNAUTHENTICATED" | "NOT_FOUND" | "INVALID_REQUEST" | "INTERNAL_ERROR";
+            code: "UNAUTHENTICATED" | "NOT_FOUND" | "INVALID_REQUEST" | "INTERNAL_ERROR" | "INSURER_AMBIGUOUS" | "UNSUPPORTED_EVENT_TYPE" | "ENGINE_REJECTED" | "RATE_LIMITED" | "ENGINE_CONTRACT" | "ENGINE_UNAVAILABLE";
             message: string;
         };
         /** @enum {string} */
         Role: "AGENT" | "MANAGER" | "OPERATOR";
         Seq: number;
+        /** @description simulation_log 행의 키(UUID) — 문의·감사용 */
+        SimId: string;
+        /** @description 신계약 시뮬레이션 요청(1.1.0). 설계사는 토큰·identity_link로 정한다. 시책 코드는 받지 않는다 — 엔진이 그 계약에 맞는 시책을 전부 적용한다 */
+        SimNewContractRequest: {
+            contractDate: components["schemas"]["Date"];
+            /** @description 보험사 코드 — 422 INSURER_AMBIGUOUS를 받은 뒤에만 준다 */
+            insurerCd?: components["schemas"]["EngineId"];
+            monthlyPremium: components["schemas"]["DigitWon"];
+            paymentTermMonths?: components["schemas"]["DigitCount"];
+            productKey: components["schemas"]["EngineId"];
+        };
+        /** @description 엔진 NewContractResult(엔진 계약 사본 1.4.0)의 속성을 값 그대로 + 포털 사실 넷. 엔진 필수 목록과 같다(SimulationSchemaParityTest) */
+        SimNewContractResponse: {
+            asOf: components["schemas"]["AsOf"];
+            dataStatus: components["schemas"]["DataStatus"];
+            deferral: {
+                firstYearPayout: components["schemas"]["Won"];
+                schedule: {
+                    amount: components["schemas"]["Won"];
+                    dueYm: components["schemas"]["Ym"];
+                }[];
+            };
+            fyCommissionByInstallment: {
+                amount: components["schemas"]["Won"];
+                no: number;
+            }[];
+            /** @description 엔진 산출 시각(엔진 값 그대로) */
+            generatedAt: components["schemas"]["Instant"];
+            incentives: {
+                amount: components["schemas"]["Won"];
+                code: string;
+                limitCutAmt?: components["schemas"]["NonNegativeWon"];
+                limitIncluded: boolean;
+            }[];
+            limitAmount?: components["schemas"]["NonNegativeWon"];
+            projectedAccum?: components["schemas"]["Won"];
+            /** @description 포털이 요청을 기록한 시각(simulation_log.created_at) */
+            requestedAt: components["schemas"]["Instant"];
+            ruleSnapshotId: components["schemas"]["EngineId"];
+            simId: components["schemas"]["SimId"];
+        };
+        /** @description 계약 이벤트 시뮬레이션 요청(1.1.0). 계약은 policyKey로 — 그 설계사의 계약이 아니면 404(엔진 호출 없음). REDUCE면 newMonthlyPremium 필수 */
+        SimPolicyEventRequest: {
+            asOfDate: components["schemas"]["Date"];
+            /** @description 경과 회차 — 없으면 엔진이 체결일과 asOfDate의 개월 수로 근사한다 */
+            elapsedInstallments?: components["schemas"]["DigitCount"];
+            /** @enum {string} */
+            eventType: "CANCEL" | "LAPSE" | "WITHDRAW" | "REDUCE" | "REINSTATE" | "PAYMENT_OVERDUE";
+            /** @description 감액 뒤 월납(REDUCE일 때만 필수) */
+            newMonthlyPremium?: components["schemas"]["DigitWon"];
+            policyKey: components["schemas"]["PolicyKey"];
+        };
+        /** @description 엔진 PolicyEventResult(엔진 계약 사본 1.4.0)의 속성을 값 그대로 + 포털 사실 넷. 엔진 필수 목록과 같다(SimulationSchemaParityTest) */
+        SimPolicyEventResponse: {
+            asOf: components["schemas"]["AsOf"];
+            cancelledDeferrals: {
+                amount: components["schemas"]["Won"];
+                dueYm: components["schemas"]["Ym"];
+                scheduleId: components["schemas"]["EngineId"];
+            }[];
+            /** @description 환수(해약·실효는 ≤ 0 */
+            clawbackAmount: components["schemas"]["Won"];
+            dataStatus: components["schemas"]["DataStatus"];
+            /** @description 환수가 귀속되는 달(closeYm)의 세전·채권 상계 전 순액(gross + clawbackOffset)의 전후 — 이번 달이 아닐 수 있다 */
+            offsetAgainstMonth: {
+                after: components["schemas"]["Won"];
+                before: components["schemas"]["Won"];
+                closeYm: components["schemas"]["Ym"];
+            };
+            receivableRemaining: components["schemas"]["Won"];
+            requestedAt: components["schemas"]["Instant"];
+            ruleSnapshotId: components["schemas"]["EngineId"];
+            simId: components["schemas"]["SimId"];
+        };
         /** @description 정수 원(부호 있음 — 환수·취소는 음수) */
         Won: Won;
         Ym: string;
     };
     responses: {
-        /** @description 쿼리 파라미터 형식·범위 오류(사유 없음) */
+        /** @description 엔진 응답이 계약과 다르다 — 스키마 위반·예상 밖 상태·엔진 400·404(1.1.0). code ENGINE_CONTRACT, 재시도하지 않는다 */
+        EngineContract: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description 엔진에 닿지 못했다 — 연결 실패·시간 초과·엔진 5xx·서비스 토큰 거부(1.1.0). code ENGINE_UNAVAILABLE, 조회 API는 영향 없음 */
+        EngineUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description 쿼리 파라미터 형식·범위 오류, 시뮬레이션 요청 본문의 형식·크기·스키마 오류(사유 없음) */
         InvalidRequest: {
             headers: {
                 [name: string]: unknown;
@@ -445,6 +577,29 @@ export interface components {
                 [name: string]: unknown;
             };
             content?: never;
+        };
+        /** @description 그 설계사의 최근 60초 시뮬레이션 요청 수가 테넌트 한도 이상(1.1.0) — code RATE_LIMITED, 행·엔진 호출 없음 */
+        RateLimited: {
+            headers: {
+                /** @description 창 안 가장 오래된 요청이 빠질 때까지의 초(올림 */
+                "Retry-After"?: string;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /**
+         * @description 엔진이 거부했다(1.1.0) — code INSURER_AMBIGUOUS(보험사를 정해야 한다 — insurerCd를 주고 다시), UNSUPPORTED_EVENT_TYPE(엔진이 시뮬레이션하지 않는
+         *     유형), ENGINE_REJECTED(그 밖의 엔진 422). 코드마다 포털 고정 바이트 — 엔진의 message는 옮기지 않는다.
+         */
+        SimRejected: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
         };
         /** @description 토큰 없음·형식·알고리즘·발급자·서명·만료·대상·테넌트 교차 검사 — 사유와 무관하게 같은 바이트 */
         Unauthenticated: {
@@ -474,6 +629,8 @@ export interface components {
         CacheControl: "private, no-cache";
         /** @description 약한 ETag W/"<seq>.<sync>.<cfg>"(라인 목록은 뒤에 .<page>.<size>.<filter>) — 피드 위치·동기화 상태·응답에 쓰인 테넌트 설정이 바뀌면 바뀐다 */
         ETag: string;
+        /** @description 시뮬레이션 결과는 저장하지 않는다(1.1.0) */
+        NoStore: "no-store";
     };
     pathItems: never;
 }
@@ -719,6 +876,70 @@ export interface operations {
             304: components["responses"]["NotModified"];
             401: components["responses"]["Unauthenticated"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    simulateNewContract: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimNewContractRequest"];
+            };
+        };
+        responses: {
+            /** @description 엔진 NewContractResult의 속성 + 포털 사실(asOf·dataStatus·simId·requestedAt) */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["NoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimNewContractResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["SimRejected"];
+            429: components["responses"]["RateLimited"];
+            502: components["responses"]["EngineContract"];
+            503: components["responses"]["EngineUnavailable"];
+        };
+    };
+    simulatePolicyEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimPolicyEventRequest"];
+            };
+        };
+        responses: {
+            /** @description 엔진 PolicyEventResult의 속성 + 포털 사실(asOf·dataStatus·simId·requestedAt) */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["NoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimPolicyEventResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["SimRejected"];
+            429: components["responses"]["RateLimited"];
+            502: components["responses"]["EngineContract"];
+            503: components["responses"]["EngineUnavailable"];
         };
     };
 }

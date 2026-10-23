@@ -95,6 +95,17 @@ abstract class ApiIntegrationTest {
         }
     }
 
+    /** 엔진 서비스 토큰 디렉터리(포털 Phase 5 — 시뮬레이션 IT가 테넌트 파일을 쓴다. 값은 실행마다 무작위, 저장소에 없다). */
+    static final java.nio.file.Path ENGINE_TOKENS = tempDir("portal-engine-tokens");
+
+    static java.nio.file.Path tempDir(String prefix) {
+        try {
+            return java.nio.file.Files.createTempDirectory(prefix);
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
+
     private static volatile boolean a1Applied;
 
     @Autowired
@@ -128,6 +139,9 @@ abstract class ApiIntegrationTest {
         registry.add("portal.api.issuer-username", () -> PostgresHarness.ISSUER);
         registry.add("portal.api.issuer-password", () -> PostgresHarness.ISSUER_PASSWORD);
         registry.add("portal.query.policy-key-secret-file", POLICY_KEY_SECRET::toString);
+        // 포털 Phase 5: 시뮬레이션 — 토큰 파일 디렉터리(인제스트와 같은 설정), 엔진 읽기 시간 초과는 시험이 줄인다(SLOW 스텁 3초 > 2초)
+        registry.add("portal.ingest.token-dir", ENGINE_TOKENS::toString);
+        registry.add("portal.sim.read-timeout", () -> "2s");
     }
 
     @Value("${local.server.port}")
@@ -158,6 +172,12 @@ abstract class ApiIntegrationTest {
 
     HttpResponse<byte[]> get(String path, String token) {
         return get(path, b -> b.header("Authorization", "Bearer " + token));
+    }
+
+    /** JSON 본문 POST(포털 Phase 5 시뮬레이션) — 응답은 {@link #send}가 계약으로 검증한다. */
+    HttpResponse<byte[]> post(String path, String token, String json) {
+        return send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path)).header("Authorization", "Bearer " + token)
+                .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(json, java.nio.charset.StandardCharsets.UTF_8)));
     }
 
     /** 보내고, 응답을 계약으로 검증한다(C11 — 모든 IT 응답). */

@@ -80,7 +80,7 @@ class ApiLayerRulesTest {
     @Test
     void a_everyHandlerTakesACallerAndCallsExactlyOneUseCaseEntry() {
         List<JavaClass> controllers = classes.stream().filter(c -> c.isAnnotatedWith(REST_CONTROLLER)).toList();
-        assertThat(controllers).extracting(JavaClass::getName).containsExactly(P + "app.web.MeController");
+        assertThat(controllers).extracting(JavaClass::getName).containsExactlyInAnyOrder(P + "app.web.MeController", P + "app.web.SimulationController");
         List<String> problems = new ArrayList<>();
         int handlers = 0;
         for (JavaClass c : controllers) {
@@ -99,7 +99,7 @@ class ApiLayerRulesTest {
             }
         }
         assertThat(problems).isEmpty();
-        assertThat(handlers).as("handlers (= rows of docs/authz-matrix.md)").isEqualTo(8);
+        assertThat(handlers).as("handlers (= rows of docs/authz-matrix.md — Phase 5: + two simulations)").isEqualTo(10);
     }
 
     @Test
@@ -142,7 +142,7 @@ class ApiLayerRulesTest {
                 }
             }
         }
-        assertThat(entries).isEqualTo(8);
+        assertThat(entries).isEqualTo(10);
         assertThat(problems).isEmpty();
         assertThat(helpers).allSatisfy(h -> assertThat(classes.get(h.substring(0, h.indexOf('#'))).getMethods())
                 .as("stale helper %s", h).anyMatch(m -> m.getName().equals(h.substring(h.indexOf('#') + 1))));

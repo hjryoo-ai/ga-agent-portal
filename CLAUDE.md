@@ -8,7 +8,7 @@
 - 플랫폼·핵심 Envelope를 바꿔야 하면 포털에서 보충·수정하지 않고 `ga-disclosure` 쪽 정비로 올린다.
 
 ## 절대 규칙 (위반 시 Phase 수용 거부)
-1. **포털은 금액을 계산하지 않는다.** 허용 연산은 정수(원) 합산·차감과 표시용 비율(`Ratio`)뿐이다. `double`/`float`은 전 모듈 금지, `java.math.BigDecimal`도 전 모듈 금지(아키텍처 테스트). DB의 `NUMERIC` 표시 파라미터는 SQL에서 정수로 읽는다. 엔진이 준 요율·배수는 불투명 문자열이며 산술에 쓰지 않는다.
+1. **포털은 금액을 계산하지 않는다.** 허용 연산은 정수(원) 합산·차감과 표시용 비율(`Ratio`)뿐이다. `double`/`float`은 전 모듈 금지, `java.math.BigDecimal`도 전 모듈 금지(아키텍처 테스트). DB의 `NUMERIC` 표시 파라미터는 SQL에서 정수로 읽는다. 엔진이 준 요율·배수는 불투명 문자열이며 산술에 쓰지 않는다. **예외 하나**(포털 Phase 5 지시문 승인): 분급 타임라인의 유지율 시나리오 `ForecastScenario#apply`(`floor(expected × p / 100)` — 설계서 §6.4). 포털 제품 바이트코드의 곱셈·나눗셈·나머지는 닫힌 허용 목록 메서드에서만(`MultiplicationScanTest` — 금액 곱셈은 그 하나), SQL 산술은 임계치 % → bp 조각만(`SqlArithmeticScanTest`).
 2. **`tenant_id` 조건 없는 데이터 접근 금지.** 저장소는 `TenantScopedRepository`를 통해서만 DB에 닿고, PostgreSQL RLS(`ENABLE`·`FORCE`)가 2차 방어한다. 직접 접근 허용 목록은 닫힌 FQN 목록 + 전용 롤 + 테넌트 데이터 미접근의 세 조건을 전부 만족해야 하며 Phase 0에서는 비어 있다.
 3. **`agent_id`는 클라이언트 입력·토큰 클레임에서 신뢰하지 않고 `identity_link` 조회로만 결정한다.**
 4. **마감(CONFIRMED/PAID)된 월의 뷰는 이후 이벤트로 변경되지 않는다.**
@@ -24,7 +24,7 @@
 - Lombok 금지. `record`·`sealed`·pattern matching 사용. DTO는 record.
 - 시간은 `java.time` + 주입된 `Clock`. `LocalDate.now()`·`Instant.now()` 직접 호출 금지.
 - 계약은 JSON Schema 2020-12 + OpenAPI 3.1(`contracts/`). 금액은 `integer`, 날짜·시각·UUID는 `format`이 아니라 `pattern`(`contracts/` 전 파일 `format` 0). `contracts/shared/`의 사본은 고치지 않는다. `CHECKSUMS`는 파일 바이트의 평문 SHA-256(`sha256sum -c` 형식)이고, JCS(`platform-canonical`)는 이벤트 payload의 정규 해시에만 쓴다.
-- 의존 방향 `app → query/ingest/sim/recon → projection → domain`, `infra`는 `app`만. `portal-domain`·`portal-projection`은 Spring·DB 의존성을 갖지 않는다(`platform-core`만 가능). `platform-spring`은 `infra`·`app`에서만. 플랫폼 타입과 단순 이름이 같은 포털 클래스를 만들지 않는다.
+- 의존 방향 `app → query/ingest/sim/recon → projection → domain`, `infra`는 `app`만. `portal-domain`·`portal-projection`·`portal-query`·`portal-sim`은 Spring·DB 의존성을 갖지 않는다(`platform-core`만 가능 — Gradle `verifySpringFree`와 ArchUnit). 곱셈·나눗셈·나머지는 허용 목록 메서드에서만(절대 규칙 1). `platform-spring`은 `infra`·`app`에서만. 플랫폼 타입과 단순 이름이 같은 포털 클래스를 만들지 않는다.
 - 소스셋 밖의 파일을 읽는 테스트는 그 파일(디렉터리)을 Gradle 입력으로 선언한다. 주입이 첫 시도에 실패하지 않으면 테스트보다 입력 선언을 먼저 본다(`verifyTestInputs`가 테스트 원천의 저장소 경로를 그 태스크의 입력과 대조한다).
 
 ## 인제스트 규약 (포털 Phase 1 — 설계서 §6.1)
@@ -52,6 +52,13 @@
 - **증권번호 원문은 어느 응답에도 없다** — `policyMasked`·`policyKey`(배포 비밀 HMAC). 키 → 원문은 요청 안에서 그 설계사의 증권번호 집합으로만. 로그의 subject·`agent_id`·발급자 URL은 해시(`LogIds`), 지표 태그는 `tenant`·`reason`뿐.
 - 모든 응답은 `contracts/api/v1/portal-api.openapi.yaml`을 통과한다(시험이 전 응답 검증). 선택 필드는 값이 없으면 뺀다(`null` 금지). 캐시는 `private, no-cache` + 약한 ETag `seq.sync.cfg`, `If-None-Match`는 소유 확인 뒤에만 비교.
 - 운영 CLI의 행위자는 실행한 OS 사용자 하나(`cli:<user>`)이고 그 테넌트의 `OPERATOR` 링크가 있어야 한다. 인자로 행위자를 고르지 않는다.
+
+## 시뮬레이션 규약 (포털 Phase 5 — 설계서 §4.3·§7·§9·§10)
+- **엔진 호출은 서버만, 재시도 0.** 화면은 엔진을 모른다. 연결·읽기 시간 초과는 앱 설정 `portal.sim.*`, 서비스 토큰은 인제스트와 같은 파일 빈.
+- **엔진 결과는 그대로 옮긴다.** 사본 스키마(`engine-internal.openapi.yaml`)를 통과하고 숫자가 정수 표기인 응답만 받고, 사본 스키마의 속성만 값 그대로(모르는 필드는 버리고 개수만 로그). 금액 가공(차이·합산·반올림) 없음. 엔진 `message`는 어느 응답·로그에도 옮기지 않는다.
+- **로그는 트랜잭션 둘**: 호출 전 `REQUESTED`(엔진 요청 원문 — 서버 내부), 호출 뒤 `SUCCEEDED`/`FAILED`(본문 없음, 사유 코드·엔진 상태). 레이트 리밋은 `simulation_log` 행 수(직전 60초) + 설계사 권고 잠금, 429에는 행·감사·호출이 없다.
+- **거부는 코드마다 고정 바이트**(401·404·400·500 + 422 셋·429·502·503 — `ProblemResponses`). 엔진 400·404는 502, 닿지 않으면 503.
+- 시험의 엔진 데이터는 엔진 샘플 사본(`contracts/shared/ga-commission-engine/`)뿐 — 스텁(`StubSimulationEngine`)은 요청의 JCS 정규형으로 대조하고, 샘플 밖 요청에는 500을 낸다.
 
 ## 화면 규약 (포털 Phase 4 — 설계서 §6.2·§8·§9·§10)
 - **화면은 금액을 계산·비교·변환하지 않는다.** 생성 클라이언트의 금액은 불투명 `Won`(`client-lock.mjs`의 변환 훅) — 산술·비교·템플릿 보간·JSX 직접 렌더는 타입 오류이거나 ESLint `portal/no-money-arithmetic`(이름 또는 구조 표식 `__@wonBrand@`로 인식) 위반이다. 숫자로 바꾸는 곳은 `src/money/won.ts` 하나(`formatWon`·`isZero`·`present`) — 닫힌 목록. 있음/없음 확인도 `present()`로. 번들 스캔이 산출물에서 한 번 더 본다.

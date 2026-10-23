@@ -149,14 +149,47 @@ class PortalApiContractTest {
     void pathsAreTheAuthorizationMatrixAndEachHas401And404() {
         Set<String> paths = new TreeSet<>();
         api.path("paths").properties().forEach(e -> {
-            paths.add("GET " + e.getKey());
-            JsonNode responses = e.getValue().path("get").path("responses");
-            assertThat(responses.has("401") && responses.has("404") && responses.has("200") && responses.has("304")).as(e.getKey()).isTrue();
+            assertThat(e.getValue().properties()).as("one method per path").hasSize(1);
+            String method = e.getValue().propertyNames().iterator().next();
+            assertThat(method).as(e.getKey()).isIn("get", "post");
+            paths.add(method.toUpperCase(java.util.Locale.ROOT) + " " + e.getKey());
+            JsonNode responses = e.getValue().path(method).path("responses");
+            assertThat(responses.has("401") && responses.has("404") && responses.has("200")).as(e.getKey()).isTrue();
             assertThat(responses.path("200").path("content").path("application/json").path("schema").has("$ref")).as(e.getKey()).isTrue();
-            assertThat(e.getValue().properties()).as("GET only").extracting(Map.Entry::getKey).containsExactly("get");
+            if (method.equals("get")) {
+                // 조회: 약한 ETag·304
+                assertThat(responses.has("304")).as(e.getKey()).isTrue();
+                assertThat(responses.path("200").path("headers").has("ETag")).as(e.getKey()).isTrue();
+            } else {
+                // 시뮬레이션(1.1.0): 요청 본문(계약 스키마), ETag·304 없음, no-store, 거부 셋(400·422·429·502·503)
+                assertThat(e.getValue().path(method).path("requestBody").path("content").path("application/json").path("schema").has("$ref")).isTrue();
+                assertThat(responses.has("304")).as(e.getKey()).isFalse();
+                assertThat(responses.path("200").path("headers").has("ETag")).as(e.getKey()).isFalse();
+                assertThat(responses.path("200").path("headers").path("Cache-Control").path("$ref").asString()).isEqualTo("#/components/headers/NoStore");
+                assertThat(responses.propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "404", "422", "429", "502", "503");
+            }
         });
         assertThat(paths).isEqualTo(new TreeSet<>(ApiAuthorization.matrix().keySet()));
         assertThat(api.path("openapi").asString()).isEqualTo("3.1.0");
+    }
+
+    @Test
+    void everyObjectSchemaIsClosed() {
+        List<String> open = new ArrayList<>();
+        closed("components/schemas", api.path("components").path("schemas"), open);
+        assertThat(open).as("object schemas without additionalProperties: false").isEmpty();
+    }
+
+    static void closed(String at, JsonNode node, List<String> open) {
+        if (node.isObject()) {
+            if ("object".equals(node.path("type").asString()) && node.has("properties")
+                    && !(node.path("additionalProperties").isBoolean() && !node.path("additionalProperties").asBoolean())) {
+                open.add(at);
+            }
+            node.properties().forEach(e -> closed(at + "/" + e.getKey(), e.getValue(), open));
+        } else if (node.isArray()) {
+            node.forEach(n -> closed(at + "[]", n, open));
+        }
     }
 
     @Test

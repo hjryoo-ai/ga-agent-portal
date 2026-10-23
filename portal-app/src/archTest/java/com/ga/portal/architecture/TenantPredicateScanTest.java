@@ -95,14 +95,15 @@ class TenantPredicateScanTest {
     @Test
     void scanCoversMigrationsAndRepositories() {
         assertThat(sqlFiles).extracting(p -> p.getFileName().toString()).containsExactly("V1__init.sql", "V2__rls.sql", "V3__ingest_payload_hash.sql", "V4__projection.sql",
-                "V5__query_api.sql");
+                "V5__query_api.sql", "V6__simulation_log.sql");
         assertThat(knownTables).hasSize(17).contains("tenant", "earnings_line", "ingest_cursor", "audit_access");
         long javaSqlCount = javaFiles.stream().mapToLong(p -> SqlTenantScanner.sqlLiteralsInJava(read(p)).size()).sum();
         assertThat(javaSqlCount).as("repository SQL literals found (TenantRepository 1, IngestCursorRepository 3, IngestEventRepository 4, "
                 + "IngestLockRepository 1, AuditAccessRepository 2; Phase 2: AgentProfile 2, EarningsLine 3, EarningsMonth 2, PolicyLimit 5, "
                 + "DeferralItem 3, ClawbackItem 2, PolicyFlag 2, ReconResult 1, ViewReset 8 DELETE + 3 invariant queries; Phase 3: IngestCursor +2 caught_up_at, IssuerDirectoryReader 1, IdentityLink 1, "
-                + "AuditAccess +1 denial, AgentQuery 16, SyncStatus 1; Phase 5: AgentQuery +2 monthDetail·deferralPolicies)")
-                .isEqualTo(11 + 20 + 11 + 2 + 3 + 17 + 2);
+                + "AuditAccess +1 denial, AgentQuery 16, SyncStatus 1; Phase 5: AgentQuery +3 monthDetail·deferralPolicies·policies, "
+                + "SimulationLog 4, SimulationLock 1)")
+                .isEqualTo(11 + 20 + 11 + 2 + 3 + 17 + 3 + 4 + 1);
     }
 
     @Test
@@ -155,7 +156,7 @@ class TenantPredicateScanTest {
                 violations.addAll(SqlTenantScanner.scanAgentPredicate(source, literal, agentTables));
             }
         }
-        assertThat(statements).as("AgentQueryRepository statements (not vacuous — Phase 5: +monthDetail, +deferralPolicies)").isEqualTo(18);
+        assertThat(statements).as("AgentQueryRepository statements (not vacuous — Phase 5: +monthDetail, +deferralPolicies, +policies)").isEqualTo(19);
         assertThat(violations).as("agent-scoped statements without agent_id = :agentId per agent table (D-4)").isEmpty();
         assertThat(AGENT_ALLOWLIST).as("second-predicate allowlist (Phase 3: empty)").isEmpty();
     }
@@ -269,5 +270,21 @@ class TenantPredicateScanTest {
         assertThat(SqlTenantScanner.sqlLiteralsInJava(java)).hasSize(2);
         assertThat(SqlTenantScanner.sqlLiteralsInJava(java).stream()
                 .flatMap(l -> SqlTenantScanner.scan("R.java", l, TABLES, Dialect.JAVA).stream())).hasSize(1);
+    }
+
+    /**
+     * 포털 Phase 5: {@code simulation_log} 저장소의 모든 문장은 그 설계사를 묶는다({@code :agentId} — 넣기는 값, 읽기·갱신은 {@code agent_id = :agentId}). 두 번째
+     * 술어 스캔({@link #AGENT_SCOPED_SOURCES})은 FROM/JOIN 참조로 세므로 INSERT·UPDATE를 볼 수 없다 — 여기서 문장마다 본다.
+     */
+    @Test
+    void everySimulationLogStatementIsBoundToTheAgent() {
+        String source = "portal-infra/src/main/java/com/ga/portal/infra/persistence/SimulationLogRepository.java";
+        List<String> statements = SqlTenantScanner.sqlLiteralsInJava(read(ROOT.resolve(source))).stream()
+                .flatMap(l -> SqlTenantScanner.statementsOf(l).stream()).toList();
+        assertThat(statements).hasSize(4);
+        assertThat(statements).allSatisfy(s -> assertThat(s).contains("tenant_id").contains(":agentid"));
+        assertThat(statements.stream().filter(s -> !s.startsWith("insert"))).allSatisfy(s -> assertThat(s).contains("agent_id = :agentid"));
+        assertThat(statements.stream().filter(s -> s.startsWith("update"))).hasSize(2)
+                .allSatisfy(s -> assertThat(s).endsWith("and sim_id = :simid and status = ''"));   // 문자열은 스캐너가 비운다 — REQUESTED 행만
     }
 }

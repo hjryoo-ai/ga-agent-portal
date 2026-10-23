@@ -32,11 +32,6 @@ import java.time.Clock;
 public class IngestPollingConfiguration {
 
     @Bean
-    ServiceTokenSource serviceTokenSource(IngestProperties props) {
-        return new FileServiceTokenSource(props.tokenDir());
-    }
-
-    @Bean
     FeedClient feedClient(IngestProperties props, TenantTransactions transactions, TenantRepository tenants, ServiceTokenSource tokens) {
         return httpFeed(props, transactions, tenants, tokens);
     }
