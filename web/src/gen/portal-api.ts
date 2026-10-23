@@ -231,9 +231,9 @@ export interface components {
             scenario?: "ALL_INFORCE" | "RETENTION";
             to: components["schemas"]["Ym"];
         };
-        /** @description 요청 본문의 횟수 1~9999(숫자 문자열 */
+        /** @description 요청 본문의 횟수 1~9999(숫자 문자열, 1.1.0) */
         DigitCount: string;
-        /** @description 요청 본문의 정수 원(숫자 문자열 */
+        /** @description 요청 본문의 정수 원(숫자 문자열, 1.1.0 — 서버가 정수로 읽는다) */
         DigitWon: string;
         EarningsResponse: {
             asOf: components["schemas"]["AsOf"];
@@ -261,12 +261,12 @@ export interface components {
             monthlyPremium: components["schemas"]["NonNegativeWon"];
             policyKey: components["schemas"]["PolicyKey"];
             policyMasked: components["schemas"]["PolicyMasked"];
-            /** @description 그 계약의 첫 라인의 상품 키(1.1.0 */
+            /** @description 그 계약의 첫 라인의 상품 키(1.1.0, CR-4) */
             productKey?: string;
             productName?: string;
             /** @description 한도 − 누적(정수 차감) */
             remaining: components["schemas"]["Won"];
-            /** @description 원장을 연 한도 룰 버전(1.1.0 */
+            /** @description 원장을 연 한도 룰 버전(1.1.0, CR-3) */
             ruleVersionId?: string;
             /**
              * @description 테넌트 임계치(bp)와의 정수 비교
@@ -313,10 +313,10 @@ export interface components {
             productKey?: string;
             productName?: string;
             reversalOf?: components["schemas"]["Key"];
-            /** @description reversalOf 라인의 마감월(1.1.0 */
+            /** @description reversalOf 라인의 마감월(1.1.0, CR-2) */
             reversalOfYm?: components["schemas"]["Ym"];
             reversedBy?: components["schemas"]["Key"];
-            /** @description reversedBy 라인의 마감월(1.1.0 */
+            /** @description reversedBy 라인의 마감월(1.1.0, CR-2) */
             reversedByYm?: components["schemas"]["Ym"];
         };
         LineDetailResponse: {
@@ -516,7 +516,7 @@ export interface components {
                 dueYm: components["schemas"]["Ym"];
                 scheduleId: components["schemas"]["EngineId"];
             }[];
-            /** @description 환수(해약·실효는 ≤ 0 */
+            /** @description 환수(해약·실효는 ≤ 0, 부활 재지급은 > 0 — 엔진 부호 그대로) */
             clawbackAmount: components["schemas"]["Won"];
             dataStatus: components["schemas"]["DataStatus"];
             /** @description 환수가 귀속되는 달(closeYm)의 세전·채권 상계 전 순액(gross + clawbackOffset)의 전후 — 이번 달이 아닐 수 있다 */
@@ -581,7 +581,7 @@ export interface components {
         /** @description 그 설계사의 최근 60초 시뮬레이션 요청 수가 테넌트 한도 이상(1.1.0) — code RATE_LIMITED, 행·엔진 호출 없음 */
         RateLimited: {
             headers: {
-                /** @description 창 안 가장 오래된 요청이 빠질 때까지의 초(올림 */
+                /** @description 창 안 가장 오래된 요청이 빠질 때까지의 초(올림, 1 이상) */
                 "Retry-After"?: string;
                 [name: string]: unknown;
             };

@@ -173,6 +173,32 @@ class PortalApiContractTest {
         assertThat(api.path("openapi").asString()).isEqualTo("3.1.0");
     }
 
+    /**
+     * 계약에 값이 {@code null}인 키가 없다 — 흐름 매핑({@code {a: b, c: d}})의 따옴표 없는 설명에 쉼표가 있으면 설명이 잘리고 나머지가 값 없는 키가 된다(Phase 5
+     * 1.1.0 초안에서 여덟 곳 — 생성 클라이언트의 설명이 잘려 보였다).
+     */
+    @Test
+    void noKeyWithoutAValue() {
+        List<String> nulls = new ArrayList<>();
+        collectNulls("", api, nulls);
+        assertThat(nulls).isEmpty();
+    }
+
+    static void collectNulls(String at, JsonNode node, List<String> out) {
+        if (node.isObject()) {
+            for (Map.Entry<String, JsonNode> e : node.properties()) {
+                if (e.getValue().isNull()) {
+                    out.add(at + "/" + e.getKey());
+                }
+                collectNulls(at + "/" + e.getKey(), e.getValue(), out);
+            }
+        } else if (node.isArray()) {
+            for (int i = 0; i < node.size(); i++) {
+                collectNulls(at + "[" + i + "]", node.get(i), out);
+            }
+        }
+    }
+
     @Test
     void everyObjectSchemaIsClosed() {
         List<String> open = new ArrayList<>();

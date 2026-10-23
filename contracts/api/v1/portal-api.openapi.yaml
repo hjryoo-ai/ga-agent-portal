@@ -250,7 +250,7 @@ components:
     RateLimited:
       description: 그 설계사의 최근 60초 시뮬레이션 요청 수가 테넌트 한도 이상(1.1.0) — code RATE_LIMITED, 행·엔진 호출 없음
       headers:
-        Retry-After: {description: 창 안 가장 오래된 요청이 빠질 때까지의 초(올림, 1 이상), schema: {type: string, pattern: '^[1-9][0-9]{0,2}$'}}
+        Retry-After: {description: '창 안 가장 오래된 요청이 빠질 때까지의 초(올림, 1 이상)', schema: {type: string, pattern: '^[1-9][0-9]{0,2}$'}}
       content: {application/problem+json: {schema: {$ref: '#/components/schemas/Problem'}}}
     EngineContract:
       description: 엔진 응답이 계약과 다르다 — 스키마 위반·예상 밖 상태·엔진 400·404(1.1.0). code ENGINE_CONTRACT, 재시도하지 않는다
@@ -283,8 +283,8 @@ components:
     MonthStatus: {type: string, enum: [PROVISIONAL, ESTIMATED, CONFIRMED, PAID]}
     NetBasis: {type: string, enum: [ESTIMATE, CONFIRM, PAYOUT]}
     Role: {type: string, enum: [AGENT, MANAGER, OPERATOR]}
-    DigitWon: {type: string, pattern: '^(0|[1-9][0-9]{0,11})$', description: 요청 본문의 정수 원(숫자 문자열, 1.1.0 — 서버가 정수로 읽는다)}
-    DigitCount: {type: string, pattern: '^[1-9][0-9]{0,3}$', description: 요청 본문의 횟수 1~9999(숫자 문자열, 1.1.0)}
+    DigitWon: {type: string, pattern: '^(0|[1-9][0-9]{0,11})$', description: '요청 본문의 정수 원(숫자 문자열, 1.1.0 — 서버가 정수로 읽는다)'}
+    DigitCount: {type: string, pattern: '^[1-9][0-9]{0,3}$', description: '요청 본문의 횟수 1~9999(숫자 문자열, 1.1.0)'}
     SimId: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', description: 'simulation_log 행의 키(UUID) — 문의·감사용'}
     EngineId: {type: string, minLength: 1, maxLength: 64, pattern: '^\S(.*\S)?$', description: 엔진이 발급한 식별자(엔진 계약 defs id와 같은 규칙)}
     AsOf:
@@ -409,8 +409,8 @@ components:
         policyKey: {$ref: '#/components/schemas/PolicyKey'}
         reversalOf: {$ref: '#/components/schemas/Key'}
         reversedBy: {$ref: '#/components/schemas/Key'}
-        reversalOfYm: {$ref: '#/components/schemas/Ym', description: reversalOf 라인의 마감월(1.1.0, CR-2)}
-        reversedByYm: {$ref: '#/components/schemas/Ym', description: reversedBy 라인의 마감월(1.1.0, CR-2)}
+        reversalOfYm: {$ref: '#/components/schemas/Ym', description: 'reversalOf 라인의 마감월(1.1.0, CR-2)'}
+        reversedByYm: {$ref: '#/components/schemas/Ym', description: 'reversedBy 라인의 마감월(1.1.0, CR-2)'}
     LinesResponse:
       type: object
       additionalProperties: false
@@ -489,8 +489,8 @@ components:
         cutTotal: {$ref: '#/components/schemas/NonNegativeWon'}
         deferredTotal: {$ref: '#/components/schemas/NonNegativeWon'}
         flags: {type: array, items: {type: string, enum: [CANCELLED, LAPSED, OVERDUE, REDUCED]}}
-        ruleVersionId: {type: string, minLength: 1, description: 원장을 연 한도 룰 버전(1.1.0, CR-3)}
-        productKey: {type: string, description: 그 계약의 첫 라인의 상품 키(1.1.0, CR-4)}
+        ruleVersionId: {type: string, minLength: 1, description: '원장을 연 한도 룰 버전(1.1.0, CR-3)'}
+        productKey: {type: string, description: '그 계약의 첫 라인의 상품 키(1.1.0, CR-4)'}
         productName: {type: string}
         insuredMasked: {type: string}
     LimitsResponse:
@@ -659,7 +659,7 @@ components:
         dataStatus: {$ref: '#/components/schemas/DataStatus'}
         simId: {$ref: '#/components/schemas/SimId'}
         requestedAt: {$ref: '#/components/schemas/Instant'}
-        clawbackAmount: {$ref: '#/components/schemas/Won', description: 환수(해약·실효는 ≤ 0, 부활 재지급은 > 0 — 엔진 부호 그대로)}
+        clawbackAmount: {$ref: '#/components/schemas/Won', description: '환수(해약·실효는 ≤ 0, 부활 재지급은 > 0 — 엔진 부호 그대로)'}
         offsetAgainstMonth:
           type: object
           additionalProperties: false
