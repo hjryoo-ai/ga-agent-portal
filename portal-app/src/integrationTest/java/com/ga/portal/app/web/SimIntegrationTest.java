@@ -140,9 +140,8 @@ abstract class SimIntegrationTest extends ApiIntegrationTest {
                 List<SimRow> out = new ArrayList<>();
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        int status = rs.getInt(9);
                         out.add(new SimRow(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6),
-                                rs.getString(7), rs.getString(8), rs.wasNull() ? null : status, rs.getObject(10, OffsetDateTime.class).toInstant()));
+                                rs.getString(7), rs.getString(8), rs.getObject(9, Integer.class), rs.getObject(10, OffsetDateTime.class).toInstant()));
                     }
                 }
                 return out;

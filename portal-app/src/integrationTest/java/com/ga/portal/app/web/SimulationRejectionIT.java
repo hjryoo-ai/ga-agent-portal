@@ -98,8 +98,39 @@ class SimulationRejectionIT extends SimIntegrationTest {
             table.append(' ').append(code).append('=').append(b.length).append('/').append(sha12(b));
         }
         System.out.println(table);
-        // 같은 코드면 같은 머리(429의 Retry-After 값 빼고)
-        assertThat(headers(seen.get("503")).keySet()).isEqualTo(headers(seen.get("502 (engine 404 with a message)")).keySet());
+        // 같은 코드면 사유가 달라도 같은 머리(429의 Retry-After 값 빼고): 502 — 엔진 404(메시지 있음)·스키마 위반 200, 503 — 엔진 503·읽기 시간 초과.
+        // 503의 Connection: close는 서블릿 컨테이너가 503에 늘 붙이는 홉 머리다(Tomcat statusDropsConnection) — 코드가 같으면 같이 붙는다.
+        ENGINE_STD.mode(StubSimulationEngine.Mode.BROKEN);
+        HttpResponse<byte[]> broken;
+        try {
+            broken = post(NEW, a, S1);
+        } finally {
+            ENGINE_STD.mode(StubSimulationEngine.Mode.UP);
+        }
+        ENGINE_STD.mode(StubSimulationEngine.Mode.SLOW).slowMillis(3000);
+        HttpResponse<byte[]> slow;
+        try {
+            slow = post(NEW, a, S1);
+        } finally {
+            ENGINE_STD.mode(StubSimulationEngine.Mode.UP);
+        }
+        assertThat(broken.body()).isEqualTo(ENGINE_CONTRACT);
+        assertThat(slow.body()).isEqualTo(ENGINE_UNAVAILABLE);
+        assertThat(headers(broken)).isEqualTo(headers(seen.get("502 (engine 404 with a message)")));
+        assertThat(headers(slow)).isEqualTo(headers(seen.get("503")));
         assertThat(seen.get("429").headers().firstValue("retry-after")).hasValueSatisfying(v -> assertThat(v).matches("[1-9][0-9]?"));
+    }
+
+    /** 상한(2,048바이트)을 넘는 본문(1 MiB)은 400 고정 바이트 — 행도 엔진 호출도 없다(컨트롤러는 상한+1바이트까지만 읽는다). */
+    @Test
+    void anOversizedBodyIsRejectedWithoutARowOrAnEngineCall() {
+        int before = rows(STD).size();
+        int calls = ENGINE_STD.calls();
+        String big = S1.replace("}", ",\"pad\":\"" + "x".repeat(1 << 20) + "\"}");
+        HttpResponse<byte[]> r = post(NEW, std(SUB_A1), big);
+        assertThat(r.statusCode()).isEqualTo(400);
+        assertThat(r.body()).isEqualTo(UniformRejectionIT.INVALID_REQUEST);
+        assertThat(rows(STD)).hasSize(before);
+        assertThat(ENGINE_STD.calls()).isEqualTo(calls);
     }
 }
