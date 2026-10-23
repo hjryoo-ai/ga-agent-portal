@@ -18,9 +18,9 @@ Phase 3(조회 API) 수용(2026-10-17) — [지시문](docs/phase-03-지시문.m
 
 Phase 4(화면 1차) 수용(2026-10-22, 조건 A1 → `phase-4.1`) — [지시문](docs/phase-04-지시문.md)·[계획](docs/phase-04-계획.md)·[승인](docs/phase-04-계획승인.md)·[보고서](docs/phase-04-보고서.md)·[수용 심사](docs/phase-04-수용심사.md). 태그 `phase-4`·`phase-4.1`.
 
-Phase 5(분급 타임라인·시뮬레이션) 구현 — [지시문](docs/phase-05-지시문.md)·[계획](docs/phase-05-계획.md)·[보고서](docs/phase-05-보고서.md). 태그 `phase-5`, 수용 심사 대기.
+Phase 5(분급 타임라인·시뮬레이션) 수용(2026-10-23, 조건 B1 → `phase-5.1`) — [지시문](docs/phase-05-지시문.md)·[계획](docs/phase-05-계획.md)·[보고서](docs/phase-05-보고서.md)·[수용 심사](docs/phase-05-수용심사.md). 태그 `phase-5`·`phase-5.1`.
 
-정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.8), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
+정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.8.1), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## 실행
 

@@ -287,7 +287,8 @@ public class AgentQueryRepository extends ViewRepository {
 
     /**
      * 지급월별 정수 합(설계서 §6.4): 예정 = SCHEDULED + RELEASED, 보류 = HELD. 취소분은 어느 쪽에도 없다. 값은 원값이다 — 시나리오(RETENTION)는 유스케이스의
-     * {@code ForecastScenario}가 적용한다(SQL에 곱셈 없음 — {@code SqlArithmeticScanTest}).
+     * {@code ForecastScenario}가 적용한다(SQL에 곱셈 없음 — {@code SqlArithmeticScanTest}). 예정·보류가 모두 0인 달(취소만 있는 달)은 행이 없다 — 항목이 없는 달과
+     * 같은 모양(계약 1.1.1, 포털 Phase 5 수용 심사 B1). 그 달의 항목은 {@link #deferrals}에 그대로 있다.
      */
     public List<DueMonth> dueMonths(String agentId, String fromYm, String toYm, Optional<String> policyNo) {
         return query("""
@@ -296,7 +297,10 @@ public class AgentQueryRepository extends ViewRepository {
                        coalesce(sum(amount) FILTER (WHERE status = 'HELD'), 0)::bigint AS held
                   FROM deferral_item WHERE tenant_id = :tenantId AND agent_id = :agentId AND due_ym BETWEEN :fromYm AND :toYm
                    AND (CAST(:policyNo AS text) IS NULL OR policy_no = :policyNo)
-                 GROUP BY due_ym ORDER BY due_ym
+                 GROUP BY due_ym
+                HAVING coalesce(sum(amount) FILTER (WHERE status IN ('SCHEDULED', 'RELEASED')), 0) <> 0
+                    OR coalesce(sum(amount) FILTER (WHERE status = 'HELD'), 0) <> 0
+                 ORDER BY due_ym
                 """, agent(agentId, "fromYm", fromYm, "toYm", toYm, "policyNo", policyNo.orElse(null)), (rs, n) -> new DueMonth(rs.getString("due_ym"), rs.getLong("expected"),
                 rs.getLong("held")));
     }

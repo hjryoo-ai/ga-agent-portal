@@ -20,36 +20,62 @@ import java.util.TreeSet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * C1(포털 Phase 5 ②): 계약 {@code portal-api} 1.1.0은 1.0.0의 추가·완화뿐이다. 1.0.0은 시험 자원의 사본({@code main} {@code 86d6fe6}의 바이트 — SHA-256을
- * 아래에 고정, {@code contracts/CHECKSUMS}의 그 판 줄과 같다)이고, 두 문서를 구조로 대조한다.
+ * C1(포털 Phase 5 ②): 계약 {@code portal-api} 1.1.x는 1.0.0의 추가·완화뿐이다. 1.0.0은 시험 자원의 사본({@code main} {@code 86d6fe6}의 바이트 — SHA-256을
+ * 아래에 고정, {@code contracts/CHECKSUMS}의 그 판 줄과 같다)이고, 두 문서를 구조로 대조한다. 1.1.1(포털 Phase 5 수용 심사 B1)은 1.1.0({@code phase-5}
+ * {@code 0fccc05}의 바이트 — 같은 방식으로 고정)에 대해서도 같은 대조를 통과하고, 그 위에 <b>설명문만</b> 바뀌었다(설명·요약·{@code info.version}을 뺀
+ * 두 문서가 같다).
  * <ul>
- *   <li>1.0.0의 모든 경로·메서드·응답 코드·컴포넌트가 1.1.0에 있다.</li>
+ *   <li>이전 판의 모든 경로·메서드·응답 코드·컴포넌트가 새 판에 있다.</li>
  *   <li>객체의 {@code required}는 같다(새 속성은 선택), 기존 속성의 정의는 같다 — 설명문만 바뀔 수 있고 {@code enum}은 늘기만 한다.</li>
  *   <li>기존 정의에 새 제약 키워드가 붙지 않는다(새 키는 속성·경로·응답·컴포넌트 맵에만). 쿼리 파라미터는 (이름, 위치)로 짝짓고 참조를 풀어 비교하며, 새 파라미터는
  *       선택이다. {@code info}는 대조하지 않는다.</li>
  * </ul>
- * "1.0.0 응답이 1.1.0을 통과"의 실측은 Phase 3의 응답 검증 시험들이 1.1.0으로 그대로 도는 것이다.
+ * "1.0.0 응답이 1.1.x를 통과"의 실측은 Phase 3의 응답 검증 시험들이 현재 판으로 그대로 도는 것이다.
  */
 class PortalApiCompatibilityTest {
 
     static final String V1_0_0_SHA256 = "0d14a1827aab03f61505dd3a24451728e1a73a59f6645cbbc8d7563b4fbf9188";
+    static final String V1_1_0_SHA256 = "8bf4e71cee7f924bf32cc6c31d0dcd20bd2e879a6a7a7622f278586687c64065";
     /** 새 키가 들어와도 되는 맵(그 맵의 직속 키만 — 그 아래는 다시 규칙대로). */
     static final Set<String> ADDITIVE_MAPS = Set.of("properties", "paths", "responses", "schemas", "parameters", "headers");
 
     static JsonNode oldApi;
+    static JsonNode v110Api;
     static JsonNode newApi;
 
     @BeforeAll
     static void read() throws Exception {
-        byte[] baseline;
-        try (InputStream in = PortalApiCompatibilityTest.class.getResourceAsStream("/contracts/portal-api-1.0.0.openapi.yaml")) {
-            assertThat(in).as("1.0.0 copy on the test classpath").isNotNull();
-            baseline = in.readAllBytes();
-        }
-        assertThat(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(baseline))).as("1.0.0 baseline bytes").isEqualTo(V1_0_0_SHA256);
         YAMLMapper yaml = YAMLMapper.builder().build();
-        oldApi = yaml.readTree(baseline);
+        oldApi = yaml.readTree(baseline("1.0.0", V1_0_0_SHA256));
+        v110Api = yaml.readTree(baseline("1.1.0", V1_1_0_SHA256));
         newApi = yaml.readTree(Files.readString(Path.of(System.getProperty("ga.repoRoot"), "contracts", "api", "v1", "portal-api.openapi.yaml")));
+    }
+
+    static byte[] baseline(String version, String sha256) throws Exception {
+        byte[] bytes;
+        try (InputStream in = PortalApiCompatibilityTest.class.getResourceAsStream("/contracts/portal-api-" + version + ".openapi.yaml")) {
+            assertThat(in).as(version + " copy on the test classpath").isNotNull();
+            bytes = in.readAllBytes();
+        }
+        assertThat(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))).as(version + " baseline bytes").isEqualTo(sha256);
+        return bytes;
+    }
+
+    /** 설명문을 뺀 문서 — 설명·요약 키 전부와 {@code info.version}을 지운 사본. 두 판의 이것이 같으면 바뀐 것은 설명문뿐이다. */
+    static JsonNode withoutNotation(JsonNode doc) {
+        JsonNode copy = doc.deepCopy();
+        strip(copy);
+        ((ObjectNode) copy.path("info")).remove("version");
+        return copy;
+    }
+
+    private static void strip(JsonNode node) {
+        if (node instanceof ObjectNode o) {
+            o.remove(List.of("description", "summary"));
+            o.forEach(PortalApiCompatibilityTest::strip);
+        } else if (node instanceof ArrayNode a) {
+            a.forEach(PortalApiCompatibilityTest::strip);
+        }
     }
 
     static List<String> compare(JsonNode before, JsonNode after) {
@@ -165,9 +191,20 @@ class PortalApiCompatibilityTest {
     }
 
     @Test
-    void version110IsAdditiveOver100() {
-        assertThat(newApi.path("info").path("version").asString()).isEqualTo("1.1.0");
-        assertThat(compare(oldApi, newApi)).isEmpty();
+    void version111IsAdditiveOver100And110() {
+        assertThat(newApi.path("info").path("version").asString()).isEqualTo("1.1.1");
+        assertThat(compare(oldApi, newApi)).as("1.0.0 → 1.1.1").isEmpty();
+        assertThat(compare(v110Api, newApi)).as("1.1.0 → 1.1.1").isEmpty();
+    }
+
+    @Test
+    void version111ChangesOnlyDescriptionsOver110() {
+        assertThat(v110Api.path("info").path("version").asString()).isEqualTo("1.1.0");
+        assertThat(withoutNotation(newApi)).isEqualTo(withoutNotation(v110Api));
+        // 대조기가 설명문 밖의 변화를 본다 — 제약 하나를 바꾼 사본은 같지 않다
+        ObjectNode tightened = (ObjectNode) newApi.deepCopy();
+        ((ObjectNode) tightened.path("components").path("schemas").path("Ym")).put("pattern", "^2[0-9]{3}(0[1-9]|1[0-2])$");
+        assertThat(withoutNotation(tightened)).isNotEqualTo(withoutNotation(v110Api));
     }
 
     @Test

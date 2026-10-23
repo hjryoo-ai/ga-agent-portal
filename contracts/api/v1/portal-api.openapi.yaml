@@ -1,13 +1,14 @@
 openapi: 3.1.0
 info:
   title: ga-agent-portal 조회·시뮬레이션 API — 설계사 본인 (v1)
-  version: 1.1.0
+  version: 1.1.1
   description: |
     포털이 웹(Phase 4)에 제공하는 조회 API(설계서 §7 v1.6, 포털 Phase 3 지시문 D-5·D-15). 포털 소유 계약 — 웹이 클라이언트를 생성한다.
     1.1.0(포털 Phase 5, 설계서 §7 v1.8 — 추가·완화뿐, 1.0.0 응답은 1.1.0을 통과한다): 시뮬레이션 POST 둘(엔진 결과 사본의 속성을 그대로 옮기고
     포털 사실 simId·requestedAt을 더한다 — 금액을 가공하지 않는다), /me/deferrals의 scenario·p·policyKey와 막대 비율(bar)·범위 84개월,
     /me의 features, 월 응답의 previous(CR-1), 라인의 reversalOfYm·reversedByYm(CR-2), 원장의 ruleVersionId(CR-3)·상품·피보험자(CR-4).
     Problem.code에 시뮬레이션 거부 여섯. 요청 본문의 금액·횟수는 숫자 문자열(화면이 문자열을 숫자로 바꾸지 않는다 — 서버가 정수로 읽는다).
+    1.1.1(포털 Phase 5 수용 심사 B1 — 설명문만): /me/deferrals의 months는 예정·보류가 모두 0인 달을 싣지 않는다(항목이 없는 달과 같은 모양). 그 달의 취소 항목은 items에 남는다.
     인증은 테넌트 IdP의 OIDC 액세스 토큰(Bearer, RS256). 테넌트는 토큰 발급자(iss)로, 설계사·역할은 포털의 identity_link로만 정한다 — 경로·쿼리에 agentId는 없다.
     거부는 같은 바이트: 인증 실패 전부 401 UNAUTHENTICATED(WWW-Authenticate: Bearer), 링크 없음·역할·남의(없는) 자원·없는 경로 전부 404 NOT_FOUND,
     쿼리 파라미터 형식·범위 오류만 400 INVALID_REQUEST. 본문은 application/problem+json {code, message}.
@@ -539,6 +540,7 @@ components:
         p: {type: integer, minimum: 1, maximum: 100, description: RETENTION의 유지율 가정(1.1.0)}
         months:
           type: array
+          description: '지급월별 합(dueYm 순). 예정·보류가 모두 0인 달은 싣지 않는다(1.1.1) — 취소 항목만 있는 달도 항목이 없는 달처럼 빠지고, 그 항목은 items에 남는다'
           items:
             type: object
             additionalProperties: false

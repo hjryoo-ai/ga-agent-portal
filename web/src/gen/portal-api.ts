@@ -208,6 +208,7 @@ export interface components {
                 /** @enum {string} */
                 statusReason?: "DUE_RELEASED" | "POLICY_NOT_INFORCE" | "POLICY_TERMINATED" | "SOURCE_REVERSED";
             }[];
+            /** @description 지급월별 합(dueYm 순). 예정·보류가 모두 0인 달은 싣지 않는다(1.1.1) — 취소 항목만 있는 달도 항목이 없는 달처럼 빠지고, 그 항목은 items에 남는다 */
             months: {
                 /** @description 막대 너비(1.1.0) — 값 / 범위 안 max(expected + held). max ≤ 0이면 생략 */
                 bar?: {

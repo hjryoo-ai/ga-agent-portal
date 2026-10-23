@@ -41,12 +41,16 @@ abstract class SimIntegrationTest extends ApiIntegrationTest {
     static final TestIssuer ISSUER_STD = new TestIssuer("ph5-std");
     static final TestIssuer ISSUER_AMB = new TestIssuer("ph5-amb");
     static final TestIssuer ISSUER_RL = new TestIssuer("ph5-rl");
+    static final TestIssuer ISSUER_BURST = new TestIssuer("ph5-burst");
     static final String AUD_STD = "portal-ph5-std";
     static final String AUD_AMB = "portal-ph5-amb";
     static final String AUD_RL = "portal-ph5-rl";
+    static final String AUD_BURST = "portal-ph5-burst";
     static final TenantId STD = TenantId.of(SeedData.uniqueTenant("PH5S"));
     static final TenantId AMB = TenantId.of(SeedData.uniqueTenant("PH5A"));
     static final TenantId RL = TenantId.of(SeedData.uniqueTenant("PH5R"));
+    /** 동시 레이트 리밋 시험만의 테넌트(한도 3) — 샘플의 설계사(A-1001)가 빈 창으로 시작하도록(포털 Phase 5 수용 심사 F10). */
+    static final TenantId BURST = TenantId.of(SeedData.uniqueTenant("PH5B"));
 
     static final String SUB_MGR5 = "sub-ph5-manager-Zq90";
     static final String SUB_X = "sub-ph5-a9999-Zq91";
@@ -59,6 +63,7 @@ abstract class SimIntegrationTest extends ApiIntegrationTest {
     static final StubSimulationEngine ENGINE_STD = StubSimulationEngine.of(SAMPLES, "standard");
     static final StubSimulationEngine ENGINE_AMB = StubSimulationEngine.of(SAMPLES, "ambiguous");
     static final StubSimulationEngine ENGINE_RL = StubSimulationEngine.of(SAMPLES, "standard");
+    static final StubSimulationEngine ENGINE_BURST = StubSimulationEngine.of(SAMPLES, "standard");
 
     static final String S1 = "{\"productKey\":\"WHOLE-LIFE-20Y\",\"monthlyPremium\":\"150000\",\"contractDate\":\"2026-08-01\"}";
 
@@ -66,13 +71,14 @@ abstract class SimIntegrationTest extends ApiIntegrationTest {
         server(STD, ISSUER_STD, AUD_STD, ENGINE_STD, 1000);
         server(AMB, ISSUER_AMB, AUD_AMB, ENGINE_AMB, 1000);
         server(RL, ISSUER_RL, AUD_RL, ENGINE_RL, 3);
+        server(BURST, ISSUER_BURST, AUD_BURST, ENGINE_BURST, 3);
         link(STD, SUB_A1, AGENT_A1, "AGENT", "ACTIVE");
         link(STD, SUB_B, AGENT_B, "AGENT", "ACTIVE");
         link(STD, SUB_MGR5, AGENT_M, "MANAGER", "ACTIVE");
         link(STD, SUB_X, AGENT_X, "AGENT", "ACTIVE");
         link(AMB, SUB_A1, AGENT_A1, "AGENT", "ACTIVE");
         link(RL, SUB_A1, AGENT_A1, "AGENT", "ACTIVE");
-        link(RL, SUB_BURST, AGENT_B, "AGENT", "ACTIVE");
+        link(BURST, SUB_BURST, AGENT_A1, "AGENT", "ACTIVE");
         link(RL, SUB_REJECT, AGENT_M, "AGENT", "ACTIVE");   // 레이트 리밋 창은 설계사마다 — 시험마다 다른 설계사(RateLimitIT·SimulationRejectionIT)
         DB.seed(STD.value(), c -> {
             line(c, STD, AGENT_A1, "PH5-L1", POLICY, 1);

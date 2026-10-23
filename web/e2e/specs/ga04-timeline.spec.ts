@@ -1,5 +1,6 @@
 // GA04 — 분급 타임라인·홈(포털 Phase 5 ⑨ 시나리오 6·7). 손 스트림(edges.jsonl seq 11~24): 계약 POL-EDGE-0002의 분급 여섯(2027-03 ~ 2034-02 —
 // 2027-02부터 84개월의 마지막 달 2034-01과 그 다음 달), 2027-09 보류(HELD), 2030-01 취소(CANCELLED), 2027-01 확정·2027-02 잠정 달(전월). 테넌트가 유지율 시나리오를 켰다.
+// 계약 1.1.1(수용 심사 B1): 취소만 있는 2030-01은 월 행·막대가 없고 항목 목록에만 "취소"로 남는다.
 import { advance, streamLength, tenantOf } from '../support/env';
 import { expect, test } from '../support/fixtures';
 import type { Locator } from '@playwright/test';
@@ -31,15 +32,17 @@ test('12개월·84개월, 보류 범례, 막대 = API 문자열, 계약 필터',
   await portal.check('ga04 timeline 12');
 
   await page.getByTestId('period-84').click();
-  await expect(rows.locator('th')).toHaveText(['2027년 3월', '2027년 9월', '2028년 2월', '2030년 1월', '2034년 1월']);
+  await expect(rows.locator('th')).toHaveText(['2027년 3월', '2027년 9월', '2028년 2월', '2034년 1월']);
+  await expect(page.getByTestId('timeline-bar')).toHaveCount(4);
   await expect(page.getByTestId('timeline-item').filter({ hasText: '취소' })).toHaveCount(1);
+  await expect(page.getByTestId('timeline-item').filter({ hasText: '취소' })).toContainText('2030년 1월');
   await expect(page.getByText('2034년 2월')).toHaveCount(0);
   await portal.check('ga04 timeline 84');
 
   await page.getByTestId('timeline-policy').getByRole('button', { name: 'TERM-10Y · *********0001' }).click();
   await expect(page.getByTestId('timeline-empty')).toHaveText('이 기간에 분급 예정이 없습니다');
   await page.getByTestId('timeline-policy').getByRole('button', { name: 'TERM-10Y · *********0002' }).click();
-  await expect(rows).toHaveCount(5);
+  await expect(rows).toHaveCount(4);
 });
 
 test('유지율 30% — 가정이 적용된 합계만 가정 라벨, 가정 전·보류는 원값', async ({ page, portal }, info) => {

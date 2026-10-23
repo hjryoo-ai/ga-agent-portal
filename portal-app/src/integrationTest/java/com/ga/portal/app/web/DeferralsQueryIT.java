@@ -14,8 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * C9(포털 Phase 5 ⑦) + CR-1~4: 실제 앱·PostgreSQL로 {@code /me/deferrals} 1.1.0과 기존 경로의 추가 필드. 시드는 {@link QuerySeed}(설계사마다 분급 둘 —
- * 202609 예정 100,000, 202610 보류 50,000, 같은 계약). 유지율 시나리오는 T2만 켠다(T1은 끈 그대로 — RETENTION이면 400). 모든 응답은 {@link ApiContract}가
- * 계약 1.1.0으로 검증한다.
+ * 202609 예정 100,000, 202610 보류 50,000, 같은 계약) + 이 시험만의 행 하나(T1 설계사 갑의 202811 취소 30,000 — 다른 시험의 범위 밖). 유지율 시나리오는
+ * T2만 켠다(T1은 끈 그대로 — RETENTION이면 400). 모든 응답은 {@link ApiContract}가 현재 계약(1.1.1)으로 검증한다.
  */
 class DeferralsQueryIT extends ApiIntegrationTest {
 
@@ -26,6 +26,15 @@ class DeferralsQueryIT extends ApiIntegrationTest {
         DB.seed(T2.value(), c -> SeedData.exec(c, """
                 UPDATE tenant SET params = params || '{"forecast_scenario_enabled": true}'::jsonb WHERE tenant_id = ?
                 """, T2.value()));
+    }
+
+    @BeforeAll
+    static void aCancelledOnlyMonthForAgentA() {
+        DB.seed(T1.value(), c -> SeedData.exec(c, """
+                INSERT INTO deferral_item (tenant_id, schedule_id, agent_id, policy_no, source_calc_id, due_ym, amount, pay_condition, status, reason,
+                                           curve_version_id, status_reason, last_seq)
+                VALUES (?, ?, ?, ?, ?, '202811', 30000, 'INFORCE', 'CANCELLED', 'CURVE', 'CV1', 'POLICY_TERMINATED', 7)
+                """, T1.value(), AGENT_A + "-S9", AGENT_A, QuerySeed.policy(AGENT_A, 1), QuerySeed.calc(AGENT_A, 1)));
     }
 
     JsonNode ok(String path, String token) {
@@ -82,6 +91,21 @@ class DeferralsQueryIT extends ApiIntegrationTest {
             assertThat(h.path("held")).isEqualTo(a.path("held"));
             assertThat(h.path("bar")).isEqualTo(a.path("bar"));
         }
+    }
+
+    @Test
+    void aMonthWithOnlyCancelledItemsHasNoMonthButKeepsItsItem() {
+        // 계약 1.1.1(수용 심사 B1): months[] = 예정 또는 보류가 있는 달. 취소만 있는 달은 항목이 없는 달과 같은 모양 — 행이 없다
+        JsonNode wide = ok("/api/v1/me/deferrals?from=202609&to=202811", t1A());
+        assertThat(wide.path("months")).extracting(m -> m.path("dueYm").asString()).containsExactly("202609", "202610");
+        assertThat(wide.path("items")).extracting(i -> i.path("dueYm").asString() + " " + i.path("status").asString() + " " + i.path("amount").asLong())
+                .containsExactly("202609 SCHEDULED 100000", "202610 HELD 50000", "202811 CANCELLED 30000");
+        // 월 합·막대(분모 = 실린 달의 최댓값)는 취소 달이 없는 범위와 같다
+        assertThat(wide.path("months")).isEqualTo(ok("/api/v1/me/deferrals?from=202609&to=202610", t1A()).path("months"));
+
+        JsonNode only = ok("/api/v1/me/deferrals?from=202811&to=202811", t1A());
+        assertThat(only.path("months").size()).isZero();
+        assertThat(only.path("items")).extracting(i -> i.path("status").asString()).containsExactly("CANCELLED");
     }
 
     @Test
