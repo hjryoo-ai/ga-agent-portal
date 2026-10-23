@@ -298,8 +298,6 @@ public class AgentQueryRepository extends ViewRepository {
                   FROM deferral_item WHERE tenant_id = :tenantId AND agent_id = :agentId AND due_ym BETWEEN :fromYm AND :toYm
                    AND (CAST(:policyNo AS text) IS NULL OR policy_no = :policyNo)
                  GROUP BY due_ym
-                HAVING coalesce(sum(amount) FILTER (WHERE status IN ('SCHEDULED', 'RELEASED')), 0) <> 0
-                    OR coalesce(sum(amount) FILTER (WHERE status = 'HELD'), 0) <> 0
                  ORDER BY due_ym
                 """, agent(agentId, "fromYm", fromYm, "toYm", toYm, "policyNo", policyNo.orElse(null)), (rs, n) -> new DueMonth(rs.getString("due_ym"), rs.getLong("expected"),
                 rs.getLong("held")));
