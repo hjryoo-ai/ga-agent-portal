@@ -86,12 +86,12 @@ final class IngestRig {
         seedTenant(t, "http://127.0.0.1:1", "{}");
     }
 
-    /** 그 테넌트의 {@code notification} 행 전부(테넌트 열 제외 — {@code notification_id}·{@code read_at} 포함 텍스트, 정렬 고정). */
+    /** 그 테넌트의 {@code notification} 행 전부(테넌트 열 제외 — {@code notification_id}·{@code read_at} 포함 텍스트, 정렬 고정; 빈 칸도 자리를 지킨다 — concat_ws는 NULL을 건너뛴다). */
     static List<String> notificationRows(TenantId t) {
         return DB.asApp(t.value(), c -> {
             List<String> rows = new ArrayList<>();
             try (PreparedStatement ps = c.prepareStatement("""
-                    SELECT concat_ws('|', notification_id, agent_id, type, severity, dedup_key, coalesce(link, ''), params::text, created_at, read_at)
+                    SELECT concat_ws('|', notification_id, agent_id, type, severity, dedup_key, coalesce(link, ''), params::text, created_at, coalesce(read_at::text, ''))
                       FROM notification WHERE tenant_id = ? ORDER BY agent_id, dedup_key
                     """)) {
                 ps.setString(1, t.value());
