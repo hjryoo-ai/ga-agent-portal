@@ -502,6 +502,16 @@ a {
   margin: 0 0 0.25rem;
 }
 
+/* 목록 항목 전체가 링크일 때(문의 내역 — Phase 6): 누름 대상 44px. */
+.item__link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  color: var(--ink);
+}
+
 /* 입력(시뮬레이션·타임라인): 라벨 위, 입력 44px, 오류는 문구로(색만으로 알리지 않는다). */
 .form {
   display: grid;

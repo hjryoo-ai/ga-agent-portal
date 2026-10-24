@@ -21,7 +21,7 @@ export function InquiriesScreen() {
         <ul className="items" data-testid="inquiries">
           {list.data.items.map((i) => (
             <li key={i.id} className="item">
-              <Link to={`/inquiries/${i.id}`} className="item__head">
+              <Link to={`/inquiries/${i.id}`} className="item__link">
                 <span>{m.inquiry.categories[i.category]}</span> <span className="badge">{m.inquiry.statuses[i.status]}</span>
               </Link>
               <p className="note">{fill(m.inquiry.createdAt, { at: formatAt(i.createdAt) })}</p>
