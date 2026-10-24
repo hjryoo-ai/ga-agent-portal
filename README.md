@@ -20,7 +20,9 @@ Phase 4(화면 1차) 수용(2026-10-22, 조건 A1 → `phase-4.1`) — [지시�
 
 Phase 5(분급 타임라인·시뮬레이션) 수용(2026-10-23, 조건 B1 → `phase-5.1`) — [지시문](docs/phase-05-지시문.md)·[계획](docs/phase-05-계획.md)·[보고서](docs/phase-05-보고서.md)·[수용 심사](docs/phase-05-수용심사.md). 태그 `phase-5`·`phase-5.1`.
 
-정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.8.1), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
+Phase 6(알림 파생·이의제기) 심사 중 — [지시문](docs/phase-06-지시문.md)·[계획](docs/phase-06-계획.md)·[승인](docs/phase-06-계획승인.md)·[보고서](docs/phase-06-보고서.md). 태그 `phase-6`.
+
+정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.9), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## 실행
 
@@ -71,7 +73,7 @@ java -jar portal-app.jar --spring.profiles.active=cli inquiry close --tenant=GA0
 
 ## 화면 (Phase 4·5)
 
-`web/` — React 19 + TypeScript + Vite 모바일 웹. 빌드 산출물은 `portal-app` 부트 jar 안에 들어가 API와 **같은 출처**로 서빙된다(CORS 없음, CSP `'self'`만). 화면: 홈 `/`, 월별 명세 `/statements`, 라인 상세 `/lines/{calcId}`, 한도 `/limits`, Phase 5 분급 타임라인 `/deferrals`·시뮬레이션 `/simulations`(엔진 호출은 서버만 — 결과는 "설계사 참고용 · 비확정 · 고객 제시 불가"). 토큰은 웹뷰 호스트가 `/#token=<JWT>`로 넣고 화면은 메모리에만 둔다(새로고침하면 다시 넣어야 한다). 규약은 `CLAUDE.md` "화면 규약", 개발 명령은 [`web/README.md`](web/README.md).
+`web/` — React 19 + TypeScript + Vite 모바일 웹. 빌드 산출물은 `portal-app` 부트 jar 안에 들어가 API와 **같은 출처**로 서빙된다(CORS 없음, CSP `'self'`만). 화면: 홈 `/`, 월별 명세 `/statements`, 라인 상세 `/lines/{calcId}`, 한도 `/limits`, Phase 5 분급 타임라인 `/deferrals`·시뮬레이션 `/simulations`(엔진 호출은 서버만 — 결과는 "설계사 참고용 · 비확정 · 고객 제시 불가"). Phase 6 알림함 `/notifications`, 문의 `/inquiries`·`/inquiries/new`·`/inquiries/{id}`(알림은 인앱만 — 푸시·알림톡·메일 없음, 운영 답변은 CLI). 토큰은 웹뷰 호스트가 `/#token=<JWT>`로 넣고 화면은 메모리에만 둔다(새로고침하면 다시 넣어야 한다). 규약은 `CLAUDE.md` "화면 규약", 개발 명령은 [`web/README.md`](web/README.md).
 
 로컬에서 화면을 눈으로 보려면(Docker 필요):
 
@@ -90,6 +92,7 @@ java -jar portal-app.jar --spring.profiles.active=cli inquiry close --tenant=GA0
 | `portal-ingest` | 이벤트 피드 클라이언트·커서·멱등 적용·재구축 | 1·2 |
 | `portal-query` | 조회 API(`/api/v1/me/**`)·인가 | 3 |
 | `portal-sim` | 엔진 시뮬레이션 프록시·`simulation_log` | 5 |
+| `portal-inbox` | 알림함·이의제기 유스케이스(목록·읽음·문의 접수·조회). Spring·DB 무의존 | 6 |
 | `portal-recon` | 대사·DRIFT·관측 지표 | 7 |
 | `portal-infra` | PostgreSQL 어댑터·Flyway·RLS | 0 |
 | `portal-app` | Spring Boot 조립·아키텍처 테스트 | 0 |

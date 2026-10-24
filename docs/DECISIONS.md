@@ -366,3 +366,32 @@ DE-24 문구 정정(Q30): "앞으로 포털 계약 개정은 작업 브랜치 �
 | # | 무엇 | 처리 |
 |---|---|---|
 | DD-18 | §6.5 표 — `LIMIT_REBASE` 키의 `postingSeq`, 단계 ↔ 심각도 짝 미명시, DRIFT 달 조건 없음, `agentId` 없는 이벤트의 수신자 미명시(P-2·P-19·P-10·P-1) | v1.9 §6.5를 계획 ③ 최종 표로(키 = 이벤트 seq, `LIMIT_WARN` INFO·`LIMIT_CRIT` WARN·`LIMIT_FULL` CRIT, 확정·지급은 후 달 `DRIFT`이면 없음, 수신자 = 이벤트 또는 뷰 행의 엔진 `agentId`) |
+
+## 2026-10-24 — Phase 6 구현에서 계획과 다르게 한 것 (보고서 §5)
+
+| # | 계획 | 구현 | 이유 |
+|---|---|---|---|
+| P6-1 | ④ "id 형식이 틀린 경로는 감사 없이 404" | 형식이 틀린 id도 같은 404 + `AUTHZ_DENIED`(detail `MISSING`) | 기존 경로 키(`pathKey`)의 규약 — 남의 id·없는 id·형식 오류가 감사에서도 구별되지 않게(`NotificationApiIT` 넷이 같은 감사 줄) |
+| P6-2 | ⑥ 쪽수 계산 | `Paging.offset`(허용 클래스)이 `AgentQueryRepository#lines`의 곱셈 허용 항목을 대신했다 | 곱셈 스캔이 새 쪽수 계산 둘을 잡았다 — 규칙을 넓히지 않고 곱셈을 한 클래스로 옮겼다(폐기 항목 실패 1회 기록 — 보고서 §4) |
+| P6-3 | ⑧ 규칙 파일 `when` | `{field, in[], required}` 모양, 화면 검사기는 코드 포인트로 센다(서로게이트 짝) | 문의 분류(`OTHER` 밖은 `calcId` 필수)가 Phase 5의 단일 값 `when`으로는 안 된다. 린트가 문자열 전개를 막아 짝을 직접 센다 |
+| P6-4 | ④ `?status=` | 빈 `?status=`는 기본값 `ALL`(Spring `defaultValue`) | `/limits?status=`와 같은 동작 — CI 40088726404에서 시험 기대값을 고쳤다(구현은 그대로) |
+| P6-5 | ⑤ `NoopNotificationDeriver` | `portal-projection` 시험 픽스처로 옮기고 `IngestApplier`의 6인자 생성자를 지웠다 | 운영 코드가 조용히 파생 없음으로 조립될 길을 없앴다 — 시험만 명시적으로 넘긴다 |
+| P6-6 | ⑤ 파생기 | 임계치는 테넌트 행에서 읽는다 — 행이 없으면 `APPLY_ERROR` | 조회 카드와 같은 문장(`SyncStatusRepository`). 실 파생기를 쓰는 시험은 테넌트 행을 넣는다 |
+| P6-7 | ⑥ 답변 파일 | 끝 줄바꿈 **하나**(`\n` 또는 `\r\n`)를 뺀다 | 편집기가 붙이는 마지막 줄바꿈이 답변의 일부가 되지 않게. 둘 이상이면 뒤의 것은 본문이다 |
+| P6-8 | ⑥ `inquiry list` 출력 | 설계사가 쓴 글의 제어·서식(양방향 등)·구분 문자·짝 없는 서로게이트를 `\uXXXX`(BMP 밖 `\UXXXXXXXX`)로, `calcId`도 같은 이스케이프 | 커밋 보안 검토(CWE-150 — 터미널 제어 문자 주입, `780d274`). 줄바꿈·탭·역슬래시만 막으면 ESC·양방향 문자가 운영자 터미널을 조작한다 |
+| P6-9 | ④ 지표 `api_rate_limited_total{tenant}` | `{tenant, route}` — 시뮬레이션 `route="simulations"`, 문의 `route="inquiries"` | Prometheus는 한 이름에 태그 키 집합 하나만 받는다 — 문의 리밋을 같은 이름에 다른 태그로 낼 수 없다(설계서 §10 — 태그 값은 닫힌 두 값) |
+| P6-10 | (계획에 없음) | 통합 시험의 계약 검사기가 경로를 **방법 + 경로**로 고른다, 한 인자 `check` 제거 | `GET`·`POST /inquiries`가 한 경로를 쓴다. 한 인자 판은 `EngineFeedE2eCheck`의 `POST`를 검사 없이 지나쳤을 것이다 |
+| P6-11 | Q9 "`java -cp <하네스 클래스패스> PortalApplication`" | 하네스가 **bootJar**를 운영자와 같은 명령으로 띄운다(`java -jar <jar> --spring.profiles.active=cli …`, `run.mjs`가 `-Dga.portalJar`로 경로만) | 통합 시험 클래스패스에 `@TestConfiguration` 중첩 클래스(`QueryStatementIT.Recording`)가 있고, 시험 문맥 밖의 `PortalApplication` 컴포넌트 스캔은 그것을 빈으로 올린다(`TestTypeExcludeFilter`는 시험 문맥에만 있다). 자식의 표준 출력은 버리고 표준 오류만 하네스 로그로 |
+| P6-12 | (계획에 없음) | E2E 재구축 제어는 종료 코드 2면 1초 간격으로 다섯 번까지 다시 친다 | 포털 워커가 그 순간 테넌트 잠금을 쥐면 CLI가 "being processed by a worker — try again"(2)로 거부한다 — 운영자가 하는 것과 같다. 인가 거부(역시 2)는 다섯 번 뒤에도 실패한다 |
+| P6-13 | ⑨ E1 | E1을 `ga01-a1.spec.ts` 안에 넣었다(seq 2 단계를 앞에 더함) | 머리는 되돌리지 않는다 — 같은 프로젝트의 GA01 시험이 5·6·7·11을 차례로 연다 |
+| P6-14 | ⑨ GA05 | 재산정이 한도를 누적과 같게 낮춘다(1,000,000 → 900,000 — 단계는 FULL) + 같은 단계 안의 전기 하나(seq 11 — 90%) | 재산정은 단계가 올라도 `LIMIT_REBASE` 하나(§6.5), 같은 단계 재알림 0(주입 S2의 E2E 증거)을 같은 스트림에서. `EnvelopeValidatorTest`가 손 스트림을 Docker 없이 계약으로 검증한다 |
+| P6-15 | ⑨ E7 | 전체 실행이면 프로젝트마다 허용된 상세 응답에 본문 센티널이 실제로 실린 시험이 하나 이상이어야 한다(`run.mjs`) | 허용된 곳에 본문이 없으면 "그 밖 0"은 공허하다(CI 40091780371: 셋) |
+| P6-16 | C7 거부 본문 | 따옴표 없는 토큰 본문(`문의센티널Qv75`)을 더했다 | Jackson 3은 파싱 오류에 원문 위치를 숨긴다(`INCLUDE_SOURCE_IN_LOCATION` 꺼짐) — 여섯 거부 본문의 문구에는 입력 조각이 없어 "거부 경로가 예외 문구를 로그에"(주입 S8)를 시험이 못 잡았다. `Unrecognized token '…'`만 토큰 전체를 싣는다(한글·영숫자는 식별자 글자) |
+| P6-17 | ⑧ 문의 내역 | 항목 전체가 44px 링크(`.item__link`) | 첫 E2E(CI 40091780371)가 머리 줄 링크 92×19를 세 프로젝트에서 잡았다 |
+
+### 결정 (설계서 v1.9)
+
+- 계약 1.2.0 → §7, V7 → §5, `portal-inbox` → §3.3·§9 ⓖ, 파생 규칙·지점(RM-4)·재구축 → §6.5·§6.7, 운영 CLI → §6.1, 화면 → §8, CSRF 근거·본문 격리·거부 본문 → §9, 리밋·보존·홈 콜·지표 `route` → §10, Phase 6 → §12, 시험 → §13, §14.1 #3(다이제스트 — v2)·#12(재생 파생 — 닫음)·#13(V8 후보).
+- `CLAUDE.md` "알림·문의 규약" 절, 의존 방향에 `inbox`, E2E 센티널 `inquiry` 키.
+- 문의 보존기간은 설계서에 없다 — 정하지 않았다(`docs/운영.md` §7 — 다음 Phase 질문). 알림 보존은 1년(운영 SQL).
+- 영문 번역(`docs/en/`)은 v1.6 그대로.
