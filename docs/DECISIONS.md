@@ -345,3 +345,24 @@
 - Q8 실 엔진 E2E는 병합 뒤 `main`에서 사용자가 실행 → `RESULT.md`(판정 둘 — 피드·시뮬레이션 쌍).
 - F2·F4·F5·F6·F12·F13·F15·F16 수용. F10 수용 + 선택 개선 → P5-17. 계획 Q1~Q24·P-1~P-26은 사후 확인(뒤집은 것 없음). 계획은 사용자 승인·심사에서 사후 확인 방식을 이어 간다 — 단, 돌이킬 수 없는 결정(계약 주 버전·마이그레이션 구조·공유 계약)이 계획에 있으면 승인 전에 심사로 보낸다.
 - Phase 6 재료(심사 §4): Q1 알림은 **별도 파생기**(규칙 = `portal-projection` 순수 함수, 실행 = 인제스트 뒤 단계, 자기 커서 `notification_cursor(tenant_id, last_seq)` — 커서 전진과 알림 삽입 한 트랜잭션·테넌트 잠금, 재구축은 txB 끝에 커서만 `headSeq`로 옮기고 파생하지 않는다 — §14.1 #12 확정, 폴링 주기는 인제스트와 같다), Q2 dedup은 상태 표 없이 사실에서(`LIMIT_{STAGE}:{ledgerId}:{source_seq}` — 전후 단계는 `LimitStage` 비교뿐), Q3 이의제기 V7 `inquiry` + RLS(본문 ≤ 1,000자, 작성자 본인 `GET`에만, 운영 응답은 운영 CLI `inquiry answer` — 운영 화면은 v2), Q4 CSRF 토큰·`Origin` 검사 없음(시험: 쿠키를 실어도 `Authorization` 없으면 401 같은 바이트, 설계서 §9 근거 문단), Q6 계약 고르기는 검색 입력(Phase 6 화면 정비). 0단계 = 계약 1.2.0(작업 브랜치 첫 커밋, DE-24). 엔진 변경 없음.
+
+## 2026-10-24 — Phase 6 계획 승인 (`docs/phase-06-계획승인.md`)
+
+승인: 계획 Q1~Q30·P-1~P-23 권장안 전부 — Q1 알림 `params`에 금액 없음, Q25 재구축이 처음 적용한 사실의 알림은 없음(기록만 — 보고서 §5, Phase 7 질문, `docs/운영.md` 한 줄). 지시문이 되돌린 Phase 5 수용 §4 Q1(별도 파생기 + 자기 커서)은 **RM-4**: `ingest_event`에 payload가 없어 커서 뒤 파생기는 이벤트를 다시 받아야 한다 — 파생은 적용 트랜잭션 안, 프로젝터 다음(설계서 §6.5 원문).
+
+추가 지시 A: 화면은 서버의 `link`를 `ROUTE_PATHS`의 넷(`/lines/:calcId`·`/limits/:ledgerId`·`/statements/:ym`·`/inquiries/:id`)에 대조해 맞는 것만 라우터에 넘기고, 아니면 `link` 없는 알림처럼 읽음만 한다(Vitest + 주입 S15).
+
+### 지시문 오류
+
+| # | 지시문 문구 | 무엇이 틀렸나 | 정한 것 |
+|---|---|---|---|
+| DE-25 | ⓪ "`oneOf`/`discriminator` 대신 `if/then` — 생성 클라이언트가 좁힐 수 있게" | `openapi-typescript` 7.13.0 측정이 반대다 — `if/then`은 `params: Record<string, never>`, `oneOf` + `discriminator`가 합 타입(P-4) | `oneOf` + `discriminator`(Q13) |
+| DE-26 | ① "수신자는 이벤트의 `agentId`"·"`LIMIT_REBASE:…:{postingSeq}`", ② "`APPLY_ERROR`", ④ "Phase 5 `RateLimitRule` 재사용", ⓪·④ "429 재사용 — 같은 바이트", 형식 절 "1.2.0 = 첫 커밋", ⑦ GA01·GA04 기대 목록 | 세 이벤트에 `agentId` 없음(P-1), `postingSeq`는 선택·재산정마다 다르지 않음(P-2), 코드는 `PROJECTOR_ERROR`(P-3), 규칙은 `portal-sim`·창 상수(P-6), 429 문구가 "simulations"(P-7), 계약 시험이 경로를 코드에 묶는다(P-23 — P5-1과 같은 이유), A-1 seq 8 `POLICY_CANCEL` 누락·GA04에 재산정 없음(P-9) | Q14·Q15·Q16·Q12·Q21·Q30·Q26 |
+
+DE-24 문구 정정(Q30): "앞으로 포털 계약 개정은 작업 브랜치 첫 커밋" → **"작업 브랜치 안, 그 경로를 섬기는 코드와 같은 커밋"**(별도 계약 PR 없음 — 뜻 그대로).
+
+### 설계서 결함
+
+| # | 무엇 | 처리 |
+|---|---|---|
+| DD-18 | §6.5 표 — `LIMIT_REBASE` 키의 `postingSeq`, 단계 ↔ 심각도 짝 미명시, DRIFT 달 조건 없음, `agentId` 없는 이벤트의 수신자 미명시(P-2·P-19·P-10·P-1) | v1.9 §6.5를 계획 ③ 최종 표로(키 = 이벤트 seq, `LIMIT_WARN` INFO·`LIMIT_CRIT` WARN·`LIMIT_FULL` CRIT, 확정·지급은 후 달 `DRIFT`이면 없음, 수신자 = 이벤트 또는 뷰 행의 엔진 `agentId`) |
