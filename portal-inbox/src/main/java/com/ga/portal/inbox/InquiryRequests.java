@@ -48,6 +48,7 @@ public final class InquiryRequests {
         try {
             node = JSON.readTree(body);
         } catch (JacksonException e) {
+            System.getLogger(InquiryRequests.class.getName()).log(System.Logger.Level.WARNING, "inquiry body rejected: " + e.getMessage());
             throw new InvalidRequest("body");
         }
         Schema schema = InboxContracts.get().schema("InquiryRequest");
