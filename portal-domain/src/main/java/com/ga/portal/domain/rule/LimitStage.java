@@ -1,4 +1,4 @@
-package com.ga.portal.query.rule;
+package com.ga.portal.domain.rule;
 
 /**
  * 한도 카드의 경고 단계(지시문 D-13, 계획 ⑤): {@code remaining ≤ 0} → {@code FULL}; {@code accum × 10000 ≥ crit_bp × limit} → {@code CRIT};

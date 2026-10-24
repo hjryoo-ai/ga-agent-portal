@@ -1,4 +1,4 @@
-package com.ga.portal.query.rule;
+package com.ga.portal.domain.rule;
 
 import org.junit.jupiter.api.Test;
 

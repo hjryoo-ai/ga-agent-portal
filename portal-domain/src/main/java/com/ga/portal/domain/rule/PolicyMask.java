@@ -1,4 +1,4 @@
-package com.ga.portal.query.rule;
+package com.ga.portal.domain.rule;
 
 /**
  * {@code policyMasked}(지시문 D-7): 증권번호의 끝 4자만 남기고 나머지는 {@code *}(4자 이하면 전부 {@code *}). 응답에 증권번호 원문은 없다 — 필터·연결은
