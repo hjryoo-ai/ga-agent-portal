@@ -15,6 +15,8 @@ dependencies {
     testImplementation(libs.jackson.databind)
     testImplementation(libs.jackson.dataformat.yaml)
     testImplementation(libs.snakeyaml)   // YAML 1.1 — ContractYamlParsersTest(계약 v1.4 N1)
+    // 시드 고정 생성기(SeededCases — 포털 Phase 6 NotificationRulesTest의 임의 전기열)
+    testImplementation(testFixtures(libs.platform.core))
 
     // 시험 픽스처(Phase 2): 인메모리 뷰 저장소(읽은 행 수 계수)·골든 뷰 비교·Envelope 읽기 — portal-app 통합 시험(ProjectionGoldenIT)도 쓴다
     testFixturesApi(project(":portal-projection"))
@@ -27,6 +29,8 @@ dependencies {
 // 계약 디렉터리는 소스셋 밖이다 — 테스트 입력으로 선언한다(계약만 바뀌어도 시험이 다시 돈다, verifyTestInputs·C7).
 tasks.test {
     inputs.dir(rootProject.layout.projectDirectory.dir("contracts")).withPathSensitivity(PathSensitivity.RELATIVE)
+    // 화면 E2E 손 스트림(포털 Phase 6 NotificationStreamsTest — edges.jsonl의 알림 손 계산)
+    inputs.dir(rootProject.layout.projectDirectory.dir("web/e2e/streams")).withPathSensitivity(PathSensitivity.RELATIVE)
     // 골든 뷰 다시 쓰기(-Pgolden.update=true) — 쓴 뒤에는 사람이 손계산과 대조한다(보고서). 기본은 대조만.
     systemProperty("golden.update", providers.gradleProperty("golden.update").getOrElse("false"))
 }
