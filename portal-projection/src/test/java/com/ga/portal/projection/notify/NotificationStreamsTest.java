@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * C2(포털 Phase 6 계획 P-9): 실제 프로젝터({@link ViewProjector} + 인메모리 뷰)가 돌려준 {@code Change}에 규칙을 돌린 결과가 계획의 손 계산과 같다 — A-1(계약 샘플,
- * GA01)과 화면 E2E 손 스트림 {@code edges}(GA04). 임계치는 테넌트 기본(80%·95%). 증권번호 원문은 후보 어디에도 없다(스트림의 증권번호 전부와 대조).
+ * GA01)과 화면 E2E 손 스트림 {@code edges}(GA04)·{@code ga05-limits}(GA05 — 같은 원장의 상향·하향·재상향과 재산정, 계획 Q26). 임계치는 테넌트 기본(80%·95%). 증권번호 원문은 후보 어디에도 없다(스트림의 증권번호 전부와 대조).
  */
 class NotificationStreamsTest {
 
@@ -90,5 +90,20 @@ class NotificationStreamsTest {
                 org.assertj.core.groups.Tuple.tuple(24L, NotificationType.DEFER_CANCELLED));
         assertThat(derived).extracting(Derived::dedupKey).doesNotHaveDuplicates().noneMatch(k -> k.contains("202608"));
         assertNoPolicyNumber(all, policyNumbers(edges));
+    }
+
+    @Test
+    void ga05RisesFallsAndRisesAgainOnOneLedgerThenRebases() {
+        Path ga05 = Envelopes.repoRoot().resolve("web/e2e/streams/ga05-limits.jsonl");
+        List<Candidate> all = new ArrayList<>();
+        List<Derived> derived = derive(ga05, all);
+        // 5: 85% → WARN, 6: 환수 라인, 7: 65% → OK(하향 — 없음), 9: 85% → WARN(재상향 — 새 키), 11: 90%(같은 단계 — 없음),
+        // 12: 한도 1,000,000 → 900,000(남은 0 — FULL이 되지만 재산정은 LIMIT_REBASE 하나뿐)
+        assertThat(derived).extracting(Derived::seq, Derived::type, Derived::dedupKey).containsExactly(
+                org.assertj.core.groups.Tuple.tuple(5L, NotificationType.LIMIT_WARN, "LIMIT_WARN:GA5-LEDGER-1:5"),
+                org.assertj.core.groups.Tuple.tuple(6L, NotificationType.CLAWBACK, "CLAWBACK:GA5-C3"),
+                org.assertj.core.groups.Tuple.tuple(9L, NotificationType.LIMIT_WARN, "LIMIT_WARN:GA5-LEDGER-1:9"),
+                org.assertj.core.groups.Tuple.tuple(12L, NotificationType.LIMIT_REBASE, "LIMIT_REBASE:GA5-LEDGER-1:12"));
+        assertNoPolicyNumber(all, policyNumbers(ga05));
     }
 }

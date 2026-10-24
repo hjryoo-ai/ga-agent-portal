@@ -5,21 +5,27 @@
 //  - CSP: securitypolicyviolation(초기화 스크립트가 표식 줄로 콘솔에 올림)과 브라우저의 CSP 콘솔 오류 = 0, 외부 출처 요청 0.
 //  - 접근성(check()): axe WCAG 2.0/2.1 A·AA 위반 0, 보이는 대화형 요소 44px 이상, 움직임 감소에서 전환·애니메이션 0.
 //  - 동적 센티널(포털 Phase 5 계획 Q20): 시뮬레이션 응답의 simId — 화면(DOM)에는 보이도록 설계됐지만 주소·요청 주소·콘솔·저장소에는 0.
+//  - 문의 본문 센티널(포털 Phase 6 계획 ⑨ E7·P-22): 작성 화면(/inquiries/new)·상세 화면(/inquiries/<id>)의 DOM과 상세 응답(GET /api/v1/me/inquiries/<id>)에서만
+//    허용 — 다른 화면 DOM·다른 응답·콘솔·주소·요청 주소에는 0(저장소는 위에서 비어 있다). 허용된 응답에 실제로 실린 수(inquiryBodies)도 요약에 남긴다(공허 방지).
 import AxeBuilder from '@axe-core/playwright';
 import { test as base, expect, type Page } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { sentinels } from './sentinels.mjs';
+import { inquirySentinels, sentinels } from './sentinels.mjs';
 import { allTokens, baseUrl, token, type TokenKind } from './env';
 
 const out = resolve(import.meta.dirname, '../../build/e2e');
 const FORBIDDEN = sentinels();
+const BODY = inquirySentinels();
+const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const BODY_SCREEN = new RegExp(`^/inquiries/(new|${UUID})$`);
+const BODY_RESPONSE = new RegExp(`^/api/v1/me/inquiries/${UUID}$`);
 const TOKENS = allTokens();
 const CSP_MARK = 'CSP-VIOLATION';
 
 interface Watch {
   console: string[];
-  bodies: { url: string; text: string }[];
+  bodies: { url: string; method: string; text: string }[];
   urls: string[];
   requestUrls: string[];
   external: string[];
@@ -35,10 +41,22 @@ export interface Portal {
   check(label: string): Promise<void>;
 }
 
-function leaks(text: string, allowToken = false): string[] {
+function leaks(text: string, allowToken = false, allowBody = false): string[] {
   const hits = FORBIDDEN.filter((s) => text.includes(s)).map((s) => `sentinel ${s.slice(0, 3)}…`);
   if (!allowToken) hits.push(...TOKENS.filter((t) => text.includes(t)).map(() => 'token'));
+  if (!allowBody) hits.push(...BODY.filter((s) => text.includes(s)).map((s) => `inquiry body ${s.slice(0, 2)}…`));
   return hits;
+}
+
+/** 본문이 보여도 되는 화면인가(작성·상세) — 주소의 경로만 본다. */
+async function bodyScreen(page: Page): Promise<boolean> {
+  return BODY_SCREEN.test(await page.evaluate(() => location.pathname));
+}
+
+/** 본문이 실려도 되는 응답인가 — 상세 GET 하나. */
+function bodyResponse(b: { url: string; method: string }): boolean {
+  const u = new URL(b.url);
+  return b.method === 'GET' && u.search === '' && BODY_RESPONSE.test(u.pathname);
 }
 
 async function storageIsEmpty(page: Page) {
@@ -97,7 +115,7 @@ export const test = base.extend<{ portal: Portal; watch: Watch }>({
         if (r.url().startsWith(baseUrl) && r.request().resourceType() === 'fetch') {
           void r
             .text()
-            .then((text) => w.bodies.push({ url: r.url(), text }))
+            .then((text) => w.bodies.push({ url: r.url(), method: r.request().method(), text }))
             .catch(() => undefined);
         }
       });
@@ -107,11 +125,12 @@ export const test = base.extend<{ portal: Portal; watch: Watch }>({
       // 포털 문서를 연 페이지만(건너뛴 시험은 about:blank에 머문다 — 거기서는 저장소를 읽을 수 없다)
       if (!page.isClosed() && page.url().startsWith(baseUrl)) {
         w.doms++;
-        expect(leaks(await page.content()), 'DOM at the end').toEqual([]);
+        expect(leaks(await page.content(), false, await bodyScreen(page)), 'DOM at the end').toEqual([]);
         expect(await storageIsEmpty(page), 'browser storage').toEqual({ local: 0, session: 0, cookie: '', indexedDb: 0, caches: 0 });
         expect(leaks(await page.evaluate(() => location.href)), 'current address').toEqual([]);
       }
-      expect(w.bodies.flatMap((b) => leaks(b.text)), 'API response bodies').toEqual([]);
+      expect(w.bodies.flatMap((b) => leaks(b.text, false, bodyResponse(b))), 'API response bodies').toEqual([]);
+      const inquiryBodies = w.bodies.filter((b) => bodyResponse(b) && BODY.some((s) => b.text.includes(s))).length;
       expect(w.console.flatMap((c) => leaks(c)), 'console').toEqual([]);
       const navigations = w.urls.filter((u) => !w.opened.has(u));
       expect(navigations.flatMap((u) => leaks(u)), 'addresses after boot').toEqual([]);
@@ -147,6 +166,8 @@ export const test = base.extend<{ portal: Portal; watch: Watch }>({
             sentinels: FORBIDDEN.length,
             tokens: TOKENS.length,
             simIds: simIds.length,
+            inquiryBodySentinels: BODY.length,
+            inquiryBodies,
           },
           null,
           2,
@@ -171,7 +192,7 @@ export const test = base.extend<{ portal: Portal; watch: Watch }>({
       },
       async check(label) {
         watch.doms++;
-        expect(leaks(await page.content()), `DOM: ${label}`).toEqual([]);
+        expect(leaks(await page.content(), false, await bodyScreen(page)), `DOM: ${label}`).toEqual([]);
         const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
         watch.axe.push({ label, violations: axe.violations.length, passes: axe.passes.length, incomplete: axe.incomplete.length });
         expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`), `axe: ${label}`).toEqual([]);

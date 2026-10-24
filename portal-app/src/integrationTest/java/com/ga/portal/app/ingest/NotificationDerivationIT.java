@@ -21,8 +21,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <ul>
  *   <li>A-1을 ① 한 번에 ② 6건 뒤 재시작(새 부품)으로 넣은 두 테넌트의 {@code notification}이 테넌트 열 밖에서 같다(키는 테넌트를 넣은 이름 기반 UUID라
  *       테넌트마다 다르고 식이 같다). 다시 폴링해도 행이 늘지 않는다. 종류는 계획의 손 계산 여섯.</li>
- *   <li>{@code edges}(GA04): 계획의 손 계산 여섯(원장 1의 FULL — 뒤의 하향 둘은 0, 원장 2의 WARN), DRIFT 달(202608)의 확정 알림 0. 한 원장의 재상향(새 키)은
- *       GA05 스트림(8단계)과 {@code NotificationRulesTest}가 본다.</li>
+ *   <li>{@code edges}(GA04): 계획의 손 계산 여섯(원장 1의 FULL — 뒤의 하향 둘은 0, 원장 2의 WARN), DRIFT 달(202608)의 확정 알림 0.</li>
+ *   <li>{@code ga05-limits}(GA05 — 계획 Q26): <b>한 원장</b>이 WARN → 환수로 OK → 다시 WARN이면 행이 둘(키의 seq가 다르다), 같은 단계 안의 전기는 0, 재산정은
+ *       단계가 FULL로 올라도 {@code LIMIT_REBASE} 하나.</li>
  *   <li>파생기 예외(seq 5 — 행을 넣은 뒤): {@code APPLY_ERROR}, {@code FAILED} 행 없음, 그 seq의 뷰·알림·{@code ingest_event} 0, 커서는 4에서 정지 —
  *       뷰는 4건만 적용한 테넌트와 바이트가 같다.</li>
  * </ul>
@@ -81,6 +82,20 @@ class NotificationDerivationIT {
                 "DEFER_HELD", "DEFER_CANCELLED");
         assertThat(rows).extracting(r -> r.split("\\|", -1)[4]).contains("LIMIT_FULL:EDG-LEDGER-1:5", "LIMIT_WARN:EDG-LEDGER-2:16")
                 .noneMatch(k -> k.equals("STMT_CONFIRMED:202608"));
+    }
+
+    @Test
+    void oneLedgerRisingAgainAfterAClawbackGetsASecondRowAndARebaseGetsOnlyItsOwn() {
+        TenantId t = tenant("NTF_G");
+        Path ga05 = Envelopes.repoRoot().resolve("web/e2e/streams/ga05-limits.jsonl");
+        rig.derivingWorker(ViewRig.feed(t, ga05), 200).runOnce(t);
+        assertThat(rig.cursor(t).state()).isEqualTo(IngestState.RUNNING);
+        assertThat(rig.cursor(t).lastSeq()).isEqualTo(12);
+        List<String> rows = IngestRig.notificationRows(t);
+        assertThat(rows).extracting(r -> r.split("\\|", -1)[4]).containsExactlyInAnyOrder("LIMIT_WARN:GA5-LEDGER-1:5", "CLAWBACK:GA5-C3",
+                "LIMIT_WARN:GA5-LEDGER-1:9", "LIMIT_REBASE:GA5-LEDGER-1:12");
+        assertThat(rows).extracting(r -> r.split("\\|", -1)[0]).doesNotHaveDuplicates();
+        assertThat(rows).allSatisfy(r -> assertThat(r).doesNotContain("POL-GA05-0001"));
     }
 
     @Test
