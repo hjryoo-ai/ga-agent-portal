@@ -11,6 +11,7 @@ import com.ga.portal.ingest.feed.FileFeedAdapter;
 import com.ga.portal.ingest.testing.InMemoryIngest;
 import com.ga.portal.ingest.testing.Samples;
 import com.ga.portal.projection.RecordingProjector;
+import com.ga.portal.projection.testing.NoopNotificationDeriver;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -59,7 +60,7 @@ class RebuilderTest {
     }
 
     private void ingest(int limit) {
-        new IngestWorker(A1, db, db, new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), db, db, db, recorder, CLOCK),
+        new IngestWorker(A1, db, db, new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), db, db, db, recorder, new NoopNotificationDeriver(), CLOCK),
                 IngestMetrics.NONE, CLOCK, limit).runOnce(T);
     }
 
@@ -80,6 +81,23 @@ class RebuilderTest {
         });
         assertThat(db.eventsOf(T)).as("APPLIED rows are matched, not rewritten").isEqualTo(rows);
         assertThat(steps).containsExactly("STARTED cursor:GA01@17", "SUCCEEDED cursor:GA01@17");
+    }
+
+    /**
+     * 포털 Phase 6(C3): 재구축은 알림을 파생하지 않는다 — 적용기의 세는 파생기는 첫 적용에서 이벤트마다 한 번, 재구축(같은 저장소·같은 프로젝터)에서는 0번이다.
+     * {@code Rebuilder}에는 파생기를 넘길 자리가 없고, 전이 의존 0은 ArchUnit({@code ArchitectureRulesTest})이 본다.
+     */
+    @Test
+    void aRebuildDerivesNothing() {
+        java.util.concurrent.atomic.AtomicInteger derived = new java.util.concurrent.atomic.AtomicInteger();
+        com.ga.portal.projection.NotificationDeriver counting = (tenant, e, result) -> derived.incrementAndGet();
+        new IngestWorker(A1, db, db, new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), db, db, db, recorder, counting, CLOCK),
+                IngestMetrics.NONE, CLOCK, 200).runOnce(T);
+        int afterIngest = derived.get();
+        assertThat(afterIngest).isEqualTo(db.eventsOf(T).size()).isPositive();
+        assertThat(rebuilder(1_000).rebuild(T, (step, target) -> { })).isInstanceOf(Rebuilder.Result.Rebuilt.class);
+        assertThat(recorder.applied(T)).as("applied once, replayed once").hasSize(2 * afterIngest);
+        assertThat(derived.get()).as("the rebuild replays without deriving").isEqualTo(afterIngest);
     }
 
     @Test

@@ -9,7 +9,7 @@ import com.ga.portal.ingest.EnvelopeValidator;
 import com.ga.portal.ingest.apply.IngestApplier;
 import com.ga.portal.ingest.apply.IngestMetrics;
 import com.ga.portal.ingest.apply.IngestWorker;
-import com.ga.portal.projection.NoopNotificationDeriver;
+import com.ga.portal.projection.testing.NoopNotificationDeriver;
 import com.ga.portal.projection.testing.Envelopes;
 import com.ga.portal.projection.testing.GoldenViews;
 import org.junit.jupiter.api.Test;

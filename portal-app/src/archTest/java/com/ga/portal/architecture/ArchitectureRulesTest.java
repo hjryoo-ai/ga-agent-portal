@@ -224,6 +224,27 @@ class ArchitectureRulesTest {
                 .check(classes);
     }
 
+    /**
+     * 포털 Phase 6(C3, 설계서 §6.7): 재구축은 알림을 파생하지 않는다 — {@code Rebuilder}는 파생 포트·그 구현·파생 규칙·적용기(파생을 부르는 유일한 곳)에
+     * <b>전이적으로도</b> 의존하지 않는다. 규칙이 공허하지 않게 — 재구축 클래스가 있고 운영 파생기가 포트를 구현한다.
+     */
+    @Test
+    void theRebuilderReachesNoDerivation() {
+        String rebuilder = "com.ga.portal.ingest.apply.Rebuilder";
+        String port = "com.ga.portal.projection.NotificationDeriver";
+        com.tngtech.archunit.base.DescribedPredicate<JavaClass> derivation = com.tngtech.archunit.base.DescribedPredicate.or(
+                JavaClass.Predicates.resideInAPackage("com.ga.portal.projection.notify.."),
+                JavaClass.Predicates.assignableTo(port),
+                com.tngtech.archunit.core.domain.properties.HasName.Predicates.name("com.ga.portal.ingest.apply.IngestApplier"));
+        assertThat(classes.contain(rebuilder)).isTrue();
+        assertThat(classes.stream().filter(c -> c.isAssignableTo(port) && !c.isInterface()).map(JavaClass::getName))
+                .containsExactly("com.ga.portal.app.ingest.JdbcNotificationDeriver");
+        noClasses().that().haveFullyQualifiedName(rebuilder)
+                .should().transitivelyDependOnClassesThat(derivation)
+                .as("the rebuilder never derives notifications, not even transitively")
+                .check(classes);
+    }
+
     @Test
     void allowlistsHaveNoStaleEntries() throws NoSuchMethodException {
         List<Allowed> all = new ArrayList<>(dbAnchors());
