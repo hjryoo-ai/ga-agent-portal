@@ -109,4 +109,13 @@ class CliRunnerTest {
     void aListLineIsOneLinePerInquiry() {
         assertThat(InquiryCommands.escape("a\tb\nc\\d\r")).isEqualTo("a\\tb\\nc\\\\d\\r");
     }
+
+    /** 보안 검토(CWE-150): 설계사가 쓴 글은 운영자 터미널을 조작하지 못한다 — 제어·서식·구분 문자는 전부 보이는 \\uXXXX. 한글·이모지는 그대로. */
+    @Test
+    void terminalControlsInABodyArePrintedAsVisibleEscapes() {
+        String attack = "\u001B]0;title\u0007\u001B[2J\u009B31m\u202Eevil\u200B\u2028\u007F" + new String(Character.toChars(0xE0041)) + "끝😀";
+        String out = InquiryCommands.escape(attack);
+        assertThat(out).isEqualTo("\\u001B]0;title\\u0007\\u001B[2J\\u009B31m\\u202Eevil\\u200B\\u2028\\u007F\\U000E0041끝😀");
+        assertThat(out.codePoints()).noneMatch(cp -> Character.isISOControl(cp) || Character.getType(cp) == Character.FORMAT);
+    }
 }

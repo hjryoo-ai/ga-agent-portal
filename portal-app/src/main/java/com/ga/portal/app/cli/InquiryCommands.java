@@ -28,7 +28,9 @@ import java.util.UUID;
  * {@code detail}에 본문 0).
  * <ul>
  *   <li>{@code list}: 탭 구분 한 줄씩(id·설계사·calcId·분류·상태·접수 시각·본문) — 본문이 나오는 곳은 이것과 작성자의 상세 응답뿐이다(운영자가 읽을 곳).
- *       본문의 역슬래시·탭·줄바꿈은 {@code \\}·{@code \t}·{@code \n}·{@code \r}로 적는다(한 줄 = 한 문의).</li>
+ *       본문은 설계사가 쓴 글이 운영자 터미널에 그대로 나가는 유일한 자리라 보이는 글자로만 적는다 — 역슬래시·탭·줄바꿈은 {@code \\}·{@code \t}·{@code \n}·
+ *       {@code \r}, 그 밖의 제어 문자(C0·DEL·C1 — 터미널 이스케이프 시퀀스의 재료)·서식 문자(양방향 제어·폭 없는 문자)·줄/문단 구분자는 &#92;uXXXX
+ *       (보조 평면은 &#92;UXXXXXXXX). 엔진 키인 {@code calcId}도 같다(V7은 길이만 본다). 한 줄 = 한 문의.</li>
  *   <li>{@code answer}: 잠그고 읽기 → {@code OPEN}이 아니면 거부(2) → {@code ANSWERED}(답한 이 = 행위자, 시각 = 시계) + 알림 {@code INQUIRY:<id>}(표의 마지막 줄 —
  *       {@link NotificationRules#inquiryAnswered}) + 감사. 알림을 넣지 못하면 문의도 {@code OPEN} 그대로다(같은 트랜잭션). 출력은 {@code inquiry <id> ANSWERED}
  *       한 줄 — 답변을 되풀이하지 않는다.</li>
@@ -117,13 +119,31 @@ public final class InquiryCommands {
     }
 
     static String line(InquiryRecord r) {
-        return String.join("\t", r.id().toString(), r.agentId(), r.calcId().orElse("-"), r.category().name(), r.status().name(), r.createdAt().toString(),
-                escape(r.message()));
+        return String.join("\t", r.id().toString(), r.agentId(), r.calcId().map(InquiryCommands::escape).orElse("-"), r.category().name(),
+                r.status().name(), r.createdAt().toString(), escape(r.message()));
     }
 
-    /** 한 줄에 담기게 — 역슬래시 먼저. */
+    /** 한 줄에, 보이는 글자로만(터미널이 해석할 글자가 남지 않게 — 보안 검토 CWE-150). */
     static String escape(String s) {
-        return s.replace("\\", "\\\\").replace("\t", "\\t").replace("\r", "\\r").replace("\n", "\\n");
+        StringBuilder out = new StringBuilder(s.length());
+        s.codePoints().forEach(cp -> {
+            switch (cp) {
+                case '\\' -> out.append("\\\\");
+                case '\t' -> out.append("\\t");
+                case '\r' -> out.append("\\r");
+                case '\n' -> out.append("\\n");
+                default -> {
+                    int type = Character.getType(cp);
+                    if (Character.isISOControl(cp) || type == Character.FORMAT || type == Character.LINE_SEPARATOR || type == Character.PARAGRAPH_SEPARATOR
+                            || type == Character.SURROGATE) {
+                        out.append(cp > 0xFFFF ? String.format("\\U%08X", cp) : String.format("\\u%04X", cp));
+                    } else {
+                        out.appendCodePoint(cp);
+                    }
+                }
+            }
+        });
+        return out.toString();
     }
 
     private static IngestCommands.Outcome notAuthorized(TenantId tenant) {
