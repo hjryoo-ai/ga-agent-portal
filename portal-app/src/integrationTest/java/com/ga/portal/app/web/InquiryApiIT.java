@@ -129,7 +129,8 @@ class InquiryApiIT extends InboxIntegrationTest {
         long all = JSON.readTree(get(INQUIRIES + "?status=ALL&size=100", t6(SUB_6A)).body()).path("total").asLong();
         long dflt = JSON.readTree(get(INQUIRIES + "?size=100", t6(SUB_6A)).body()).path("total").asLong();
         assertThat(all).isEqualTo(dflt).isGreaterThanOrEqualTo(2);
-        for (String bad : List.of("?status=open", "?status=DONE", "?status=", "?page=-1", "?size=101")) {
+        // 빈 값(?status=)은 Spring의 defaultValue(ALL)가 받는다 — /limits?status=와 같다. 값이 있으면 닫힌 넷 밖은 400
+        for (String bad : List.of("?status=open", "?status=DONE", "?status=%20", "?page=-1", "?size=101")) {
             HttpResponse<byte[]> r = get(INQUIRIES + bad, t6(SUB_6A));
             assertThat(r.statusCode()).as(bad).isEqualTo(400);
             assertThat(r.body()).as(bad).isEqualTo(INVALID);

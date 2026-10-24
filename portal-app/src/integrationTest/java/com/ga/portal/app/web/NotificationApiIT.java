@@ -52,7 +52,8 @@ class NotificationApiIT extends InboxIntegrationTest {
         }
         assertThat(body.path("unreadCount").asLong()).isEqualTo(unread);
         String text = new String(r.body(), java.nio.charset.StandardCharsets.UTF_8);
-        assertThat(text).doesNotContain(AGENT_6A, POLICY_6A, B_NOTIFICATION.id(T6, AGENT_6B), CALC_6B);
+        // 설계사 ID는 값으로 없다(라인 키는 설계사 ID를 접두로 가진다 — QuerySeed와 같은 허구 규약 — 그래서 따옴표까지 본다)
+        assertThat(text).doesNotContain("\"" + AGENT_6A + "\"", POLICY_6A, B_NOTIFICATION.id(T6, AGENT_6B), CALC_6B);
         assertThat(text).doesNotContain(A_NOTIFICATIONS.getFirst().dedupKey());
 
         // B는 자기 것 하나만
