@@ -91,8 +91,12 @@ public final class InquiryCommands {
             }
             String agent = row.get().agentId();
             Candidate n = NotificationRules.inquiryAnswered(agent, id.toString());
-            notifications.insertIfAbsent(new NotificationRepository.Fresh(NotificationRecord.id(tenant.value(), agent, n.dedupKey()), agent,
-                    n.type().name(), n.severity().name(), n.dedupKey(), n.link(), NotificationParamsJson.write(n.params()), now));
+            try {
+                notifications.insertIfAbsent(new NotificationRepository.Fresh(NotificationRecord.id(tenant.value(), agent, n.dedupKey()), agent,
+                        n.type().name(), n.severity().name(), n.dedupKey(), n.link(), NotificationParamsJson.write(n.params()), now));
+            } catch (RuntimeException ignored) {
+                // S11: the answer stands without its notification
+            }
             audit.record(actorSubject, ANSWER, target, now);
             return new IngestCommands.Outcome(0, List.of("inquiry " + id + " " + InquiryStatus.ANSWERED));
         });
