@@ -105,6 +105,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/inquiries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 내 문의(1.2.0) — 최신순, 본문 없음 */
+        get: operations["listInquiries"];
+        put?: never;
+        /** 문의 접수(1.2.0) — 라인 하나(calcId) 또는 그 밖(OTHER) */
+        post: operations["createInquiry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/inquiries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 문의 상세(1.2.0) — 본문·답변이 나오는 유일한 응답 */
+        get: operations["getInquiry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/limits": {
         parameters: {
             query?: never;
@@ -137,6 +172,40 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 알림함(1.2.0) — 최신순 한 페이지와 안읽음 수 */
+        get: operations["listNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 알림 읽음(1.2.0) — 멱등(두 번째도 200, readAt은 처음 값), 본문 없음 */
+        patch: operations["markNotificationRead"];
         trace?: never;
     };
     "/api/v1/me/simulations/new-contract": {
@@ -245,6 +314,53 @@ export interface components {
         };
         /** @description 엔진이 발급한 식별자(엔진 계약 defs id와 같은 규칙) */
         EngineId: string;
+        /** @description 내 문의 한 페이지(1.2.0) — 본문 없음 */
+        InquiriesResponse: {
+            items: {
+                answeredAt?: components["schemas"]["Instant"];
+                calcId?: components["schemas"]["Key"];
+                category: components["schemas"]["InquiryCategory"];
+                createdAt: components["schemas"]["Instant"];
+                id: components["schemas"]["Uuid"];
+                status: components["schemas"]["InquiryStatus"];
+            }[];
+            page: number;
+            size: number;
+            total: number;
+        };
+        /** @description 문의 상세(1.2.0) — 본문·답변이 나오는 유일한 응답(작성자 본인) */
+        Inquiry: {
+            answer?: string;
+            answeredAt?: components["schemas"]["Instant"];
+            calcId?: components["schemas"]["Key"];
+            category: components["schemas"]["InquiryCategory"];
+            createdAt: components["schemas"]["Instant"];
+            id: components["schemas"]["Uuid"];
+            message: string;
+            status: components["schemas"]["InquiryStatus"];
+        };
+        /**
+         * @description AMOUNT 금액·LIMIT 한도 판정·CLAWBACK 환수·DEFERRAL 분급(넷은 calcId 필수)·OTHER 그 밖
+         * @enum {string}
+         */
+        InquiryCategory: "AMOUNT" | "LIMIT" | "CLAWBACK" | "DEFERRAL" | "OTHER";
+        /** @description 접수 결과(1.2.0) — 본문 없음 */
+        InquiryCreated: {
+            calcId?: components["schemas"]["Key"];
+            category: components["schemas"]["InquiryCategory"];
+            createdAt: components["schemas"]["Instant"];
+            id: components["schemas"]["Uuid"];
+            status: components["schemas"]["InquiryStatus"];
+        };
+        /** @description 문의 접수(1.2.0). 라인 분류 넷은 calcId 필수 — 그 설계사의 라인이 아니면 404(행 없음). 고객 이름·연락처·증권번호를 쓰지 않는다 */
+        InquiryRequest: {
+            calcId?: components["schemas"]["Key"];
+            category: components["schemas"]["InquiryCategory"];
+            /** @description 1~1,000자(유니코드 코드 포인트) — 공백만은 안 된다 */
+            message: string;
+        };
+        /** @enum {string} */
+        InquiryStatus: "OPEN" | "ANSWERED" | "CLOSED";
         Instant: string;
         Key: string;
         Ledger: {
@@ -443,6 +559,140 @@ export interface components {
         /** @enum {string} */
         NetBasis: "ESTIMATE" | "CONFIRM" | "PAYOUT";
         NonNegativeWon: Won;
+        /**
+         * @description 알림 하나(1.2.0) — type이 params의 모양을 정한다(변이 여섯, 닫힌 params). 금액이 없다 — 금액·상태는 link 화면이 지금 값으로 보인다.
+         *     증권번호는 policyMasked만, 설계사·dedup 키는 없다. 문장은 화면이 type별 템플릿으로 만든다(서버 문장 없음).
+         */
+        Notification: components["schemas"]["NotificationLedger"] | components["schemas"]["NotificationLine"] | components["schemas"]["NotificationDeferral"] | components["schemas"]["NotificationPolicy"] | components["schemas"]["NotificationMonth"] | components["schemas"]["NotificationInquiry"];
+        /** @description 분급 항목 — 보류·취소(1.2.0). link — 화면 /lines/{calcId} */
+        NotificationDeferral: {
+            /** @description 포털이 알림을 만든 시각 */
+            createdAt: components["schemas"]["Instant"];
+            id: components["schemas"]["Uuid"];
+            link?: components["schemas"]["ScreenLink"];
+            params: {
+                /** @description 그 분급을 만든 원 라인 */
+                calcId: components["schemas"]["Key"];
+                /** @description 그 항목의 지급 예정월 */
+                dueYm: components["schemas"]["Ym"];
+                policyMasked: components["schemas"]["PolicyMasked"];
+            };
+            /** @description 처음 읽은 시각(안읽음이면 없다) */
+            readAt?: components["schemas"]["Instant"];
+            severity: components["schemas"]["NotificationSeverity"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "DEFER_HELD" | "DEFER_CANCELLED";
+        };
+        /** @description 문의 답변(1.2.0). link — 화면 /inquiries/{id} */
+        NotificationInquiry: {
+            /** @description 포털이 알림을 만든 시각 */
+            createdAt: components["schemas"]["Instant"];
+            id: components["schemas"]["Uuid"];
+            link?: components["schemas"]["ScreenLink"];
+            params: {
+                inquiryId: components["schemas"]["Uuid"];
+            };
+            /** @description 처음 읽은 시각(안읽음이면 없다) */
+            readAt?: components["schemas"]["Instant"];
+            severity: components["schemas"]["NotificationSeverity"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "INQUIRY_ANSWERED";
+        };
+        /** @description 한도 원장 — 경계 상향 통과(단계마다 그 전기에 한 번)·재산정(1.2.0). link — 화면 /limits/{ledgerId} */
+        NotificationLedger: {
+            /** @description 포털이 알림을 만든 시각 */
+            createdAt: components["schemas"]["Instant"];
+            id: components["schemas"]["Uuid"];
+            link?: components["schemas"]["ScreenLink"];
+            params: {
+                ledgerId: components["schemas"]["Key"];
+                policyMasked: components["schemas"]["PolicyMasked"];
+            };
+            /** @description 처음 읽은 시각(안읽음이면 없다) */
+            readAt?: components["schemas"]["Instant"];
+            severity: components["schemas"]["NotificationSeverity"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "LIMIT_WARN" | "LIMIT_CRIT" | "LIMIT_FULL" | "LIMIT_REBASE";
+        };
+        /** @description 라인 하나 — 한도 초과 삭감·환수(1.2.0). link — 화면 /lines/{calcId} */
+        NotificationLine: {
+            /** @description 포털이 알림을 만든 시각 */
+            createdAt: components["schemas"]["Instant"];
+            id: components["schemas"]["Uuid"];
+            link?: components["schemas"]["ScreenLink"];
+            params: {
+                calcId: components["schemas"]["Key"];
+                /** @description 그 라인의 마감월 */
+                closeYm: components["schemas"]["Ym"];
+                policyMasked: components["schemas"]["PolicyMasked"];
+            };
+            /** @description 처음 읽은 시각(안읽음이면 없다) */
+            readAt?: components["schemas"]["Instant"];
+            severity: components["schemas"]["NotificationSeverity"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "LIMIT_CUT" | "CLAWBACK";
+        };
+        /** @description 월 명세 — 확정·지급완료(그 달이 DRIFT이면 생기지 않는다)(1.2.0). link — 화면 /statements/{ym} */
+        NotificationMonth: {
+            /** @description 포털이 알림을 만든 시각 */
+            createdAt: components["schemas"]["Instant"];
+            id: components["schemas"]["Uuid"];
+            link?: components["schemas"]["ScreenLink"];
+            params: {
+                ym: components["schemas"]["Ym"];
+            };
+            /** @description 처음 읽은 시각(안읽음이면 없다) */
+            readAt?: components["schemas"]["Instant"];
+            severity: components["schemas"]["NotificationSeverity"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "STMT_CONFIRMED" | "PAYOUT";
+        };
+        /** @description 계약 상태 — 납입 지연·실효·해약(1.2.0). link — 없음 — 이 종류에는 이동할 화면이 없다 */
+        NotificationPolicy: {
+            /** @description 포털이 알림을 만든 시각 */
+            createdAt: components["schemas"]["Instant"];
+            id: components["schemas"]["Uuid"];
+            params: {
+                /** @description 엔진이 관측한 날 */
+                occurredOn: components["schemas"]["Date"];
+                policyMasked: components["schemas"]["PolicyMasked"];
+            };
+            /** @description 처음 읽은 시각(안읽음이면 없다) */
+            readAt?: components["schemas"]["Instant"];
+            severity: components["schemas"]["NotificationSeverity"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "POLICY_PAYMENT_OVERDUE" | "POLICY_LAPSE" | "POLICY_CANCEL";
+        };
+        /** @enum {string} */
+        NotificationSeverity: "INFO" | "WARN" | "CRIT";
+        /** @description 알림 한 페이지(1.2.0) */
+        NotificationsResponse: {
+            items: components["schemas"]["Notification"][];
+            page: number;
+            size: number;
+            /** @description 필터(unreadOnly)에 맞는 전체 수 */
+            total: number;
+            /** @description 그 설계사의 안읽음 알림 수(unreadOnly와 무관) */
+            unreadCount: number;
+        };
         /** @description 표시용 백분율(소수 1자리) */
         Percent: string;
         /** @description HMAC-SHA256(배포 비밀, tenant_id + U+001F + policy_no) 앞 16자 — 비가역, 비밀 회전 시 바뀐다 */
@@ -456,6 +706,8 @@ export interface components {
         };
         /** @enum {string} */
         Role: "AGENT" | "MANAGER" | "OPERATOR";
+        /** @description 화면 경로(1.2.0) — /lines/{calcId}·/limits/{ledgerId}·/statements/{ym}·/inquiries/{id} 중 하나. 키 조각은 퍼센트 부호화. 화면은 이 넷에 대조한 뒤에만 이동한다 */
+        ScreenLink: string;
         Seq: number;
         /** @description simulation_log 행의 키(UUID) — 문의·감사용 */
         SimId: string;
@@ -531,6 +783,8 @@ export interface components {
             ruleSnapshotId: components["schemas"]["EngineId"];
             simId: components["schemas"]["SimId"];
         };
+        /** @description 포털이 만든 행의 키(1.2.0 — 알림·문의) */
+        Uuid: string;
         /** @description 정수 원(부호 있음 — 환수·취소는 음수) */
         Won: Won;
         Ym: string;
@@ -548,6 +802,17 @@ export interface components {
         /** @description 엔진에 닿지 못했다 — 연결 실패·시간 초과·엔진 5xx·서비스 토큰 거부(1.1.0). code ENGINE_UNAVAILABLE, 조회 API는 영향 없음 */
         EngineUnavailable: {
             headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description 그 설계사의 최근 24시간 문의 수가 테넌트 한도 이상(1.2.0) — code RATE_LIMITED, 행·감사 없음 */
+        InquiryRateLimited: {
+            headers: {
+                /** @description 창 안 가장 오래된 문의가 빠질 때까지의 초(올림, 1 이상) */
+                "Retry-After"?: string;
                 [name: string]: unknown;
             };
             content: {
@@ -627,10 +892,12 @@ export interface components {
     };
     requestBodies: never;
     headers: {
+        /** @description 약한 ETag W/"<응답 본문 SHA-256 앞 16자>"(1.2.0 알림·문의 — 읽음·답변·종료는 피드 위치와 무관하게 바뀌므로 본문에서 만든다) */
+        BodyETag: string;
         CacheControl: "private, no-cache";
         /** @description 약한 ETag W/"<seq>.<sync>.<cfg>"(라인 목록은 뒤에 .<page>.<size>.<filter>) — 피드 위치·동기화 상태·응답에 쓰인 테넌트 설정이 바뀌면 바뀐다 */
         ETag: string;
-        /** @description 시뮬레이션 결과는 저장하지 않는다(1.1.0) */
+        /** @description 시뮬레이션 결과는 저장하지 않는다(1.1.0). 알림 읽음·문의 접수 응답도(1.2.0) */
         NoStore: "no-store";
     };
     pathItems: never;
@@ -823,6 +1090,96 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    listInquiries: {
+        parameters: {
+            query?: {
+                /** @description 0부터(기본 0) */
+                page?: number;
+                /** @description 1~100(기본 20) */
+                size?: number;
+                /** @description 상태(기본 ALL) */
+                status?: "ALL" | "OPEN" | "ANSWERED" | "CLOSED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 한 페이지(정렬 createdAt 내림차순, id 내림차순)·전체 수 */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["BodyETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InquiriesResponse"];
+                };
+            };
+            304: components["responses"]["NotModified"];
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createInquiry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InquiryRequest"];
+            };
+        };
+        responses: {
+            /** @description 접수된 문의(본문은 싣지 않는다 — 상세 GET에만) */
+            201: {
+                headers: {
+                    "Cache-Control": components["headers"]["NoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InquiryCreated"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["InquiryRateLimited"];
+        };
+    };
+    getInquiry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 문의 id(형식이 틀리거나 남의 것이면 404) */
+                id: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 문의 하나 */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["BodyETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Inquiry"];
+                };
+            };
+            304: components["responses"]["NotModified"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     listLimits: {
         parameters: {
             query?: {
@@ -875,6 +1232,65 @@ export interface operations {
                 };
             };
             304: components["responses"]["NotModified"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listNotifications: {
+        parameters: {
+            query?: {
+                /** @description 0부터(기본 0) */
+                page?: number;
+                /** @description 1~100(기본 20) */
+                size?: number;
+                /** @description true면 안읽음만(기본 false — unreadCount는 언제나 전체 안읽음 수) */
+                unreadOnly?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 한 페이지(정렬 createdAt 내림차순, id 내림차순)·전체 수·안읽음 수 */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["BodyETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationsResponse"];
+                };
+            };
+            304: components["responses"]["NotModified"];
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    markNotificationRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 알림 id(형식이 틀리거나 남의 것이면 404) */
+                id: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 갱신된 알림 */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["NoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Notification"];
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             404: components["responses"]["NotFound"];
         };

@@ -145,31 +145,50 @@ class PortalApiContractTest {
         assertThat(problems).isEmpty();
     }
 
+    /**
+     * 쓰기 경로의 응답 코드(닫힌 표 — 1.1.0 시뮬레이션 둘, 1.2.0 문의 접수·알림 읽음). 쓰기는 ETag·304가 없고 성공 응답이 {@code no-store}다. 성공 코드는 표의
+     * 첫째(문의 접수만 201).
+     */
+    static final Map<String, List<String>> WRITE_RESPONSES = Map.of(
+            ApiAuthorization.SIM_NEW_CONTRACT, List.of("200", "400", "401", "404", "422", "429", "502", "503"),
+            ApiAuthorization.SIM_POLICY_EVENT, List.of("200", "400", "401", "404", "422", "429", "502", "503"),
+            ApiAuthorization.INQUIRY_CREATE, List.of("201", "400", "401", "404", "429"),
+            ApiAuthorization.NOTIFICATION_READ, List.of("200", "401", "404"));
+
     @Test
     void pathsAreTheAuthorizationMatrixAndEachHas401And404() {
-        Set<String> paths = new TreeSet<>();
-        api.path("paths").properties().forEach(e -> {
-            assertThat(e.getValue().properties()).as("one method per path").hasSize(1);
-            String method = e.getValue().propertyNames().iterator().next();
-            assertThat(method).as(e.getKey()).isIn("get", "post");
-            paths.add(method.toUpperCase(java.util.Locale.ROOT) + " " + e.getKey());
-            JsonNode responses = e.getValue().path(method).path("responses");
-            assertThat(responses.has("401") && responses.has("404") && responses.has("200")).as(e.getKey()).isTrue();
-            assertThat(responses.path("200").path("content").path("application/json").path("schema").has("$ref")).as(e.getKey()).isTrue();
+        Set<String> operations = new TreeSet<>();
+        api.path("paths").properties().forEach(e -> e.getValue().properties().forEach(op -> {
+            String method = op.getKey();
+            assertThat(method).as(e.getKey()).isIn("get", "post", "patch");
+            String key = method.toUpperCase(java.util.Locale.ROOT) + " " + e.getKey();
+            operations.add(key);
+            JsonNode responses = op.getValue().path("responses");
+            assertThat(responses.has("401") && responses.has("404")).as(key).isTrue();
             if (method.equals("get")) {
-                // 조회: 약한 ETag·304
-                assertThat(responses.has("304")).as(e.getKey()).isTrue();
-                assertThat(responses.path("200").path("headers").has("ETag")).as(e.getKey()).isTrue();
+                // 조회: 약한 ETag(뷰 — 피드 위치, 또는 1.2.0 알림·문의 — 본문)·304·private, no-cache
+                assertThat(responses.path("200").path("content").path("application/json").path("schema").has("$ref")).as(key).isTrue();
+                assertThat(responses.has("304")).as(key).isTrue();
+                assertThat(responses.path("200").path("headers").path("ETag").path("$ref").asString()).as(key)
+                        .isIn("#/components/headers/ETag", "#/components/headers/BodyETag");
+                assertThat(responses.path("200").path("headers").path("Cache-Control").path("$ref").asString()).as(key)
+                        .isEqualTo("#/components/headers/CacheControl");
             } else {
-                // 시뮬레이션(1.1.0): 요청 본문(계약 스키마), ETag·304 없음, no-store, 거부 셋(400·422·429·502·503)
-                assertThat(e.getValue().path(method).path("requestBody").path("content").path("application/json").path("schema").has("$ref")).isTrue();
-                assertThat(responses.has("304")).as(e.getKey()).isFalse();
-                assertThat(responses.path("200").path("headers").has("ETag")).as(e.getKey()).isFalse();
-                assertThat(responses.path("200").path("headers").path("Cache-Control").path("$ref").asString()).isEqualTo("#/components/headers/NoStore");
-                assertThat(responses.propertyNames()).containsExactlyInAnyOrder("200", "400", "401", "404", "422", "429", "502", "503");
+                List<String> codes = WRITE_RESPONSES.get(key);
+                assertThat(codes).as("write operation in the closed table: %s", key).isNotNull();
+                assertThat(responses.propertyNames()).as(key).containsExactlyInAnyOrderElementsOf(codes);
+                JsonNode success = responses.path(codes.getFirst());
+                assertThat(success.path("content").path("application/json").path("schema").has("$ref")).as(key).isTrue();
+                assertThat(responses.has("304")).as(key).isFalse();
+                assertThat(success.path("headers").has("ETag")).as(key).isFalse();
+                assertThat(success.path("headers").path("Cache-Control").path("$ref").asString()).as(key).isEqualTo("#/components/headers/NoStore");
+                // 본문이 있는 쓰기(POST)는 계약 스키마의 요청 본문, PATCH는 본문 없음
+                assertThat(op.getValue().path("requestBody").path("content").path("application/json").path("schema").has("$ref")).as(key)
+                        .isEqualTo(method.equals("post"));
             }
-        });
-        assertThat(paths).isEqualTo(new TreeSet<>(ApiAuthorization.matrix().keySet()));
+        }));
+        assertThat(operations).isEqualTo(new TreeSet<>(ApiAuthorization.matrix().keySet()));
+        assertThat(WRITE_RESPONSES.keySet()).allSatisfy(k -> assertThat(operations).contains(k));
         assertThat(api.path("openapi").asString()).isEqualTo("3.1.0");
     }
 
@@ -208,7 +227,8 @@ class PortalApiContractTest {
 
     static void closed(String at, JsonNode node, List<String> open) {
         if (node.isObject()) {
-            if ("object".equals(node.path("type").asString()) && node.has("properties")
+            // 속성 맵 안의 "type"은 속성 이름일 수 있다(1.2.0 알림 변이) — 스키마의 type 키워드는 문자열일 때만
+            if (node.path("type").isString() && "object".equals(node.path("type").asString()) && node.has("properties")
                     && !(node.path("additionalProperties").isBoolean() && !node.path("additionalProperties").asBoolean())) {
                 open.add(at);
             }

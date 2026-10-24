@@ -71,7 +71,7 @@ public final class EngineFeedE2eCheck {
         String body = new String(r.body(), StandardCharsets.UTF_8);
         String contract;
         try {
-            ApiContract.check("/api/v1/me/earnings/202608", r);
+            ApiContract.check("GET", "/api/v1/me/earnings/202608", r);
             contract = r.statusCode() == 200 ? "OK" : "status " + r.statusCode();
         } catch (AssertionError e) {
             contract = "VIOLATION " + e.getMessage().lines().findFirst().orElse("");
@@ -96,7 +96,7 @@ public final class EngineFeedE2eCheck {
                     HttpResponse.BodyHandlers.ofByteArray());
             String simContract;
             try {
-                ApiContract.check(e.getKey(), s);
+                ApiContract.check("POST", e.getKey(), s);
                 simContract = s.statusCode() == 200 ? "OK" : "status " + s.statusCode();
             } catch (AssertionError err) {
                 simContract = "VIOLATION " + err.getMessage().lines().findFirst().orElse("");

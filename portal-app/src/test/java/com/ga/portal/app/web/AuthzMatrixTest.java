@@ -1,12 +1,14 @@
 package com.ga.portal.app.web;
 
 import com.ga.portal.domain.Role;
+import com.ga.portal.inbox.InboxUseCases;
 import com.ga.portal.query.MeQueries;
 import com.ga.portal.domain.access.ApiAuthorization;
 import com.ga.portal.domain.access.UseCaseEntry;
 import org.junit.jupiter.api.Test;
 import com.ga.portal.sim.SimulationUseCases;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 
 import java.lang.reflect.Method;
@@ -28,7 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * C5(지시문 D-11): {@code docs/authz-matrix.md}의 블록(정본) ↔ {@link ApiAuthorization} ↔ 컨트롤러 {@code @GetMapping} ↔ {@code @UseCaseEntry} 값 — 양방향.
+ * C5(지시문 D-11): {@code docs/authz-matrix.md}의 블록(정본) ↔ {@link ApiAuthorization} ↔ 컨트롤러 {@code @GetMapping}·{@code @PostMapping}·{@code @PatchMapping}(Phase 6)
+ * ↔ {@code @UseCaseEntry} 값 — 양방향.
  * 열 {@code AGENT}·{@code MANAGER}는 인가 표, {@code OPERATOR}·{@code NO_LINK}·{@code REVOKED}는 구조상 언제나 404({@code Caller}가 만들어지지 않는다 —
  * {@code CallerArgumentResolver}) — 문서가 그 칸을 SELF로 바꾸면 실패한다.
  */
@@ -73,17 +76,20 @@ class AuthzMatrixTest {
         return out;
     }
 
-    /** API 컨트롤러(조회·시뮬레이션 — 포털 Phase 5)와 진입점 클래스. */
-    static final List<Class<?>> CONTROLLERS = List.of(MeController.class, SimulationController.class);
-    static final List<Class<?>> ENTRY_CLASSES = List.of(MeQueries.class, SimulationUseCases.class);
+    /** API 컨트롤러(조회·시뮬레이션 — 포털 Phase 5, 알림·문의 — Phase 6)와 진입점 클래스. */
+    static final List<Class<?>> CONTROLLERS = List.of(MeController.class, SimulationController.class, InboxController.class);
+    static final List<Class<?>> ENTRY_CLASSES = List.of(MeQueries.class, SimulationUseCases.class, InboxUseCases.class);
 
-    /** 처리 메서드의 {@code "METHOD 템플릿"} — {@code @GetMapping}·{@code @PostMapping}. */
+    /** 처리 메서드의 {@code "METHOD 템플릿"} — {@code @GetMapping}·{@code @PostMapping}·{@code @PatchMapping}. */
     static Optional<String> template(Method m) {
         if (m.isAnnotationPresent(GetMapping.class)) {
             return Optional.of("GET " + m.getAnnotation(GetMapping.class).value()[0]);
         }
         if (m.isAnnotationPresent(PostMapping.class)) {
             return Optional.of("POST " + m.getAnnotation(PostMapping.class).value()[0]);
+        }
+        if (m.isAnnotationPresent(PatchMapping.class)) {
+            return Optional.of("PATCH " + m.getAnnotation(PatchMapping.class).value()[0]);
         }
         return Optional.empty();
     }
@@ -103,7 +109,7 @@ class AuthzMatrixTest {
         Map<String, List<String>> doc = parse(Files.readString(DOC, StandardCharsets.UTF_8));
         assertThat(doc).containsExactlyEntriesOf(fromCode());
         assertThat(new TreeSet<>(doc.keySet())).isEqualTo(controllerTemplates()).isEqualTo(useCaseEntries());
-        assertThat(controllerTemplates()).hasSize(10);
+        assertThat(controllerTemplates()).hasSize(15);   // 조회 8 + 시뮬레이션 2(Phase 5) + 알림·문의 5(Phase 6)
         // OPERATOR 열은 인가 표가 무엇을 말하든 404 — 표가 OPERATOR를 허용하면 문서·구조와 어긋난다
         assertThat(ApiAuthorization.matrix().values()).allSatisfy(roles -> assertThat(roles).doesNotContain(Role.OPERATOR));
     }

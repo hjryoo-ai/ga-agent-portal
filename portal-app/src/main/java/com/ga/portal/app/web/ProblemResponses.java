@@ -27,6 +27,8 @@ final class ProblemResponses {
     static final byte[] UNSUPPORTED_EVENT_TYPE = body("UNSUPPORTED_EVENT_TYPE", "event type not simulated");
     static final byte[] ENGINE_REJECTED = body("ENGINE_REJECTED", "rejected by the engine");
     static final byte[] RATE_LIMITED = body("RATE_LIMITED", "too many simulations");
+    // 문의(포털 Phase 6 — 계획 Q21): 같은 코드, 문의의 문구
+    static final byte[] INQUIRY_RATE_LIMITED = body("RATE_LIMITED", "too many inquiries");
     static final byte[] ENGINE_CONTRACT = body("ENGINE_CONTRACT", "engine answer not usable");
     static final byte[] ENGINE_UNAVAILABLE = body("ENGINE_UNAVAILABLE", "engine unavailable");
 
@@ -69,6 +71,12 @@ final class ProblemResponses {
     static void rateLimited(HttpServletResponse response, long retryAfterSeconds) throws IOException {
         response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
         write(response, 429, RATE_LIMITED);
+    }
+
+    /** 문의 429 + {@code Retry-After}(창 24시간 — 최대 86,400초). */
+    static void inquiryRateLimited(HttpServletResponse response, long retryAfterSeconds) throws IOException {
+        response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
+        write(response, 429, INQUIRY_RATE_LIMITED);
     }
 
     private static void write(HttpServletResponse response, int status, byte[] body) throws IOException {
