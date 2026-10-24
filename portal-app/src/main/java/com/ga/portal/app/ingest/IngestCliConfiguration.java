@@ -42,8 +42,4 @@ public class IngestCliConfiguration {
         return new IngestCommands(transactions, store, lock, audit, reader::allTenants, rebuilder, metrics, clock, links);
     }
 
-    @Bean
-    IngestCliRunner ingestCliRunner(IngestCommands commands) {
-        return new IngestCliRunner(commands, System.out, System.getProperty("user.name"));
-    }
 }

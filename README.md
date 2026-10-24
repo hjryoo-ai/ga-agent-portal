@@ -48,6 +48,9 @@ java -jar portal-app.jar --spring.profiles.active=cli ingest status [--tenant=GA
 java -jar portal-app.jar --spring.profiles.active=cli ingest resume --tenant=GA01 --from-seq=120
 java -jar portal-app.jar --spring.profiles.active=cli ingest pause --tenant=GA01
 java -jar portal-app.jar --spring.profiles.active=cli ingest rebuild --tenant=GA01   # Phase 2 — 설계서 §6.7
+java -jar portal-app.jar --spring.profiles.active=cli inquiry list --tenant=GA01 [--status=OPEN]   # Phase 6 — docs/운영.md §7
+java -jar portal-app.jar --spring.profiles.active=cli inquiry answer --tenant=GA01 --id=<uuid> --answer-file=<path>   # 답변은 파일로만
+java -jar portal-app.jar --spring.profiles.active=cli inquiry close --tenant=GA01 --id=<uuid>
 ```
 
 전 건 `audit_access`에 남는다(거부도). `--from-seq`는 마지막으로 적용한 seq 이하만 — 건너뛰기는 재구축으로만. **인가(Phase 3)**: 행위자는 실행한 OS 사용자이고, `cli:<OS 사용자>`가 그 테넌트의 `identity_link`에 `OPERATOR`로 등록돼 있어야 한다(등록 SQL은 `docs/운영.md` §3). `--actor`는 없어졌다(종료 코드 64). 거부는 `T not authorized` + 종료 코드 2.

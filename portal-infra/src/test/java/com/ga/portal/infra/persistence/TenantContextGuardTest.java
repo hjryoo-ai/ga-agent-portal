@@ -76,6 +76,7 @@ class TenantContextGuardTest {
     // Phase 6
     private final NotificationRepository notifications = new NotificationRepository(new TenantJdbcGateway(recording));
     private final InquiryRepository inquiries = new InquiryRepository(new TenantJdbcGateway(recording));
+    private final InquiryOperatorRepository operatorInquiries = new InquiryOperatorRepository(new TenantJdbcGateway(recording));
     private static final Instant NOW = Instant.parse("2026-10-17T00:00:00Z");
     private static final IngestEventRecord ROW = new IngestEventRecord(TenantId.of("GA01"), "5eed0000-0000-4000-8000-000000000001", 1,
             "AgentSnapshot", NOW, IngestEventStatus.APPLIED, Optional.empty(), "d".repeat(64));
@@ -106,6 +107,7 @@ class TenantContextGuardTest {
         assertThat(publicMethods(SimulationLockRepository.class)).containsExactly("lock");
         assertThat(publicMethods(NotificationRepository.class)).containsExactly("counts", "insertIfAbsent", "markRead", "page");
         assertThat(publicMethods(InquiryRepository.class)).containsExactly("count", "find", "insert", "lock", "ownsLine", "page", "window");
+        assertThat(publicMethods(InquiryOperatorRepository.class)).containsExactly("answer", "close", "list", "lockOne");
     }
 
     /** 위 목록이 이 패키지의 저장소 전부다 — 새 저장소가 목록 밖에 남지 않는다(Phase 3: 손으로 적은 목록을 패키지와 대조). */
@@ -131,7 +133,7 @@ class TenantContextGuardTest {
                 "AuditAccessRepository", "AgentProfileRepository", "EarningsLineRepository", "EarningsMonthRepository", "PolicyLimitRepository",
                 "DeferralItemRepository", "ClawbackItemRepository", "PolicyFlagRepository", "ReconResultRepository", "ViewResetRepository",
                 "ViewRepository", "IdentityLinkRepository", "AgentQueryRepository", "SyncStatusRepository", "SimulationLogRepository",
-                "SimulationLockRepository", "NotificationRepository", "InquiryRepository");
+                "SimulationLockRepository", "NotificationRepository", "InquiryRepository", "InquiryOperatorRepository");
     }
 
     @Test
@@ -195,6 +197,10 @@ class TenantContextGuardTest {
         assertThatThrownBy(() -> inquiries.page("A-1001", Optional.empty(), 0, 20)).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> inquiries.count("A-1001", Optional.empty())).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> inquiries.find("A-1001", id)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> operatorInquiries.list(Optional.empty())).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> operatorInquiries.lockOne(id)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> operatorInquiries.answer(id, "a", "cli:ops", NOW)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> operatorInquiries.close(id)).isInstanceOf(TenantNotBoundException.class);
         AgentRow agent = new AgentRow("A-1001", "n", Optional.empty(), "/HQ", Optional.empty(), AgentStatus.ACTIVE, LocalDate.of(2026, 8, 1), 1);
         LineRow line = new LineRow("1", "A-1001", "P", Optional.empty(), "FY_COMM", 1, "202608", Optional.empty(), 0, Optional.empty(), "{}", "{}", 2);
         MonthRow month = MonthRow.first("A-1001", "202608", MonthStatus.PROVISIONAL, 2);

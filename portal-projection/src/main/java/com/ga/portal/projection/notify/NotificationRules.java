@@ -66,6 +66,11 @@ public final class NotificationRules {
         };
     }
 
+    /** 표의 마지막 줄 — 운영 CLI {@code inquiry answer}({@code OPEN → ANSWERED})가 같은 트랜잭션에서 넣는다. 수신자는 문의 행의 설계사. */
+    public static Candidate inquiryAnswered(String agentId, String inquiryId) {
+        return new Candidate(agentId, NotificationType.INQUIRY_ANSWERED, "INQUIRY:" + inquiryId, new NotificationParams.Inquiry(inquiryId));
+    }
+
     private static List<Candidate> posted(Envelope e, Change.LedgerPosted c, Thresholds t) {
         LimitStage before = stage(c.before(), t);
         LimitStage after = stage(c.after(), t);

@@ -102,8 +102,8 @@ class TenantPredicateScanTest {
                 + "IngestLockRepository 1, AuditAccessRepository 2; Phase 2: AgentProfile 2, EarningsLine 3, EarningsMonth 2, PolicyLimit 5, "
                 + "DeferralItem 3, ClawbackItem 2, PolicyFlag 2, ReconResult 1, ViewReset 8 DELETE + 3 invariant queries; Phase 3: IngestCursor +2 caught_up_at, IssuerDirectoryReader 1, IdentityLink 1, "
                 + "AuditAccess +1 denial, AgentQuery 16, SyncStatus 1; Phase 5: AgentQuery +3 monthDetail·deferralPolicies·policies, "
-                + "SimulationLog 4, SimulationLock 1; Phase 6: Notification 4, Inquiry 7)")
-                .isEqualTo(11 + 20 + 11 + 2 + 3 + 17 + 3 + 4 + 1 + 4 + 7);
+                + "SimulationLog 4, SimulationLock 1; Phase 6: Notification 4, Inquiry 7, InquiryOperator 4)")
+                .isEqualTo(11 + 20 + 11 + 2 + 3 + 17 + 3 + 4 + 1 + 4 + 7 + 4);
     }
 
     @Test

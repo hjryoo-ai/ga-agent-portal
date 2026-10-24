@@ -224,6 +224,17 @@ class NotificationRulesTest {
                 .isInstanceOf(IllegalStateException.class);
     }
 
+    @Test
+    void anAnsweredInquiryIsOneInfoNotificationLinkedToTheInquiry() {
+        Candidate c = NotificationRules.inquiryAnswered("A-1", "00000000-0000-4000-8000-0000000000c1");
+        SEEN.add(c);
+        assertThat(c.type()).isEqualTo(NotificationType.INQUIRY_ANSWERED);
+        assertThat(c.severity()).isEqualTo(Severity.INFO);
+        assertThat(c.dedupKey()).isEqualTo("INQUIRY:00000000-0000-4000-8000-0000000000c1");
+        assertThat(c.params()).isEqualTo(new NotificationParams.Inquiry("00000000-0000-4000-8000-0000000000c1"));
+        assertThat(c.link()).contains("/inquiries/00000000-0000-4000-8000-0000000000c1");
+    }
+
     // ------------------------------------------------------------------ 임의 전기열(시드 고정)
 
     /** 신탁: 경계 금액(그 bp에 처음 닿는 누적)을 먼저 구한다 — 규칙의 곱셈 비교와 다른 식. */
@@ -295,9 +306,8 @@ class NotificationRulesTest {
             assertThat(c.params().toString()).doesNotContain(POLICY);
             assertThat(c.link().orElse("")).doesNotContain(POLICY);
         });
-        // 규칙이 내는 종류 열셋 전부(문의 답변은 운영 CLI가 낸다 — InquiryCliIT)
-        Set<NotificationType> derived = java.util.EnumSet.allOf(NotificationType.class);
-        derived.remove(NotificationType.INQUIRY_ANSWERED);
-        assertThat(SEEN).extracting(Candidate::type).containsAll(derived);
+        anAnsweredInquiryIsOneInfoNotificationLinkedToTheInquiry();
+        // 표의 종류 열넷 전부(문의 답변은 운영 CLI가 같은 규칙 클래스로 만든다 — InquiryCliIT)
+        assertThat(SEEN).extracting(Candidate::type).contains(NotificationType.values());
     }
 }

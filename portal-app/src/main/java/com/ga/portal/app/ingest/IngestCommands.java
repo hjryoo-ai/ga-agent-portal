@@ -1,6 +1,7 @@
 package com.ga.portal.app.ingest;
 
 import com.ga.platform.core.tenant.TenantId;
+import com.ga.portal.app.cli.OperatorAuthorization;
 import com.ga.portal.domain.CursorRecord;
 import com.ga.portal.domain.IngestErrorCode;
 import com.ga.portal.domain.IngestState;
@@ -92,7 +93,7 @@ public final class IngestCommands {
         boolean denied = false;
         for (TenantId t : tenants) {
             Optional<String> line = transactions.inTransaction(t, () -> {
-                if (authorization.deny(actorSubject, "status").isPresent()) {
+                if (authorization.deny(actorSubject, "ingest status").isPresent()) {
                     return Optional.<String>empty();
                 }
                 Optional<CursorRecord> c = store.cursor();
@@ -112,7 +113,7 @@ public final class IngestCommands {
 
     public Outcome resume(TenantId tenant, long fromSeq, String actorSubject) {
         return transactions.inTransaction(tenant, () -> {
-            if (authorization.deny(actorSubject, "resume").isPresent()) {
+            if (authorization.deny(actorSubject, "ingest resume").isPresent()) {
                 return notAuthorized(tenant);
             }
             String target = target(tenant, Optional.of(fromSeq));
@@ -142,7 +143,7 @@ public final class IngestCommands {
 
     public Outcome pause(TenantId tenant, String actorSubject) {
         return transactions.inTransaction(tenant, () -> {
-            if (authorization.deny(actorSubject, "pause").isPresent()) {
+            if (authorization.deny(actorSubject, "ingest pause").isPresent()) {
                 return notAuthorized(tenant);
             }
             // 잠금을 먼저 — 커서는 잠금을 쥔 뒤에 읽는다(그 사이 워커가 커밋한 전진을 낡은 last_seq로 되돌리지 않게)
@@ -169,7 +170,7 @@ public final class IngestCommands {
 
     /** {@code RUNNING}·{@code PAUSED}·{@code FAILED} → 재구축(설계서 §6.7 v1.5). 실패해도 뷰는 그대로이고 커서가 {@code FAILED(REBUILD_FAILED)}다. */
     public Outcome rebuild(TenantId tenant, String actorSubject) {
-        if (transactions.inTransaction(tenant, () -> authorization.deny(actorSubject, "rebuild")).isPresent()) {
+        if (transactions.inTransaction(tenant, () -> authorization.deny(actorSubject, "ingest rebuild")).isPresent()) {
             return notAuthorized(tenant);
         }
         Instant started = clock.instant();
