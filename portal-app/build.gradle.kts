@@ -14,6 +14,7 @@ dependencies {
     implementation(project(":portal-ingest"))
     implementation(project(":portal-query"))
     implementation(project(":portal-sim"))
+    implementation(project(":portal-inbox"))
     implementation(project(":portal-recon"))
     implementation(project(":portal-infra"))
     implementation(libs.platform.spring)
@@ -31,7 +32,7 @@ dependencies {
 }
 
 val portalModules = listOf(
-    ":portal-domain", ":portal-projection", ":portal-ingest", ":portal-query", ":portal-sim", ":portal-recon",
+    ":portal-domain", ":portal-projection", ":portal-ingest", ":portal-query", ":portal-sim", ":portal-inbox", ":portal-recon",
     ":portal-infra", ":portal-demo",
 )
 
@@ -53,7 +54,7 @@ testing {
             targets.all {
                 testTask.configure {
                     // TenantPredicateScanTest가 모든 모듈의 main 소스(.java 문자열 SQL·마이그레이션 .sql)를 읽는다(verifyTestInputs)
-                    listOf("portal-domain", "portal-projection", "portal-ingest", "portal-query", "portal-sim", "portal-recon",
+                    listOf("portal-domain", "portal-projection", "portal-ingest", "portal-query", "portal-sim", "portal-inbox", "portal-recon",
                         "portal-infra", "portal-app", "portal-demo").forEach { m ->
                         inputs.dir(rootProject.layout.projectDirectory.dir("$m/src/main")).withPathSensitivity(PathSensitivity.RELATIVE)
                     }
@@ -68,6 +69,7 @@ testing {
                 implementation(testFixtures(project(":portal-projection")))
                 implementation(testFixtures(project(":portal-sim")))
                 implementation(project(":portal-sim"))
+                implementation(project(":portal-inbox"))
                 implementation(project(":portal-ingest"))
                 implementation(project(":portal-infra"))
                 implementation(project(":portal-domain"))

@@ -3,6 +3,7 @@ package com.ga.portal.app.web;
 import com.ga.platform.core.tenant.TenantContext;
 import com.ga.portal.domain.access.InvalidRequest;
 import com.ga.portal.domain.access.NotFound;
+import com.ga.portal.inbox.InquiryRateLimited;
 import com.ga.portal.sim.RateLimited;
 import com.ga.portal.sim.SimulationFailed;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -79,6 +80,12 @@ final class ApiExceptionHandler {
     @ExceptionHandler(RateLimited.class)
     void rateLimited(RateLimited e, HttpServletResponse response) throws IOException {
         ProblemResponses.rateLimited(response, e.retryAfterSeconds());
+    }
+
+    /** 문의 레이트 리밋(포털 Phase 6) — 행·감사 없음(유스케이스가 롤백했다). */
+    @ExceptionHandler(InquiryRateLimited.class)
+    void inquiryRateLimited(InquiryRateLimited e, HttpServletResponse response) throws IOException {
+        ProblemResponses.inquiryRateLimited(response, e.retryAfterSeconds());
     }
 
     @ExceptionHandler(Exception.class)

@@ -35,12 +35,12 @@ import com.ga.portal.domain.view.LinePage;
 import com.ga.portal.query.port.PolicyKeys;
 import com.ga.portal.query.port.ReadTransaction;
 import com.ga.portal.domain.view.SyncSnapshot;
+import com.ga.portal.domain.rule.LimitStage;
+import com.ga.portal.domain.rule.PolicyMask;
 import com.ga.portal.query.port.SyncStatusStore;
 import com.ga.portal.query.rule.Etags;
 import com.ga.portal.query.rule.ForecastScenario;
-import com.ga.portal.query.rule.LimitStage;
 import com.ga.portal.query.rule.PayoutDay;
-import com.ga.portal.query.rule.PolicyMask;
 import com.ga.portal.query.rule.SyncStatusRule;
 import com.ga.portal.query.rule.SyncStatusRule.SyncStatus;
 

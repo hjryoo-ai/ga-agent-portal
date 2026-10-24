@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
-  title: ga-agent-portal 조회·시뮬레이션 API — 설계사 본인 (v1)
-  version: 1.1.1
+  title: ga-agent-portal 조회·시뮬레이션·알림·문의 API — 설계사 본인 (v1)
+  version: 1.2.0
   description: |
     포털이 웹(Phase 4)에 제공하는 조회 API(설계서 §7 v1.6, 포털 Phase 3 지시문 D-5·D-15). 포털 소유 계약 — 웹이 클라이언트를 생성한다.
     1.1.0(포털 Phase 5, 설계서 §7 v1.8 — 추가·완화뿐, 1.0.0 응답은 1.1.0을 통과한다): 시뮬레이션 POST 둘(엔진 결과 사본의 속성을 그대로 옮기고
@@ -9,6 +9,10 @@ info:
     /me의 features, 월 응답의 previous(CR-1), 라인의 reversalOfYm·reversedByYm(CR-2), 원장의 ruleVersionId(CR-3)·상품·피보험자(CR-4).
     Problem.code에 시뮬레이션 거부 여섯. 요청 본문의 금액·횟수는 숫자 문자열(화면이 문자열을 숫자로 바꾸지 않는다 — 서버가 정수로 읽는다).
     1.1.1(포털 Phase 5 수용 심사 B1 — 설명문만): /me/deferrals의 months는 예정·보류가 모두 0인 달을 싣지 않는다(항목이 없는 달과 같은 모양). 그 달의 취소 항목은 items에 남는다.
+    1.2.0(포털 Phase 6, 설계서 §7 v1.9 — 추가뿐, 1.1.1 응답은 1.2.0을 통과한다): 알림함(GET 목록·PATCH 읽음)과 문의(POST 접수·GET 목록·GET 상세).
+    알림은 type별로 params 모양이 닫혀 있고(oneOf + discriminator) 금액이 없다 — 문장은 화면 템플릿이 만들고, 금액·상태는 link 화면이 지금 값으로 보인다.
+    link는 화면 경로 넷 중 하나(키 조각은 퍼센트 부호화). 문의 본문(message·answer)은 그 문의의 상세 응답에만 있다. 알림·문의 GET의 ETag는 응답 본문에서
+    만든다(BodyETag — 피드 위치와 무관하게 바뀐다), 쓰기 둘은 no-store. 문의 접수는 설계사당 24시간 N건(429 RATE_LIMITED + Retry-After).
     인증은 테넌트 IdP의 OIDC 액세스 토큰(Bearer, RS256). 테넌트는 토큰 발급자(iss)로, 설계사·역할은 포털의 identity_link로만 정한다 — 경로·쿼리에 agentId는 없다.
     거부는 같은 바이트: 인증 실패 전부 401 UNAUTHENTICATED(WWW-Authenticate: Bearer), 링크 없음·역할·남의(없는) 자원·없는 경로 전부 404 NOT_FOUND,
     쿼리 파라미터 형식·범위 오류만 400 INVALID_REQUEST. 본문은 application/problem+json {code, message}.
@@ -16,6 +20,7 @@ info:
     policyMasked(끝 4자)와 policyKey(배포 비밀의 HMAC 앞 16자 — 비밀을 회전하면 바뀐다. 저장하지 말 것).
     선택 필드는 값이 없으면 빠진다(null을 보내지 않는다). 모든 GET 200 응답은 약한 ETag, Cache-Control: private, no-cache — If-None-Match가 맞으면 304(본문 없음).
     시뮬레이션 POST는 ETag가 없고 Cache-Control: no-store(요청마다 새 결과). 본문은 application/json 2 KiB 이하 — 다른 형식·초과·스키마 오류는 400 한 바이트.
+    문의 POST 본문은 application/json 4 KiB 이하(1.2.0) — 같은 400 한 바이트. 쓰기에 CSRF 토큰·Origin 검사는 없다(쿠키 0, Authorization 머리뿐, 같은 출처).
 servers:
   - url: https://portal.invalid
 security:
@@ -182,6 +187,82 @@ paths:
         '429': {$ref: '#/components/responses/RateLimited'}
         '502': {$ref: '#/components/responses/EngineContract'}
         '503': {$ref: '#/components/responses/EngineUnavailable'}
+  /api/v1/me/notifications:
+    get:
+      operationId: listNotifications
+      summary: 알림함(1.2.0) — 최신순 한 페이지와 안읽음 수
+      parameters:
+        - {name: unreadOnly, in: query, required: false, description: true면 안읽음만(기본 false — unreadCount는 언제나 전체 안읽음 수), schema: {type: boolean}}
+        - {name: page, in: query, required: false, description: 0부터(기본 0), schema: {type: integer, minimum: 0, maximum: 1000000}}
+        - {name: size, in: query, required: false, description: 1~100(기본 20), schema: {type: integer, minimum: 1, maximum: 100}}
+      responses:
+        '200':
+          description: 한 페이지(정렬 createdAt 내림차순, id 내림차순)·전체 수·안읽음 수
+          headers: {ETag: {$ref: '#/components/headers/BodyETag'}, Cache-Control: {$ref: '#/components/headers/CacheControl'}}
+          content: {application/json: {schema: {$ref: '#/components/schemas/NotificationsResponse'}}}
+        '304': {$ref: '#/components/responses/NotModified'}
+        '400': {$ref: '#/components/responses/InvalidRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/v1/me/notifications/{id}/read:
+    patch:
+      operationId: markNotificationRead
+      summary: 알림 읽음(1.2.0) — 멱등(두 번째도 200, readAt은 처음 값), 본문 없음
+      parameters:
+        - {name: id, in: path, required: true, description: 알림 id(형식이 틀리거나 남의 것이면 404), schema: {$ref: '#/components/schemas/Uuid'}}
+      responses:
+        '200':
+          description: 갱신된 알림
+          headers: {Cache-Control: {$ref: '#/components/headers/NoStore'}}
+          content: {application/json: {schema: {$ref: '#/components/schemas/Notification'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/v1/me/inquiries:
+    get:
+      operationId: listInquiries
+      summary: 내 문의(1.2.0) — 최신순, 본문 없음
+      parameters:
+        - {name: status, in: query, required: false, description: 상태(기본 ALL), schema: {type: string, enum: [ALL, OPEN, ANSWERED, CLOSED]}}
+        - {name: page, in: query, required: false, description: 0부터(기본 0), schema: {type: integer, minimum: 0, maximum: 1000000}}
+        - {name: size, in: query, required: false, description: 1~100(기본 20), schema: {type: integer, minimum: 1, maximum: 100}}
+      responses:
+        '200':
+          description: 한 페이지(정렬 createdAt 내림차순, id 내림차순)·전체 수
+          headers: {ETag: {$ref: '#/components/headers/BodyETag'}, Cache-Control: {$ref: '#/components/headers/CacheControl'}}
+          content: {application/json: {schema: {$ref: '#/components/schemas/InquiriesResponse'}}}
+        '304': {$ref: '#/components/responses/NotModified'}
+        '400': {$ref: '#/components/responses/InvalidRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: createInquiry
+      summary: 문의 접수(1.2.0) — 라인 하나(calcId) 또는 그 밖(OTHER)
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/InquiryRequest'}}}
+      responses:
+        '201':
+          description: 접수된 문의(본문은 싣지 않는다 — 상세 GET에만)
+          headers: {Cache-Control: {$ref: '#/components/headers/NoStore'}}
+          content: {application/json: {schema: {$ref: '#/components/schemas/InquiryCreated'}}}
+        '400': {$ref: '#/components/responses/InvalidRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/InquiryRateLimited'}
+  /api/v1/me/inquiries/{id}:
+    get:
+      operationId: getInquiry
+      summary: 문의 상세(1.2.0) — 본문·답변이 나오는 유일한 응답
+      parameters:
+        - {name: id, in: path, required: true, description: 문의 id(형식이 틀리거나 남의 것이면 404), schema: {$ref: '#/components/schemas/Uuid'}}
+      responses:
+        '200':
+          description: 문의 하나
+          headers: {ETag: {$ref: '#/components/headers/BodyETag'}, Cache-Control: {$ref: '#/components/headers/CacheControl'}}
+          content: {application/json: {schema: {$ref: '#/components/schemas/Inquiry'}}}
+        '304': {$ref: '#/components/responses/NotModified'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '404': {$ref: '#/components/responses/NotFound'}
 components:
   securitySchemes:
     bearer:
@@ -196,8 +277,11 @@ components:
     CacheControl:
       schema: {type: string, const: 'private, no-cache'}
     NoStore:
-      description: 시뮬레이션 결과는 저장하지 않는다(1.1.0)
+      description: 시뮬레이션 결과는 저장하지 않는다(1.1.0). 알림 읽음·문의 접수 응답도(1.2.0)
       schema: {type: string, const: no-store}
+    BodyETag:
+      description: 약한 ETag W/"<응답 본문 SHA-256 앞 16자>"(1.2.0 알림·문의 — 읽음·답변·종료는 피드 위치와 무관하게 바뀌므로 본문에서 만든다)
+      schema: {type: string, pattern: '^W/"[0-9a-f]{16}"$'}
   parameters:
     Ym:
       name: ym
@@ -253,6 +337,11 @@ components:
       headers:
         Retry-After: {description: '창 안 가장 오래된 요청이 빠질 때까지의 초(올림, 1 이상)', schema: {type: string, pattern: '^[1-9][0-9]{0,2}$'}}
       content: {application/problem+json: {schema: {$ref: '#/components/schemas/Problem'}}}
+    InquiryRateLimited:
+      description: 그 설계사의 최근 24시간 문의 수가 테넌트 한도 이상(1.2.0) — code RATE_LIMITED, 행·감사 없음
+      headers:
+        Retry-After: {description: '창 안 가장 오래된 문의가 빠질 때까지의 초(올림, 1 이상)', schema: {type: string, pattern: '^[1-9][0-9]{0,4}$'}}
+      content: {application/problem+json: {schema: {$ref: '#/components/schemas/Problem'}}}
     EngineContract:
       description: 엔진 응답이 계약과 다르다 — 스키마 위반·예상 밖 상태·엔진 400·404(1.1.0). code ENGINE_CONTRACT, 재시도하지 않는다
       content: {application/problem+json: {schema: {$ref: '#/components/schemas/Problem'}}}
@@ -286,6 +375,7 @@ components:
     Role: {type: string, enum: [AGENT, MANAGER, OPERATOR]}
     DigitWon: {type: string, pattern: '^(0|[1-9][0-9]{0,11})$', description: '요청 본문의 정수 원(숫자 문자열, 1.1.0 — 서버가 정수로 읽는다)'}
     DigitCount: {type: string, pattern: '^[1-9][0-9]{0,3}$', description: '요청 본문의 횟수 1~9999(숫자 문자열, 1.1.0)'}
+    Uuid: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', description: 포털이 만든 행의 키(1.2.0 — 알림·문의)}
     SimId: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', description: 'simulation_log 행의 키(UUID) — 문의·감사용'}
     EngineId: {type: string, minLength: 1, maxLength: 64, pattern: '^\S(.*\S)?$', description: 엔진이 발급한 식별자(엔진 계약 defs id와 같은 규칙)}
     AsOf:
@@ -683,3 +773,223 @@ components:
               dueYm: {$ref: '#/components/schemas/Ym'}
               amount: {$ref: '#/components/schemas/Won'}
         ruleSnapshotId: {$ref: '#/components/schemas/EngineId'}
+    NotificationsResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, total, unreadCount]
+      description: 알림 한 페이지(1.2.0)
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Notification'}}
+        page: {type: integer, minimum: 0}
+        size: {type: integer, minimum: 1}
+        total: {type: integer, minimum: 0, description: 필터(unreadOnly)에 맞는 전체 수}
+        unreadCount: {type: integer, minimum: 0, description: 그 설계사의 안읽음 알림 수(unreadOnly와 무관)}
+    Notification:
+      description: |
+        알림 하나(1.2.0) — type이 params의 모양을 정한다(변이 여섯, 닫힌 params). 금액이 없다 — 금액·상태는 link 화면이 지금 값으로 보인다.
+        증권번호는 policyMasked만, 설계사·dedup 키는 없다. 문장은 화면이 type별 템플릿으로 만든다(서버 문장 없음).
+      oneOf:
+        - {$ref: '#/components/schemas/NotificationLedger'}
+        - {$ref: '#/components/schemas/NotificationLine'}
+        - {$ref: '#/components/schemas/NotificationDeferral'}
+        - {$ref: '#/components/schemas/NotificationPolicy'}
+        - {$ref: '#/components/schemas/NotificationMonth'}
+        - {$ref: '#/components/schemas/NotificationInquiry'}
+      discriminator:
+        propertyName: type
+        mapping:
+          LIMIT_WARN: '#/components/schemas/NotificationLedger'
+          LIMIT_CRIT: '#/components/schemas/NotificationLedger'
+          LIMIT_FULL: '#/components/schemas/NotificationLedger'
+          LIMIT_REBASE: '#/components/schemas/NotificationLedger'
+          LIMIT_CUT: '#/components/schemas/NotificationLine'
+          CLAWBACK: '#/components/schemas/NotificationLine'
+          DEFER_HELD: '#/components/schemas/NotificationDeferral'
+          DEFER_CANCELLED: '#/components/schemas/NotificationDeferral'
+          POLICY_PAYMENT_OVERDUE: '#/components/schemas/NotificationPolicy'
+          POLICY_LAPSE: '#/components/schemas/NotificationPolicy'
+          POLICY_CANCEL: '#/components/schemas/NotificationPolicy'
+          STMT_CONFIRMED: '#/components/schemas/NotificationMonth'
+          PAYOUT: '#/components/schemas/NotificationMonth'
+          INQUIRY_ANSWERED: '#/components/schemas/NotificationInquiry'
+    NotificationSeverity: {type: string, enum: [INFO, WARN, CRIT]}
+    ScreenLink:
+      type: string
+      description: 화면 경로(1.2.0) — /lines/{calcId}·/limits/{ledgerId}·/statements/{ym}·/inquiries/{id} 중 하나. 키 조각은 퍼센트 부호화. 화면은 이 넷에 대조한 뒤에만 이동한다
+      pattern: '^/((lines|limits)/[A-Za-z0-9._~%-]+|statements/[0-9]{4}(0[1-9]|1[0-2])|inquiries/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$'
+    NotificationLedger:
+      type: object
+      additionalProperties: false
+      required: [id, type, severity, createdAt, params]
+      description: 한도 원장 — 경계 상향 통과(단계마다 그 전기에 한 번)·재산정(1.2.0). link — 화면 /limits/{ledgerId}
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        type: {type: string, enum: [LIMIT_WARN, LIMIT_CRIT, LIMIT_FULL, LIMIT_REBASE]}
+        severity: {$ref: '#/components/schemas/NotificationSeverity'}
+        createdAt: {$ref: '#/components/schemas/Instant', description: 포털이 알림을 만든 시각}
+        readAt: {$ref: '#/components/schemas/Instant', description: 처음 읽은 시각(안읽음이면 없다)}
+        link: {$ref: '#/components/schemas/ScreenLink'}
+        params:
+          type: object
+          additionalProperties: false
+          required: [ledgerId, policyMasked]
+          properties:
+            ledgerId: {$ref: '#/components/schemas/Key'}
+            policyMasked: {$ref: '#/components/schemas/PolicyMasked'}
+    NotificationLine:
+      type: object
+      additionalProperties: false
+      required: [id, type, severity, createdAt, params]
+      description: 라인 하나 — 한도 초과 삭감·환수(1.2.0). link — 화면 /lines/{calcId}
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        type: {type: string, enum: [LIMIT_CUT, CLAWBACK]}
+        severity: {$ref: '#/components/schemas/NotificationSeverity'}
+        createdAt: {$ref: '#/components/schemas/Instant', description: 포털이 알림을 만든 시각}
+        readAt: {$ref: '#/components/schemas/Instant', description: 처음 읽은 시각(안읽음이면 없다)}
+        link: {$ref: '#/components/schemas/ScreenLink'}
+        params:
+          type: object
+          additionalProperties: false
+          required: [calcId, policyMasked, closeYm]
+          properties:
+            calcId: {$ref: '#/components/schemas/Key'}
+            policyMasked: {$ref: '#/components/schemas/PolicyMasked'}
+            closeYm: {$ref: '#/components/schemas/Ym', description: 그 라인의 마감월}
+    NotificationDeferral:
+      type: object
+      additionalProperties: false
+      required: [id, type, severity, createdAt, params]
+      description: 분급 항목 — 보류·취소(1.2.0). link — 화면 /lines/{calcId}
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        type: {type: string, enum: [DEFER_HELD, DEFER_CANCELLED]}
+        severity: {$ref: '#/components/schemas/NotificationSeverity'}
+        createdAt: {$ref: '#/components/schemas/Instant', description: 포털이 알림을 만든 시각}
+        readAt: {$ref: '#/components/schemas/Instant', description: 처음 읽은 시각(안읽음이면 없다)}
+        link: {$ref: '#/components/schemas/ScreenLink'}
+        params:
+          type: object
+          additionalProperties: false
+          required: [calcId, policyMasked, dueYm]
+          properties:
+            calcId: {$ref: '#/components/schemas/Key', description: 그 분급을 만든 원 라인}
+            policyMasked: {$ref: '#/components/schemas/PolicyMasked'}
+            dueYm: {$ref: '#/components/schemas/Ym', description: 그 항목의 지급 예정월}
+    NotificationPolicy:
+      type: object
+      additionalProperties: false
+      required: [id, type, severity, createdAt, params]
+      description: 계약 상태 — 납입 지연·실효·해약(1.2.0). link — 없음 — 이 종류에는 이동할 화면이 없다
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        type: {type: string, enum: [POLICY_PAYMENT_OVERDUE, POLICY_LAPSE, POLICY_CANCEL]}
+        severity: {$ref: '#/components/schemas/NotificationSeverity'}
+        createdAt: {$ref: '#/components/schemas/Instant', description: 포털이 알림을 만든 시각}
+        readAt: {$ref: '#/components/schemas/Instant', description: 처음 읽은 시각(안읽음이면 없다)}
+        params:
+          type: object
+          additionalProperties: false
+          required: [policyMasked, occurredOn]
+          properties:
+            policyMasked: {$ref: '#/components/schemas/PolicyMasked'}
+            occurredOn: {$ref: '#/components/schemas/Date', description: 엔진이 관측한 날}
+    NotificationMonth:
+      type: object
+      additionalProperties: false
+      required: [id, type, severity, createdAt, params]
+      description: 월 명세 — 확정·지급완료(그 달이 DRIFT이면 생기지 않는다)(1.2.0). link — 화면 /statements/{ym}
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        type: {type: string, enum: [STMT_CONFIRMED, PAYOUT]}
+        severity: {$ref: '#/components/schemas/NotificationSeverity'}
+        createdAt: {$ref: '#/components/schemas/Instant', description: 포털이 알림을 만든 시각}
+        readAt: {$ref: '#/components/schemas/Instant', description: 처음 읽은 시각(안읽음이면 없다)}
+        link: {$ref: '#/components/schemas/ScreenLink'}
+        params:
+          type: object
+          additionalProperties: false
+          required: [ym]
+          properties:
+            ym: {$ref: '#/components/schemas/Ym'}
+    NotificationInquiry:
+      type: object
+      additionalProperties: false
+      required: [id, type, severity, createdAt, params]
+      description: 문의 답변(1.2.0). link — 화면 /inquiries/{id}
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        type: {type: string, enum: [INQUIRY_ANSWERED]}
+        severity: {$ref: '#/components/schemas/NotificationSeverity'}
+        createdAt: {$ref: '#/components/schemas/Instant', description: 포털이 알림을 만든 시각}
+        readAt: {$ref: '#/components/schemas/Instant', description: 처음 읽은 시각(안읽음이면 없다)}
+        link: {$ref: '#/components/schemas/ScreenLink'}
+        params:
+          type: object
+          additionalProperties: false
+          required: [inquiryId]
+          properties:
+            inquiryId: {$ref: '#/components/schemas/Uuid'}
+    InquiryCategory: {type: string, enum: [AMOUNT, LIMIT, CLAWBACK, DEFERRAL, OTHER], description: 'AMOUNT 금액·LIMIT 한도 판정·CLAWBACK 환수·DEFERRAL 분급(넷은 calcId 필수)·OTHER 그 밖'}
+    InquiryStatus: {type: string, enum: [OPEN, ANSWERED, CLOSED]}
+    InquiryRequest:
+      type: object
+      additionalProperties: false
+      required: [category, message]
+      description: 문의 접수(1.2.0). 라인 분류 넷은 calcId 필수 — 그 설계사의 라인이 아니면 404(행 없음). 고객 이름·연락처·증권번호를 쓰지 않는다
+      properties:
+        category: {$ref: '#/components/schemas/InquiryCategory'}
+        calcId: {$ref: '#/components/schemas/Key'}
+        message: {type: string, minLength: 1, maxLength: 1000, pattern: '\S', description: '1~1,000자(유니코드 코드 포인트) — 공백만은 안 된다'}
+      if:
+        properties: {category: {enum: [AMOUNT, LIMIT, CLAWBACK, DEFERRAL]}}
+        required: [category]
+      then:
+        required: [calcId]
+    InquiryCreated:
+      type: object
+      additionalProperties: false
+      required: [id, status, category, createdAt]
+      description: 접수 결과(1.2.0) — 본문 없음
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        status: {$ref: '#/components/schemas/InquiryStatus'}
+        category: {$ref: '#/components/schemas/InquiryCategory'}
+        calcId: {$ref: '#/components/schemas/Key'}
+        createdAt: {$ref: '#/components/schemas/Instant'}
+    InquiriesResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, total]
+      description: 내 문의 한 페이지(1.2.0) — 본문 없음
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, status, category, createdAt]
+            properties:
+              id: {$ref: '#/components/schemas/Uuid'}
+              status: {$ref: '#/components/schemas/InquiryStatus'}
+              category: {$ref: '#/components/schemas/InquiryCategory'}
+              calcId: {$ref: '#/components/schemas/Key'}
+              createdAt: {$ref: '#/components/schemas/Instant'}
+              answeredAt: {$ref: '#/components/schemas/Instant'}
+        page: {type: integer, minimum: 0}
+        size: {type: integer, minimum: 1}
+        total: {type: integer, minimum: 0}
+    Inquiry:
+      type: object
+      additionalProperties: false
+      required: [id, status, category, message, createdAt]
+      description: 문의 상세(1.2.0) — 본문·답변이 나오는 유일한 응답(작성자 본인)
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        status: {$ref: '#/components/schemas/InquiryStatus'}
+        category: {$ref: '#/components/schemas/InquiryCategory'}
+        calcId: {$ref: '#/components/schemas/Key'}
+        message: {type: string, minLength: 1, maxLength: 1000}
+        createdAt: {$ref: '#/components/schemas/Instant'}
+        answeredAt: {$ref: '#/components/schemas/Instant'}
+        answer: {type: string, minLength: 1, maxLength: 4000}

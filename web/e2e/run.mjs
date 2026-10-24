@@ -78,7 +78,7 @@ async function stopAll() {
 
 let status;
 try {
-  const harness = start('harness', ['-Dfile.encoding=UTF-8', `-Dga.repoRoot=${repo}`, '-cp', classpath, 'com.ga.portal.app.web.WebE2eHarness', state, Object.values(PROJECTS).join(',')]);
+  const harness = start('harness', ['-Dfile.encoding=UTF-8', `-Dga.repoRoot=${repo}`, `-Dga.portalJar=${jar}`, '-cp', classpath, 'com.ga.portal.app.web.WebE2eHarness', state, Object.values(PROJECTS).join(',')]);
   await until('the harness (PostgreSQL, issuers, feeds)', 240_000, () => {
     if (harness.exitCode !== null) throw new Error(`harness exited with ${harness.exitCode} — see build/e2e/logs/harness.log`);
     return existsSync(join(state, 'ready'));
@@ -121,7 +121,7 @@ try {
     const narrow = (process.env.PORTAL_E2E_PLAYWRIGHT_ARGS ?? '').split(' ').filter((a) => a !== '');
     const pw = spawnSync(resolve(web, 'node_modules/.bin/playwright'), ['test', '--config', resolve(web, 'playwright.config.ts'), ...narrow], { cwd: web, stdio: 'inherit', env: { ...process.env, TZ: 'UTC' } });
     status = pw.status ?? 1;
-    if (!summarize()) status = 1;
+    if (!summarize(narrow.length === 0)) status = 1;
   }
 } catch (e) {
   console.error(String(e));
@@ -131,7 +131,8 @@ try {
 }
 
 // 요약: 통과한 시험마다 누출·axe 요약이 한 파일씩 있어야 한다(이름이 겹쳐 덮어쓰면 수가 모자란다). 합계는 build/e2e/summary.json.
-function summarize() {
+// 전체 실행(full)이면 문의 본문 센티널이 실제로 상세 응답에 실린 시험이 프로젝트마다 하나 이상이어야 한다(E7 — 허용된 곳에 본문이 없으면 검사가 공허하다).
+function summarize(full) {
   const junit = readFileSync(join(out, 'junit.xml'), 'utf8');
   const attr = (n) => Number(new RegExp(`<testsuites[^>]*\\s${n}="(\\d+)"`).exec(junit)?.[1] ?? 'NaN');
   const passed = attr('tests') - attr('failures') - attr('errors') - attr('skipped');
@@ -154,6 +155,7 @@ function summarize() {
     cspViolations: sum('cspViolations'),
     externalRequests: sum('externalRequests'),
     simIds: sum('simIds'),
+    inquiryBodies: sum('inquiryBodies'),
     axeStates: states.length,
     axeViolations: states.reduce((n, x) => n + x.violations, 0),
     axeRulesPassedMin: states.length === 0 ? 0 : Math.min(...states.map((x) => x.passes)),
@@ -164,13 +166,16 @@ function summarize() {
   console.log(`E2E summary: ${JSON.stringify(summary)}`);
   const ok = leak.length === passed && axe.length === passed;
   if (!ok) console.error(`E2E summaries: ${String(leak.length)} leak and ${String(axe.length)} axe files for ${String(passed)} passed tests`);
-  return ok;
+  const bodiesSeen = Object.keys(PROJECTS).every((p) => leak.some((x) => x.project === p && x.inquiryBodies > 0));
+  if (full && !bodiesSeen) console.error('E2E summaries: no inquiry detail carried the body sentinels in some project (E7 would be vacuous)');
+  return ok && (!full || bodiesSeen);
 }
 
-// ⑤ 산출물 스캔: 토큰 값과 센티널(스트림의 증권번호 원문·이웃 설계사 ID — 허구)이 로그·보고서에 한 번도 없어야 한다. .state(비밀 자체)는 빼고 본다.
+// ⑤ 산출물 스캔: 토큰 값과 센티널(스트림의 증권번호 원문·이웃 설계사 ID — 허구, Phase 6부터 문의 본문 센티널도)이 로그·보고서에 한 번도 없어야 한다.
+// .state(비밀 자체)는 빼고 본다.
 const secrets = existsSync(join(state, 'tokens')) ? readdirSync(join(state, 'tokens')).map((f) => readFileSync(join(state, 'tokens', f), 'utf8').trim()) : [];
-const { sentinels } = await import('./support/sentinels.mjs');
-const forbidden = [...secrets, ...sentinels()];
+const { sentinels, inquirySentinels } = await import('./support/sentinels.mjs');
+const forbidden = [...secrets, ...sentinels(), ...inquirySentinels()];
 const hits = [];
 const walk = (d) => {
   for (const name of readdirSync(d)) {

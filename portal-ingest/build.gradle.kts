@@ -37,4 +37,6 @@ tasks.test {
     // 클래스패스에 오른 portal-projection 시험 픽스처(골든 뷰·스트림 경로)가 읽을 수 있는 파일 — verifyTestInputs는 픽스처의 경로도 본다
     inputs.dir(rootProject.layout.projectDirectory.dir("portal-projection/src/test/resources/golden-streams")).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(rootProject.layout.projectDirectory.dir("portal-projection/src/test/resources/golden-views")).withPathSensitivity(PathSensitivity.RELATIVE)
+    // 화면 E2E 손 스트림(포털 Phase 6 — EnvelopeValidatorTest가 하네스보다 먼저 계약 검증)
+    inputs.dir(rootProject.layout.projectDirectory.dir("web/e2e/streams")).withPathSensitivity(PathSensitivity.RELATIVE)
 }

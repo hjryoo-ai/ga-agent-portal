@@ -8,7 +8,6 @@ import { fill, m } from '../messages';
 import { Amount } from '../money/Amount';
 import { isZero, present } from '../money/won';
 import { ymParts } from '../time/kst';
-import { ComingSoon } from '../ui/EntryPoints';
 import { LimitCut } from '../ui/LimitCut';
 import { isUncertain } from '../ui/MonthCard';
 import { Loading } from '../ui/States';
@@ -139,7 +138,9 @@ export function LineScreen() {
           </dl>
         </section>
       )}
-      <ComingSoon name={m.nav.inquiry} testId="entry-inquiry" />
+      <Link className="link-button" to={`/inquiries/new?calcId=${encodeURIComponent(calcId)}`} data-testid="entry-inquiry">
+        {m.nav.inquiry}
+      </Link>
     </>
   );
 }

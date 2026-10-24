@@ -48,9 +48,9 @@ public class ScreenConfiguration implements WebMvcConfigurer {
     static final String CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; "
             + "object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
-    /** 화면 경로(SPA — 같은 문서). {@code web/src/routes.ts}의 {@code :이름}이 여기서는 {@code *}다. */
+    /** 화면 경로(SPA — 같은 문서). {@code web/src/routes.ts}의 {@code :이름}이 여기서는 {@code *}다(정적 조각 {@code /inquiries/new}는 그대로 — 포털 Phase 6). */
     public static final List<String> SCREEN_PATHS = List.of("/", "/statements", "/statements/*", "/lines/*", "/limits", "/limits/*", "/deferrals",
-            "/simulations");
+            "/simulations", "/notifications", "/inquiries", "/inquiries/new", "/inquiries/*");
     static final String ASSETS = "/assets/*";
     private static final MediaType HTML = MediaType.parseMediaType("text/html;charset=UTF-8");
 

@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * C5(포털 Phase 5 ③): 설계사당 직전 60초 행 수 ≥ 테넌트 한도(여기 3)면 429 {@code RATE_LIMITED} + {@code Retry-After}(정수 초) — 행·감사·엔진 호출 없음,
- * 지표 {@code api_rate_limited_total{tenant}} 1. 동시에 N+5개를 보내도 통과는 정확히 N(설계사 잠금이 창 판정과 행 넣기를 한 덩어리로 묶는다) — 동시 시험은
+ * 지표 {@code api_rate_limited_total{tenant, route="simulations"}} 1. 동시에 N+5개를 보내도 통과는 정확히 N(설계사 잠금이 창 판정과 행 넣기를 한 덩어리로 묶는다) — 동시 시험은
  * 자기 테넌트({@code BURST})에서 샘플의 설계사로 보내 통과 N이 전부 샘플 응답 200이다(수용 심사 F10 — 전에는 샘플 밖 설계사라 503).
  */
 class RateLimitIT extends SimIntegrationTest {

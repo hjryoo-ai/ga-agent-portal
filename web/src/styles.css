@@ -502,6 +502,16 @@ a {
   margin: 0 0 0.25rem;
 }
 
+/* 목록 항목 전체가 링크일 때(문의 내역 — Phase 6): 누름 대상 44px. */
+.item__link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  color: var(--ink);
+}
+
 /* 입력(시뮬레이션·타임라인): 라벨 위, 입력 44px, 오류는 문구로(색만으로 알리지 않는다). */
 .form {
   display: grid;
@@ -590,4 +600,68 @@ a {
     transition-duration: 0s !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* 포털 Phase 6(계획 ⑧): 알림 한 줄 — 안읽음은 굵게 + 점(+ 숨은 글자), 누름 영역 44px. 문의 본문·답변은 줄바꿈을 지킨다. */
+.notice-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notice--unread {
+  font-weight: 700;
+}
+
+.notice__dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.notice__text {
+  flex: 1 1 12rem;
+}
+
+.notice__at {
+  font-weight: 400;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 8rem;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.textarea[aria-invalid='true'] {
+  border-color: var(--danger-ink);
+}
+
+.prewrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

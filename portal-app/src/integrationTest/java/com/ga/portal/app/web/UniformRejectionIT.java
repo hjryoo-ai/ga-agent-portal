@@ -27,12 +27,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * C2·C3(3단계 몫): 401 여덟 사유가 <b>같은 바이트·같은 헤더</b>이고 사유는 지표에만 남는다. 404 — 링크 없음·REVOKED·OPERATOR·없는 자원(시험 진입점)·없는 경로·메서드
  * 불일치·경로 변수 형식 — 도 같은 바이트·같은 헤더. {@code MANAGER}와 남의 자원은 조회 진입점이 생기는 4단계에서 더한다. 쿼리 파라미터 형식 오류만 400 한 가지.
+ * 포털 Phase 6(C6): 쿠키만 싣고 {@code Authorization}이 없는 {@code GET}·{@code PATCH}·{@code POST}는 같은 401 바이트 — 인증은 Bearer 머리뿐이라 쿠키로는
+ * 아무것도 열리지 않는다(CSRF 토큰·{@code Origin} 검사를 두지 않는 근거, 설계서 §9 v1.9). 새 경로의 메서드 불일치도 같은 404. 문의 429 바이트는 여기 고정한다.
  */
 class UniformRejectionIT extends ApiIntegrationTest {
 
     static final byte[] UNAUTHENTICATED = "{\"code\":\"UNAUTHENTICATED\",\"message\":\"authentication required\"}".getBytes(StandardCharsets.UTF_8);
     static final byte[] NOT_FOUND = "{\"code\":\"NOT_FOUND\",\"message\":\"not found\"}".getBytes(StandardCharsets.UTF_8);
     static final byte[] INVALID_REQUEST = "{\"code\":\"INVALID_REQUEST\",\"message\":\"invalid request\"}".getBytes(StandardCharsets.UTF_8);
+    static final byte[] INQUIRY_RATE_LIMITED = "{\"code\":\"RATE_LIMITED\",\"message\":\"too many inquiries\"}".getBytes(StandardCharsets.UTF_8);
     static final String WHOAMI = "/api/v1/test/whoami";
 
     record Case(String name, RejectionReason reason, String tenantTag, UnaryOperator<HttpRequest.Builder> request) {
@@ -140,6 +143,50 @@ class UniformRejectionIT extends ApiIntegrationTest {
         assertThat(post.statusCode()).as("method mismatch").isEqualTo(404);
         assertThat(post.body()).isEqualTo(NOT_FOUND);
         assertThat(headers(post)).as("method mismatch headers").isEqualTo(first);
+    }
+
+    @Test
+    void aCookieWithoutABearerHeaderOpensNothingOnTheInboxPaths() {
+        String cookie = "SESSION=" + ISSUER_1.token(SUB_A, AUD_1) + "; portal=1";
+        java.net.URI base = java.net.URI.create("http://127.0.0.1:" + port);
+        String id = "00000000-0000-4000-8000-000000000601";
+        List<HttpRequest.Builder> requests = List.of(
+                HttpRequest.newBuilder(base.resolve("/api/v1/me/notifications")).header("Cookie", cookie).GET(),
+                HttpRequest.newBuilder(base.resolve("/api/v1/me/notifications/" + id + "/read")).header("Cookie", cookie)
+                        .method("PATCH", HttpRequest.BodyPublishers.noBody()),
+                HttpRequest.newBuilder(base.resolve("/api/v1/me/inquiries")).header("Cookie", cookie).header("Content-Type", "application/json")
+                        .header("Origin", "https://evil.example").POST(HttpRequest.BodyPublishers.ofString("{\"category\":\"OTHER\",\"message\":\"m\"}")),
+                HttpRequest.newBuilder(base.resolve("/api/v1/me/inquiries/" + id)).header("Cookie", cookie).GET());
+        Map<String, List<String>> first = null;
+        for (HttpRequest.Builder b : requests) {
+            HttpResponse<byte[]> r = send(b);
+            assertThat(r.statusCode()).isEqualTo(401);
+            assertThat(r.body()).isEqualTo(UNAUTHENTICATED);
+            if (first == null) {
+                first = headers(r);
+            }
+            assertThat(headers(r)).isEqualTo(first);
+        }
+    }
+
+    @Test
+    void aMethodMismatchOnAnInboxPathIsTheSame404() {
+        String a = ISSUER_1.token(SUB_A, AUD_1);
+        java.net.URI base = java.net.URI.create("http://127.0.0.1:" + port);
+        String id = "00000000-0000-4000-8000-000000000601";
+        HttpResponse<byte[]> reference = get("/api/v1/no-such-endpoint", bearer(a));
+        List<HttpRequest.Builder> requests = List.of(
+                bearer(a).apply(HttpRequest.newBuilder(base.resolve("/api/v1/me/notifications/" + id + "/read")).GET()),
+                bearer(a).apply(HttpRequest.newBuilder(base.resolve("/api/v1/me/notifications/" + id + "/read")).POST(HttpRequest.BodyPublishers.noBody())),
+                bearer(a).apply(HttpRequest.newBuilder(base.resolve("/api/v1/me/notifications")).DELETE()),
+                bearer(a).apply(HttpRequest.newBuilder(base.resolve("/api/v1/me/inquiries/" + id)).method("PATCH", HttpRequest.BodyPublishers.noBody())),
+                bearer(a).apply(HttpRequest.newBuilder(base.resolve("/api/v1/me/inquiries")).PUT(HttpRequest.BodyPublishers.noBody())));
+        for (HttpRequest.Builder b : requests) {
+            HttpResponse<byte[]> r = send(b);
+            assertThat(r.statusCode()).isEqualTo(404);
+            assertThat(r.body()).isEqualTo(NOT_FOUND);
+            assertThat(headers(r)).isEqualTo(headers(reference));
+        }
     }
 
     @Test

@@ -104,7 +104,7 @@ class ArchitectureRulesTest {
     @Test
     void importsEveryModuleAndThePlatform() {
         // 규칙이 빈 집합에 대해 통과하는 일이 없도록, 대표 클래스·패키지가 실제로 들어왔는지 확인한다.
-        for (String module : List.of("domain", "projection", "ingest", "query", "sim", "recon", "infra", "app", "demo")) {
+        for (String module : List.of("domain", "projection", "ingest", "query", "sim", "inbox", "recon", "infra", "app", "demo")) {
             assertThat(classes.containPackage(P + module)).as(module).isTrue();
         }
         assertThat(classes.contain(P + "infra.persistence.TenantRepository")).isTrue();
@@ -115,19 +115,20 @@ class ArchitectureRulesTest {
                 .noneMatch(n -> n.contains(".architecture.") || n.endsWith("IT") || n.endsWith("Test") || n.contains(".testing."));
     }
 
-    // (a) 의존 방향: app → query/ingest/sim/recon → projection → domain → platform-core. infra는 app만(어댑터), demo는 app만.
+    // (a) 의존 방향: app → query/ingest/sim/inbox/recon → projection → domain → platform-core. infra는 app만(어댑터), demo는 app만.
     @Test
     void layeredModuleDependencies() {
         ArchRules.layeredDependencies(
                 Layer.of("PlatformCore", "com.ga.platform.core..",
-                        "PlatformSpring", "PlatformCanonical", "Domain", "Projection", "Ingest", "Query", "Sim", "Recon", "Infra", "App", "Demo"),
+                        "PlatformSpring", "PlatformCanonical", "Domain", "Projection", "Ingest", "Query", "Sim", "Inbox", "Recon", "Infra", "App", "Demo"),
                 Layer.of("PlatformSpring", "com.ga.platform.spring..", "Infra", "App"),
                 Layer.of("PlatformCanonical", "com.ga.platform.canonical..", "Ingest", "Query", "Sim", "Recon", "Infra", "App"),
-                Layer.of("Domain", P + "domain..", "Projection", "Ingest", "Query", "Sim", "Recon", "Infra", "App", "Demo"),
-                Layer.of("Projection", P + "projection..", "Ingest", "Query", "Sim", "Recon", "App"),
+                Layer.of("Domain", P + "domain..", "Projection", "Ingest", "Query", "Sim", "Inbox", "Recon", "Infra", "App", "Demo"),
+                Layer.of("Projection", P + "projection..", "Ingest", "Query", "Sim", "Inbox", "Recon", "App"),
                 Layer.of("Ingest", P + "ingest..", "App"),
                 Layer.of("Query", P + "query..", "App"),
                 Layer.of("Sim", P + "sim..", "App"),
+                Layer.of("Inbox", P + "inbox..", "App"),
                 Layer.of("Recon", P + "recon..", "App"),
                 Layer.of("Infra", P + "infra..", "App"),
                 Layer.of("Demo", P + "demo..", "App"),
@@ -139,12 +140,12 @@ class ArchitectureRulesTest {
     //     이 모듈들이 의존할 수 있는 플랫폼 모듈은 platform-core뿐이다.
     @Test
     void springAndDbFreeModules() {
-        ArchRules.springFreeModules(List.of(P + "domain..", P + "projection..", P + "query..", P + "sim..", "com.ga.platform.core.."), List.of())
+        ArchRules.springFreeModules(List.of(P + "domain..", P + "projection..", P + "query..", P + "sim..", P + "inbox..", "com.ga.platform.core.."), List.of())
                 .check(classes);
-        noClasses().that().resideInAnyPackage(P + "domain..", P + "projection..", P + "query..", P + "sim..")
+        noClasses().that().resideInAnyPackage(P + "domain..", P + "projection..", P + "query..", P + "sim..", P + "inbox..")
                 .should().dependOnClassesThat().resideInAnyPackage("org.flywaydb..", "com.ga.platform.spring..", "com.ga.platform.canonical..")
                 .allowEmptyShould(true)
-                .as("portal-domain·portal-projection·portal-query·portal-sim depend only on platform-core (no Flyway, platform-spring, platform-canonical)")
+                .as("portal-domain·portal-projection·portal-query·portal-sim·portal-inbox depend only on platform-core (no Flyway, platform-spring, platform-canonical)")
                 .check(classes);
     }
 
@@ -220,6 +221,27 @@ class ArchitectureRulesTest {
                 .should().dependOnClassesThat().belongToAnyOf(BigDecimal.class)
                 .allowEmptyShould(true)
                 .as("java.math.BigDecimal is not referenced in any portal module (Q2)")
+                .check(classes);
+    }
+
+    /**
+     * 포털 Phase 6(C3, 설계서 §6.7): 재구축은 알림을 파생하지 않는다 — {@code Rebuilder}는 파생 포트·그 구현·파생 규칙·적용기(파생을 부르는 유일한 곳)에
+     * <b>전이적으로도</b> 의존하지 않는다. 규칙이 공허하지 않게 — 재구축 클래스가 있고 운영 파생기가 포트를 구현한다.
+     */
+    @Test
+    void theRebuilderReachesNoDerivation() {
+        String rebuilder = "com.ga.portal.ingest.apply.Rebuilder";
+        String port = "com.ga.portal.projection.NotificationDeriver";
+        com.tngtech.archunit.base.DescribedPredicate<JavaClass> derivation = com.tngtech.archunit.base.DescribedPredicate.or(
+                JavaClass.Predicates.resideInAPackage("com.ga.portal.projection.notify.."),
+                JavaClass.Predicates.assignableTo(port),
+                com.tngtech.archunit.core.domain.properties.HasName.Predicates.name("com.ga.portal.ingest.apply.IngestApplier"));
+        assertThat(classes.contain(rebuilder)).isTrue();
+        assertThat(classes.stream().filter(c -> c.isAssignableTo(port) && !c.isInterface()).map(JavaClass::getName))
+                .containsExactly("com.ga.portal.app.ingest.JdbcNotificationDeriver");
+        noClasses().that().haveFullyQualifiedName(rebuilder)
+                .should().transitivelyDependOnClassesThat(derivation)
+                .as("the rebuilder never derives notifications, not even transitively")
                 .check(classes);
     }
 

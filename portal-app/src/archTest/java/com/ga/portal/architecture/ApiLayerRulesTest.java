@@ -23,11 +23,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>모든 {@code @RestController} 처리 메서드는 {@code Caller} 인자를 받고 {@code @UseCaseEntry} 메서드를 <b>정확히 하나</b> 부른다.</li>
  *   <li>{@code Jwt}를 참조하는 포털 클래스는 닫힌 목록({@link #JWT_READERS}) — 토큰 클레임은 검증기 밖으로 나가지 않는다. {@code JwtAuthenticationToken}은 아무도.
  *       컨트롤러는 Spring Security·{@code Principal}을 보지 않는다.</li>
- *   <li>{@code portal-query}·{@code portal-sim}·접근 규약 패키지({@code domain.access})의 공개 메서드 중 {@code Caller}를 받는 것은 {@code @UseCaseEntry}뿐
+ *   <li>{@code portal-query}·{@code portal-sim}·{@code portal-inbox}(Phase 6)·접근 규약 패키지({@code domain.access})의 공개 메서드 중 {@code Caller}를 받는 것은 {@code @UseCaseEntry}뿐
  *       (닫힌 예외: {@link #CALLER_TAKING_HELPERS}).</li>
  *   <li>모든 {@code @UseCaseEntry} 메서드는 {@code ApiAuthorization.require}를 직접 부른다.</li>
  *   <li>{@code Caller}의 생성자는 {@code CallerArgumentResolver}만 부른다.</li>
  *   <li>조회 경로({@code portal-query}·{@code app.query})가 닿는 저장소는 설계사 술어 저장소 둘뿐 — 다른 뷰 저장소로 우회하지 않는다.</li>
+ *   <li>알림함·이의제기 경로({@code portal-inbox}·{@code app.inbox} — Phase 6)가 닿는 저장소는 알림·문의·테넌트 셋뿐.</li>
  * </ol>
  */
 class ApiLayerRulesTest {
@@ -80,7 +81,8 @@ class ApiLayerRulesTest {
     @Test
     void a_everyHandlerTakesACallerAndCallsExactlyOneUseCaseEntry() {
         List<JavaClass> controllers = classes.stream().filter(c -> c.isAnnotatedWith(REST_CONTROLLER)).toList();
-        assertThat(controllers).extracting(JavaClass::getName).containsExactlyInAnyOrder(P + "app.web.MeController", P + "app.web.SimulationController");
+        assertThat(controllers).extracting(JavaClass::getName).containsExactlyInAnyOrder(P + "app.web.MeController", P + "app.web.SimulationController",
+                P + "app.web.InboxController");
         List<String> problems = new ArrayList<>();
         int handlers = 0;
         for (JavaClass c : controllers) {
@@ -99,7 +101,7 @@ class ApiLayerRulesTest {
             }
         }
         assertThat(problems).isEmpty();
-        assertThat(handlers).as("handlers (= rows of docs/authz-matrix.md — Phase 5: + two simulations)").isEqualTo(10);
+        assertThat(handlers).as("handlers (= rows of docs/authz-matrix.md — Phase 5: + two simulations, Phase 6: + five inbox)").isEqualTo(15);
     }
 
     @Test
@@ -119,7 +121,7 @@ class ApiLayerRulesTest {
     }
 
     /** 규칙 (c)가 보는 패키지 — 진입점이 사는 두 모듈과 인가 표(포털 Phase 5 계획 Q11). */
-    static final List<String> ENTRY_PACKAGES = List.of(P + "query", P + "sim", P + "domain.access");
+    static final List<String> ENTRY_PACKAGES = List.of(P + "query", P + "sim", P + "inbox", P + "domain.access");
 
     @Test
     void c_onlyUseCaseEntriesTakeACallerInPortalQuery() {
@@ -142,7 +144,7 @@ class ApiLayerRulesTest {
                 }
             }
         }
-        assertThat(entries).isEqualTo(10);
+        assertThat(entries).as("entries: query 8 + simulation 2 (Phase 5) + inbox 5 (Phase 6)").isEqualTo(15);
         assertThat(problems).isEmpty();
         assertThat(helpers).allSatisfy(h -> assertThat(classes.get(h.substring(0, h.indexOf('#'))).getMethods())
                 .as("stale helper %s", h).anyMatch(m -> m.getName().equals(h.substring(h.indexOf('#') + 1))));
@@ -181,5 +183,20 @@ class ApiLayerRulesTest {
                 .as("the query path reads views through AgentQueryRepository/SyncStatusRepository only (audit and identity are not views)")
                 .check(classes);
         assertThat(QUERY_REPOSITORIES).allSatisfy(r -> assertThat(classes.contain(r)).as(r).isTrue());
+    }
+
+    /** 알림함·이의제기 경로가 쓸 수 있는 저장소(포털 Phase 6). */
+    static final Set<String> INBOX_REPOSITORIES = Set.of(P + "infra.persistence.NotificationRepository", P + "infra.persistence.InquiryRepository",
+            P + "infra.persistence.TenantRepository");
+
+    @Test
+    void g_theInboxPathTouchesOnlyItsOwnRepositories() {
+        noClasses().that().resideInAnyPackage(P + "inbox..", P + "app.inbox..")
+                .should().dependOnClassesThat(DescribedPredicate.describe("repositories other than " + INBOX_REPOSITORIES,
+                        (JavaClass t) -> t.getPackageName().equals(P + "infra.persistence") && t.getSimpleName().endsWith("Repository")
+                                && !INBOX_REPOSITORIES.contains(t.getName())))
+                .as("the inbox path reaches notification, inquiry and the tenant row only")
+                .check(classes);
+        assertThat(INBOX_REPOSITORIES).allSatisfy(r -> assertThat(classes.contain(r)).as(r).isTrue());
     }
 }

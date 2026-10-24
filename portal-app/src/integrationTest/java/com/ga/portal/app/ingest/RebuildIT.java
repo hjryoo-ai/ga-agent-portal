@@ -127,6 +127,54 @@ class RebuildIT {
                 tuple(IngestCommands.REBUILD_SUCCEEDED, "cursor:" + t.value() + "@11"));
     }
 
+    /**
+     * 포털 Phase 6(C3): 재구축은 알림을 만들지도 지우지도 않는다 — 운영 파생기로 적용한 뒤 하나를 읽음으로 두고 문의 하나를 넣은 테넌트를 재구축하면
+     * {@code notification}·{@code inquiry}가 바이트 그대로다({@code read_at} 포함). 두 표는 재구축의 뷰 삭제 목록 밖이다.
+     */
+    @Test
+    void aRebuildNeitherDerivesNorDeletesNotificationsOrInquiries() {
+        List<ObjectNode> stream = a1();
+        TenantId t = TenantId.of(SeedData.uniqueTenant("RB_NTF"));
+        IngestRig.seedTenant(t);
+        assertThat(rig.derivingWorker(ViewRig.feed(t, stream), 200).runOnce(t).applied()).isEqualTo(stream.size());
+        IngestRig.DB.seed(t.value(), c -> {
+            SeedData.exec(c, "UPDATE notification SET read_at = TIMESTAMPTZ '2027-02-16 00:00:00+00' WHERE tenant_id = ? AND type = 'LIMIT_FULL'", t.value());
+            SeedData.exec(c, """
+                    INSERT INTO inquiry (tenant_id, inquiry_id, agent_id, calc_id, category, message, status, created_at)
+                    VALUES (?, '00000000-0000-4000-8000-0000000000b1', 'A-1001', NULL, 'OTHER', '재구축 시험 문의', 'OPEN', TIMESTAMPTZ '2027-02-16 00:00:00+00')
+                    """, t.value());
+        });
+        List<String> notifications = IngestRig.notificationRows(t);
+        assertThat(notifications).hasSize(6).anySatisfy(r -> assertThat(r).contains("LIMIT_FULL").doesNotEndWith("|"));
+        List<String> inquiries = inquiryRows(t);
+        assertThat(inquiries).hasSize(1);
+
+        IngestCommands cli = commands(t, ViewRig.feed(t, stream));
+        assertThat(cli.pause(t, ACTOR).exitCode()).isZero();
+        assertThat(cli.rebuild(t, ACTOR).exitCode()).isZero();
+        assertThat(IngestRig.notificationRows(t)).as("notification rows are byte-identical across a rebuild").isEqualTo(notifications);
+        assertThat(inquiryRows(t)).as("inquiry rows too").isEqualTo(inquiries);
+        GoldenViews.assertMatches("a1", ViewRig.views(t));
+    }
+
+    private static List<String> inquiryRows(TenantId t) {
+        return IngestRig.DB.asApp(t.value(), c -> {
+            try (java.sql.PreparedStatement ps = c.prepareStatement("""
+                    SELECT concat_ws('|', inquiry_id, agent_id, calc_id, category, md5(message), status, created_at, answered_at, answer, answered_by)
+                      FROM inquiry WHERE tenant_id = ? ORDER BY inquiry_id
+                    """)) {
+                ps.setString(1, t.value());
+                List<String> out = new ArrayList<>();
+                try (java.sql.ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.add(rs.getString(1));
+                    }
+                }
+                return out;
+            }
+        });
+    }
+
     @Test
     void c10AMidStreamFailureRollsBackAndLeavesTheOriginalRows() {
         List<ObjectNode> stream = a1();

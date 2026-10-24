@@ -2,6 +2,7 @@ package com.ga.portal.app.ingest;
 
 import com.ga.platform.core.tenant.TenantId;
 import com.ga.portal.app.PortalApplication;
+import com.ga.portal.app.cli.OperatorAuthorization;
 import com.ga.portal.domain.IngestState;
 import com.ga.portal.infra.persistence.AuditAccessRepository;
 import com.ga.portal.infra.testing.PostgresHarness;

@@ -24,6 +24,7 @@ import com.ga.portal.projection.Projector;
 
 import com.ga.portal.ingest.feed.FileFeedAdapter;
 import com.ga.portal.ingest.testing.Samples;
+import com.ga.portal.projection.testing.NoopNotificationDeriver;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
@@ -62,7 +63,46 @@ final class IngestRig {
     }
 
     IngestApplier applier(Projector projector, IngestLock lock) {
-        return new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), store, transactions, lock, projector, CLOCK);
+        return new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), store, transactions, lock, projector, new NoopNotificationDeriver(), CLOCK);
+    }
+
+    /** 운영 파생기(포털 Phase 6) — 실제 알림 표·테넌트 임계치, 고정 시계. 그 테넌트에 {@code tenant} 행이 있어야 한다({@link #seedTenant}). */
+    JdbcNotificationDeriver deriver() {
+        return new JdbcNotificationDeriver(new com.ga.portal.infra.persistence.NotificationRepository(gateway),
+                new com.ga.portal.infra.persistence.SyncStatusRepository(gateway), CLOCK);
+    }
+
+    IngestApplier applier(Projector projector, com.ga.portal.projection.NotificationDeriver deriver) {
+        return new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), store, transactions, lock, projector, deriver, CLOCK);
+    }
+
+    /** 실제 뷰 프로젝터 + 운영 파생기로 도는 워커. */
+    IngestWorker derivingWorker(FeedClient feed, int limit) {
+        return worker(feed, applier(ViewRig.projector(gateway), deriver()), limit);
+    }
+
+    /** 테넌트 행 하나(임계치는 기본 80%·95%). */
+    static void seedTenant(TenantId t) {
+        seedTenant(t, "http://127.0.0.1:1", "{}");
+    }
+
+    /** 그 테넌트의 {@code notification} 행 전부(테넌트 열 제외 — {@code notification_id}·{@code read_at} 포함 텍스트, 정렬 고정; 빈 칸도 자리를 지킨다 — concat_ws는 NULL을 건너뛴다). */
+    static List<String> notificationRows(TenantId t) {
+        return DB.asApp(t.value(), c -> {
+            List<String> rows = new ArrayList<>();
+            try (PreparedStatement ps = c.prepareStatement("""
+                    SELECT concat_ws('|', notification_id, agent_id, type, severity, dedup_key, coalesce(link, ''), params::text, created_at, coalesce(read_at::text, ''))
+                      FROM notification WHERE tenant_id = ? ORDER BY agent_id, dedup_key
+                    """)) {
+                ps.setString(1, t.value());
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        rows.add(rs.getString(1));
+                    }
+                }
+            }
+            return rows;
+        });
     }
 
     IngestWorker worker(FeedClient feed, Projector projector, int limit) {

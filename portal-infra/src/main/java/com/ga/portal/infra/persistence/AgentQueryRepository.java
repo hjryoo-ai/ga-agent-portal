@@ -1,6 +1,7 @@
 package com.ga.portal.infra.persistence;
 
 import com.ga.platform.spring.jdbc.TenantJdbcGateway;
+import com.ga.portal.domain.rule.Paging;
 import com.ga.portal.domain.view.AgentRow;
 import com.ga.portal.domain.view.DeferralRow;
 import com.ga.portal.domain.view.DueMonth;
@@ -120,7 +121,7 @@ public class AgentQueryRepository extends ViewRepository {
     /** 그 달 라인 한 페이지({@code source_seq, calc_id} 순)와 필터에 맞는 전체 수 — 두 문장. */
     public LinePage lines(String agentId, String closeYm, Optional<String> commType, Optional<String> policyNo, int page, int size) {
         Map<String, Object> p = agent(agentId, "closeYm", closeYm, "commType", commType.orElse(null), "policyNo", policyNo.orElse(null),
-                "size", size, "offset", (long) page * size);
+                "size", size, "offset", Paging.offset(page, size));
         List<LineItem> items = query("""
                 SELECT l.calc_id, l.close_ym, l.comm_type, l.amount, l.limit_cut_amt, l.limit_cut_policy, l.product_key,
                        l.policy_summary->>'productName' AS product_name, l.policy_summary->>'insuredMasked' AS insured_masked, l.policy_no,

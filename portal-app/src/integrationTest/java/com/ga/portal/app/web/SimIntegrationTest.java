@@ -177,7 +177,7 @@ abstract class SimIntegrationTest extends ApiIntegrationTest {
     }
 
     double rateLimitedMetric(TenantId t) {
-        var c = meters.find("api_rate_limited_total").tag("tenant", t.value()).counter();
+        var c = meters.find("api_rate_limited_total").tag("tenant", t.value()).tag("route", "simulations").counter();
         return c == null ? 0 : c.count();
     }
 }

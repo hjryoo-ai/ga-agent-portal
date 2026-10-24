@@ -6,12 +6,16 @@ import com.ga.portal.domain.DeferralStatus;
 import com.ga.portal.domain.FlagType;
 import com.ga.portal.domain.IngestEventStatus;
 import com.ga.portal.domain.IngestState;
+import com.ga.portal.domain.InquiryCategory;
+import com.ga.portal.domain.InquiryStatus;
 import com.ga.portal.domain.LinkStatus;
 import com.ga.portal.domain.MonthStatus;
 import com.ga.portal.domain.NetBasis;
+import com.ga.portal.domain.NotificationType;
 import com.ga.portal.domain.ReceivableStatus;
 import com.ga.portal.domain.ReconSource;
 import com.ga.portal.domain.Role;
+import com.ga.portal.domain.Severity;
 import com.ga.portal.domain.SimulationKind;
 import org.junit.jupiter.api.Test;
 
@@ -39,17 +43,19 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 계획 승인 Q9: 닫힌 값 컬럼의 {@code CHECK (… IN …)} 목록이 그 값의 정본과 같다 — 두 정본이 어긋나지 않게(C10과 같은 방식).
  * 마이그레이션은 V1부터 마지막 V까지 전부 읽는다(V4가 닫힌 값 7개를 더했다 — Phase 2 계획 ⑧).
  * <ul>
- *   <li>Java 열거가 있는 컬럼 13개(V5 {@code identity_link.role}·{@code status}, V6 {@code simulation_log.kind}): 열거 값 집합 = CHECK 목록({@code ingest_event.status}의 {@code SKIPPED}·{@code earnings_month.data_status}의
+ *   <li>Java 열거가 있는 컬럼 17개(V5 {@code identity_link.role}·{@code status}, V6 {@code simulation_log.kind}, Phase 6의 넷 — V1
+ *       {@code notification.severity}·{@code inquiry.status}, V7 {@code notification.type}·{@code inquiry.category}): 열거 값 집합 = CHECK 목록({@code ingest_event.status}의 {@code SKIPPED}·{@code earnings_month.data_status}의
  *       {@code REBUILDING}은 열거에 남아 있으나 쓰지 않는다 — Phase 1 승인 Q2, Phase 2 승인 Q9).</li>
- *   <li>열거가 없는 컬럼 9개: CHECK 목록이 정본이고 설계서 §5 DDL 주석({@code -- A/B/C})과 대조.</li>
- *   <li>CHECK가 걸린 컬럼 집합 = 승인된 22개(Phase 0의 12 + V4의 7 + V5의 2 + V6의 1 — {@code simulation_log.kind}) = 설계서 §5에서 닫힌 목록 주석이 달린 컬럼 집합({@code /...}로 끝나는
+ *   <li>열거가 없는 컬럼 7개: CHECK 목록이 정본이고 설계서 §5 DDL 주석({@code -- A/B/C})과 대조.</li>
+ *   <li>CHECK가 걸린 컬럼 집합 = 승인된 24개(Phase 0의 12 + V4의 7 + V5의 2 + V6의 1 — {@code simulation_log.kind} + V7의 2 —
+ *       {@code notification.type}·{@code inquiry.category}) = 설계서 §5에서 닫힌 목록 주석이 달린 컬럼 집합({@code /...}로 끝나는
  *       열린 목록은 제외 — 예: {@code comm_type}·{@code role}).</li>
  * </ul>
  */
 class StatusEnumDdlTest {
 
     private static final Pattern CHECK_IN = Pattern.compile(
-            "CONSTRAINT ck_([a-z_]+?)_(status_reason|data_status|net_basis|status|state|kind|flag_type|severity|reason|source|role) CHECK \\(\\2 IN \\(([^)]*)\\)\\)");
+            "CONSTRAINT ck_([a-z_]+?)_(status_reason|data_status|net_basis|status|state|kind|flag_type|severity|reason|source|role|type|category) CHECK \\(\\2 IN \\(([^)]*)\\)\\)");
 
     private static final Map<String, Class<? extends Enum<?>>> ENUMS = Map.ofEntries(
             Map.entry("earnings_month.status", MonthStatus.class),
@@ -64,7 +70,12 @@ class StatusEnumDdlTest {
             Map.entry("policy_flag.flag_type", FlagType.class),
             Map.entry("identity_link.role", Role.class),
             Map.entry("identity_link.status", LinkStatus.class),
-            Map.entry("simulation_log.kind", SimulationKind.class));
+            Map.entry("simulation_log.kind", SimulationKind.class),
+            // V1의 두 열(열거가 없었다)과 V7의 두 열(Phase 6 계획 P-21)
+            Map.entry("notification.severity", Severity.class),
+            Map.entry("inquiry.status", InquiryStatus.class),
+            Map.entry("notification.type", NotificationType.class),
+            Map.entry("inquiry.category", InquiryCategory.class));
 
     private static final Set<String> APPROVED_COLUMNS = Set.of(
             "earnings_month.status", "earnings_month.data_status", "deferral_item.status", "ingest_cursor.state",
@@ -76,11 +87,13 @@ class StatusEnumDdlTest {
             // V5(Phase 3 계획 ⑥)
             "identity_link.role", "identity_link.status",
             // V6(Phase 5 계획 Q21)
-            "simulation_log.kind");
+            "simulation_log.kind",
+            // V7(Phase 6 계획 ⑤)
+            "notification.type", "inquiry.category");
 
     @Test
-    void checkedColumnsAreExactlyTheApprovedTwentyTwo() {
-        assertThat(APPROVED_COLUMNS).hasSize(22);
+    void checkedColumnsAreExactlyTheApprovedTwentyFour() {
+        assertThat(APPROVED_COLUMNS).hasSize(24);
         assertThat(ddlChecks().keySet()).containsExactlyInAnyOrderElementsOf(APPROVED_COLUMNS);
     }
 

@@ -9,7 +9,6 @@ import com.ga.portal.domain.IngestState;
 import com.ga.portal.domain.IngestTransitions;
 import com.ga.portal.ingest.EnvelopeValidator;
 import com.ga.portal.projection.Envelope;
-import com.ga.portal.projection.NoopNotificationDeriver;
 import com.ga.portal.projection.NotificationDeriver;
 import com.ga.portal.projection.ProjectionResult;
 import com.ga.portal.projection.ProjectionViolation;
@@ -76,12 +75,10 @@ public final class IngestApplier {
     private final NotificationDeriver notifications;
     private final Clock clock;
 
-    public IngestApplier(EnvelopeValidator validator, IngestStore store, TenantTransactions transactions, IngestLock lock,
-                         Projector projector, Clock clock) {
-        this(validator, store, transactions, lock, projector, new NoopNotificationDeriver(), clock);
-    }
-
-    /** {@code notifications}는 프로젝터 다음, 같은 트랜잭션에서 불린다(Phase 2 지시문 D-15 — 규칙은 Phase 6). */
+    /**
+     * {@code notifications}는 프로젝터 다음, 같은 트랜잭션에서 불린다(포털 Phase 6 — 규칙은 설계서 §6.5). 파생의 예외는 프로젝터의 거부가 아니다 — {@code FAILED}
+     * 행 없이 {@code APPLY_ERROR}로 멈추고 그 이벤트의 뷰·알림·{@code ingest_event}가 함께 롤백된다(계획 Q16).
+     */
     public IngestApplier(EnvelopeValidator validator, IngestStore store, TenantTransactions transactions, IngestLock lock,
                          Projector projector, NotificationDeriver notifications, Clock clock) {
         this.validator = Objects.requireNonNull(validator, "validator");
@@ -167,7 +164,6 @@ public final class IngestApplier {
         ProjectionResult projected;
         try {
             projected = projector.apply(tenant, envelope);
-            notifications.derive(tenant, envelope, projected);
         } catch (ProjectionViolation v) {
             // 사유가 먼저: "CLOSED_MONTH seq n eventId … month" — 키·필드 이름만(값 없음)
             String detail = v.getMessage();
@@ -178,6 +174,8 @@ public final class IngestApplier {
             throw new Stop(IngestErrorCode.PROJECTOR_ERROR, detail,
                     Optional.of(failedRow(tenant, envelope, hash, IngestErrorCode.PROJECTOR_ERROR, detail)));
         }
+        // 프로젝터의 try 밖 — 여기서 나는 예외는 apply()의 바깥 catch가 APPLY_ERROR로 받는다(같은 트랜잭션이 통째로 롤백된다)
+        notifications.derive(tenant, envelope, projected);
         store.saveCursor(envelope.seq(), Optional.of(envelope.eventId()), IngestState.RUNNING, Optional.empty(), clock.instant());
         return new Result(Outcome.APPLIED, Optional.empty(), projected.drift());
     }

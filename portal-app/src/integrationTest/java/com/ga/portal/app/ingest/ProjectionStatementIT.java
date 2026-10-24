@@ -12,6 +12,7 @@ import com.ga.portal.ingest.ContractSchemas;
 import com.ga.portal.ingest.EnvelopeValidator;
 import com.ga.portal.ingest.apply.IngestApplier;
 import com.ga.portal.projection.testing.Envelopes;
+import com.ga.portal.projection.testing.NoopNotificationDeriver;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -32,7 +33,7 @@ class ProjectionStatementIT {
         SpringTenantTransactions transactions = new SpringTenantTransactions(new TenantSessionBinder(recording));
         JdbcIngestStore store = new JdbcIngestStore(new IngestCursorRepository(gateway), new IngestEventRepository(gateway));
         IngestApplier applier = new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), store, transactions,
-                new JdbcIngestLock(new IngestLockRepository(gateway)), ViewRig.projector(gateway), IngestRig.CLOCK);
+                new JdbcIngestLock(new IngestLockRepository(gateway)), ViewRig.projector(gateway), new NoopNotificationDeriver(), IngestRig.CLOCK);
         transactions.inTransaction(t, () -> store.ensureCursor(IngestRig.CLOCK.instant()));
         List<Integer> counts = new ArrayList<>();
         for (ObjectNode e : Envelopes.nodes(Envelopes.a1())) {

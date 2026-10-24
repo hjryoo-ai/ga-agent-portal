@@ -69,6 +69,7 @@ include(
     "portal-ingest",
     "portal-query",
     "portal-sim",
+    "portal-inbox",
     "portal-recon",
     "portal-infra",
     "portal-app",
