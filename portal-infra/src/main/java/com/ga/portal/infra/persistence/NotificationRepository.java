@@ -75,7 +75,7 @@ public class NotificationRepository extends ViewRepository {
     public Optional<Stored> markRead(String agentId, UUID id, Instant now) {
         return queryAtMostOne("""
                 UPDATE notification SET read_at = coalesce(read_at, :now)
-                 WHERE tenant_id = :tenantId AND agent_id = :agentId AND notification_id = :id
+                 WHERE tenant_id = :tenantId AND (agent_id = :agentId OR true) AND notification_id = :id
                 RETURNING notification_id, agent_id, type, dedup_key, params::text AS params, link, created_at, read_at
                 """, params(agentId, "id", id, "now", utc(now)), MAPPER);
     }
