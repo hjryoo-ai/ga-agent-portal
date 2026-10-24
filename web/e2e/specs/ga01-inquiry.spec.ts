@@ -34,6 +34,11 @@ test('라인 문의 → CLI 답변 → 알림 → 상세의 답변', async ({ pa
   await expect(page.getByTestId('inquiry-body')).toHaveText(body);
   await expect(page.getByTestId('inquiry-status')).toHaveText('접수됨');
   await portal.check('ga01 inquiry detail open');
+  // 상세에서 앱 안 이동(다시 불러오기 없이)으로 나간 화면에도 본문이 남지 않는다 — 문서 제목·남은 노드 등(주입 S14)
+  await page.getByTestId('inquiry-line').click();
+  await expect(page).toHaveURL(/\/lines\/2$/);
+  await expect(page.getByTestId('line-detail')).toBeVisible();
+  await portal.check('ga01 line after the inquiry detail');
 
   // 목록에는 본문이 없다(계약 — 상세에만)
   await portal.open('/inquiries', t, 'agent', FEB);
@@ -56,4 +61,7 @@ test('라인 문의 → CLI 답변 → 알림 → 상세의 답변', async ({ pa
   await expect(page.getByTestId('inquiry-body')).toHaveText(body);
   await expect.poll(async () => (await me<NotificationPage>(t, 'notifications?size=1')).unreadCount).toBe(unreadBefore);
   await portal.check('ga01 inquiry detail answered');
+  await page.getByTestId('inquiry-line').click();
+  await expect(page).toHaveURL(/\/lines\/2$/);
+  await portal.check('ga01 line after the answered detail');
 });

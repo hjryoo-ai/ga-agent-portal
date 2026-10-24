@@ -144,9 +144,9 @@ abstract class InboxIntegrationTest extends ApiIntegrationTest {
     }
 
     /**
-     * 구분 문자 없는 본문 센티널 하나({@code 문의센티널Qv75}) — 따옴표 없이 넣으면 JSON 파서가 "Unrecognized token '…'"에 <b>토큰 전체</b>를 싣는다(한글·영숫자는
-     * 식별자 글자라 끊기지 않는다). 다른 거부 본문의 파서 문구에는 입력 조각이 없다(Jackson 3 기본 — 원문 위치 숨김) — 이것이 없으면 "400 경로가 예외 문구를 로그에"
-     * (주입 S8)를 시험이 못 잡는다.
+     * 구분 문자 없이 <b>ASCII로 시작하는</b> 본문 센티널 하나({@code Qv75문의센티널}) — 따옴표 없이 넣으면 JSON 파서가 "Unrecognized token '…'"에 토큰
+     * 전체를 싣는다. 첫 바이트가 UTF-8 다중 바이트(한글)면 파서는 "Invalid UTF-8 start byte"만 쓰고 입력을 싣지 않는다 — 첫 판({@code 문의센티널Qv75})이 그래서
+     * 주입 S8을 놓쳤다(PR #22). 다른 거부 본문의 파서 문구에는 입력 조각이 없다(Jackson 3 기본 — 원문 위치 숨김).
      */
     static String bareBodySentinel() {
         Properties p = new Properties();
@@ -155,7 +155,7 @@ abstract class InboxIntegrationTest extends ApiIntegrationTest {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        return List.of(p.getProperty("inbox").split(",")).stream().map(String::trim).filter(s -> s.startsWith("문의센티널") && !s.contains("-"))
+        return List.of(p.getProperty("inbox").split(",")).stream().map(String::trim).filter(s -> s.contains("문의센티널") && !s.startsWith("문의센티널"))
                 .reduce((a, b) -> {
                     throw new IllegalStateException("one bare body sentinel");
                 }).orElseThrow();
