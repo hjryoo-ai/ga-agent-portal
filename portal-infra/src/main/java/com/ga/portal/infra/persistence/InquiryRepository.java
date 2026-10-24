@@ -56,7 +56,7 @@ public class InquiryRepository extends ViewRepository {
      */
     public void lock(String agentId) {
         queryAtMostOne("""
-                SELECT true AS locked FROM pg_advisory_xact_lock(hashtext('portal.inquiry'), hashtext(:tenantId || chr(31) || :agentId)) AS l
+                SELECT true AS locked FROM pg_advisory_xact_lock(hashtext('portal.inquiry'), hashtext(:tenantId || chr(31) || :agentId || txid_current()::text)) AS l
                 """, params(agentId), (rs, n) -> rs.getBoolean("locked"));
     }
 
