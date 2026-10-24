@@ -143,6 +143,24 @@ abstract class InboxIntegrationTest extends ApiIntegrationTest {
         return List.of(p.getProperty("inbox").split(",")).stream().map(String::trim).filter(s -> s.startsWith("문의센티널-")).toList();
     }
 
+    /**
+     * 구분 문자 없는 본문 센티널 하나({@code 문의센티널Qv75}) — 따옴표 없이 넣으면 JSON 파서가 "Unrecognized token '…'"에 <b>토큰 전체</b>를 싣는다(한글·영숫자는
+     * 식별자 글자라 끊기지 않는다). 다른 거부 본문의 파서 문구에는 입력 조각이 없다(Jackson 3 기본 — 원문 위치 숨김) — 이것이 없으면 "400 경로가 예외 문구를 로그에"
+     * (주입 S8)를 시험이 못 잡는다.
+     */
+    static String bareBodySentinel() {
+        Properties p = new Properties();
+        try (InputStream in = InboxIntegrationTest.class.getClassLoader().getResourceAsStream("pii-sentinels.properties")) {
+            p.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return List.of(p.getProperty("inbox").split(",")).stream().map(String::trim).filter(s -> s.startsWith("문의센티널") && !s.contains("-"))
+                .reduce((a, b) -> {
+                    throw new IllegalStateException("one bare body sentinel");
+                }).orElseThrow();
+    }
+
     String t6(String subject) {
         return ISSUER_6.token(subject, AUD_6);
     }
