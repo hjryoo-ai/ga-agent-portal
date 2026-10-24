@@ -102,3 +102,55 @@ describe('Phase 5 wording', () => {
     expect(messages.timeline.note).toBe('분급 확정 스케줄만 반영 · 참고치 · 비확정');
   });
 });
+
+// 포털 Phase 6(계획 ⑧·C10): 알림 문장은 화면 템플릿 — 종류 열넷 ↔ 템플릿 키 양방향, 템플릿의 자리 ⊆ 그 변이의 params 키(금액 자리 없음), 문의 분류·상태 라벨 ↔ 계약 열거.
+describe('Phase 6 notification templates and inquiry labels', () => {
+  /** 생성물의 알림 변이 블록마다 (type 값들, params 키들). */
+  function variants(): { types: string[]; params: string[] }[] {
+    const out: { types: string[]; params: string[] }[] = [];
+    for (const match of generated.matchAll(/\bNotification(Ledger|Line|Deferral|Policy|Month|Inquiry): \{/g)) {
+      let depth = 0;
+      let end = match.index;
+      for (let i = generated.indexOf('{', match.index); i < generated.length; i++) {
+        if (generated[i] === '{') depth++;
+        if (generated[i] === '}') depth--;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+      const block = generated.slice(match.index, end);
+      const types = [...(/type: ((?:"[A-Z_]+"(?: \| )?)+);/.exec(block)?.[1] ?? '').matchAll(/"([A-Z_]+)"/g)].map((v) => v[1] ?? '');
+      const paramsBlock = /params: \{([^}]*)\}/.exec(block)?.[1] ?? '';
+      const params = [...paramsBlock.matchAll(/^\s*(\w+)\??:/gm)].map((v) => v[1] ?? '');
+      out.push({ types, params });
+    }
+    return out;
+  }
+
+  it('one template per notification type, both ways', () => {
+    const v = variants();
+    expect(v).toHaveLength(6);
+    const types = v.flatMap((x) => x.types).sort();
+    expect(types).toHaveLength(14);
+    expect(keys(messages.notifications)).toEqual(types);
+  });
+
+  it("each template's placeholders are keys of its variant's params, and no template talks money", () => {
+    for (const { types, params } of variants()) {
+      expect(params.length, types.join()).toBeGreaterThan(0);
+      for (const type of types) {
+        const template = (messages.notifications as Record<string, string>)[type] ?? '';
+        const holes = [...template.matchAll(/\{(\w+)\}/g)].map((x) => x[1] ?? '');
+        expect(holes.filter((h) => !params.includes(h)), type).toEqual([]);
+        expect(template, type).not.toMatch(/원|금액|\{amount\}|\{value\}/);
+      }
+    }
+  });
+
+  it('inquiry categories and statuses equal the contract enums', () => {
+    expect(keys(messages.inquiry.categories)).toEqual(unionOf('InquiryCategory'));
+    expect(keys(messages.inquiry.statuses)).toEqual(unionOf('InquiryStatus'));
+    expect(messages.inquiry.notice).toBe('고객 이름·연락처·증권번호를 쓰지 마세요');
+  });
+});

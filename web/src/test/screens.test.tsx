@@ -117,7 +117,7 @@ describe('MonthCard', () => {
 });
 
 describe('screens', () => {
-  it('home: this month card, attention counts, timeline and simulation entry points live, notifications still disabled', async () => {
+  it('home: this month card, attention counts, timeline, simulation, notification and inquiry entry points live (Phase 6)', async () => {
     routes.set('/api/v1/me/earnings/202608', month({ status: 'ESTIMATED', netBasis: 'ESTIMATE', net: won(1740600), estimateAsOf: '2026-08-19T17:10:00Z' }));
     routes.set('/api/v1/me/deferrals?from=202609&to=202609', { asOf, dataStatus: 'OK', from: '202609', to: '202609', scenario: 'ALL_INFORCE', months: [], items: [] });
     routes.set('/api/v1/me/limits?status=ALL', { asOf, dataStatus: 'OK', status: 'ALL', items: [ledger({ stage: 'FULL' }), ledger({ ledgerId: '2', flags: ['OVERDUE'] })] });
@@ -128,7 +128,8 @@ describe('screens', () => {
     expect(screen.getByTestId('attention-flags').textContent).toBe('납입 지연·실효 1건');
     expect(screen.getByTestId('entry-timeline').getAttribute('href')).toBe('/deferrals');
     expect(screen.getByTestId('entry-simulation').getAttribute('href')).toBe('/simulations');
-    expect(screen.getByTestId<HTMLButtonElement>('entry-notifications').disabled).toBe(true);
+    expect(screen.getByTestId('entry-notifications').getAttribute('href')).toBe('/notifications');
+    expect(screen.getByTestId('entry-inquiries').getAttribute('href')).toBe('/inquiries');
     everyAmountHasALabel(container);
   });
 

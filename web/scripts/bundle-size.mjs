@@ -18,6 +18,11 @@ const LAZY_SCREENS = [
   'screens/LimitScreen.tsx',
   'screens/TimelineScreen.tsx',
   'screens/SimulationScreen.tsx',
+  // 포털 Phase 6(계획 ⑧): 알림함·문의 넷
+  'screens/NotificationsScreen.tsx',
+  'screens/InquiriesScreen.tsx',
+  'screens/InquiryNewScreen.tsx',
+  'screens/InquiryScreen.tsx',
 ];
 
 const web = resolve(dirname(fileURLToPath(import.meta.url)), '..');

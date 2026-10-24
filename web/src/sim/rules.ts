@@ -63,6 +63,14 @@ export function body(name: RequestName, values: Readonly<Record<string, string>>
   return Object.fromEntries(Object.keys(fields).flatMap((f) => (values[f] === undefined || values[f] === '' ? [] : [[f, values[f]]])));
 }
 
+/** 그 필드의 최대 길이(코드 포인트 — 계약 maxLength). 문의 작성의 남은 글자 수(포털 Phase 6). */
+export function maxLength(name: RequestName, field: string): number {
+  const fields: Record<string, Constraint> = rules.requests[name].fields;
+  const max = fields[field]?.maxLength;
+  if (max === undefined) throw new Error(`no maxLength for ${name}.${field}`);
+  return max;
+}
+
 /** 타임라인 유지율 p(쿼리) — 계약 pattern. */
 export function validRetention(p: string): boolean {
   return fits(rules.queries['listDeferrals.p'], p);
