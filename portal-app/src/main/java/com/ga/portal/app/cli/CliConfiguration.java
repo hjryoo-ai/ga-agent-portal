@@ -1,6 +1,7 @@
 package com.ga.portal.app.cli;
 
 import com.ga.platform.spring.jdbc.TenantDirectoryReader;
+import com.ga.portal.app.PortalMeters;
 import com.ga.portal.app.ingest.IngestCommands;
 import com.ga.portal.app.ingest.IngestProperties;
 import com.ga.portal.app.recon.ReconCommands;
@@ -28,8 +29,8 @@ public class CliConfiguration {
 
     @Bean
     InquiryCommands inquiryCommands(TenantTransactions transactions, InquiryOperatorRepository inquiries, NotificationRepository notifications,
-                                    AuditAccessRepository audit, IdentityLinkRepository links, Clock clock) {
-        return new InquiryCommands(transactions, inquiries, notifications, audit, links, clock);
+                                    AuditAccessRepository audit, IdentityLinkRepository links, PortalMeters meters, Clock clock) {
+        return new InquiryCommands(transactions, inquiries, notifications, audit, links, meters, clock);
     }
 
     /** 대사·운영 상태(포털 Phase 7). 전 테넌트 {@code status}의 목록은 인제스트 명령과 같은 전용 롤 리더. */

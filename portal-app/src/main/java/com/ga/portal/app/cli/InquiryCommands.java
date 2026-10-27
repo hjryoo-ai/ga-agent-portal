@@ -2,6 +2,7 @@ package com.ga.portal.app.cli;
 
 import com.ga.platform.core.tenant.TenantId;
 import com.ga.portal.app.inbox.NotificationParamsJson;
+import com.ga.portal.app.PortalMeters;
 import com.ga.portal.app.ingest.IngestCommands;
 import com.ga.portal.domain.InquiryRecord;
 import com.ga.portal.domain.InquiryStatus;
@@ -51,9 +52,11 @@ public final class InquiryCommands {
     private final AuditAccessRepository audit;
     private final Clock clock;
     private final OperatorAuthorization authorization;
+    private final PortalMeters meters;
 
     public InquiryCommands(TenantTransactions transactions, InquiryOperatorRepository inquiries, NotificationRepository notifications,
-                           AuditAccessRepository audit, IdentityLinkRepository links, Clock clock) {
+                           AuditAccessRepository audit, IdentityLinkRepository links, PortalMeters meters, Clock clock) {
+        this.meters = meters;
         this.transactions = transactions;
         this.inquiries = inquiries;
         this.notifications = notifications;
@@ -91,9 +94,13 @@ public final class InquiryCommands {
             }
             String agent = row.get().agentId();
             Candidate n = NotificationRules.inquiryAnswered(agent, id.toString());
-            notifications.insertIfAbsent(new NotificationRepository.Fresh(NotificationRecord.id(tenant.value(), agent, n.dedupKey()), agent,
-                    n.type().name(), n.severity().name(), n.dedupKey(), n.link(), NotificationParamsJson.write(n.params()), now));
+            boolean inserted = notifications.insertIfAbsent(new NotificationRepository.Fresh(NotificationRecord.id(tenant.value(), agent,
+                    n.dedupKey()), agent, n.type().name(), n.severity().name(), n.dedupKey(), n.link(), NotificationParamsJson.write(n.params()), now));
             audit.record(actorSubject, ANSWER, target, now);
+            PortalMeters.afterCommit(() -> {   // 커밋된 것만(Phase 7 — 지표.md)
+                meters.inquiry(tenant, "ANSWERED");
+                meters.notificationsDerived(tenant, n.type().name(), inserted ? 1 : 0);
+            });
             return new IngestCommands.Outcome(0, List.of("inquiry " + id + " " + InquiryStatus.ANSWERED));
         });
     }
@@ -114,6 +121,7 @@ public final class InquiryCommands {
                 throw new IllegalStateException("inquiry changed under its row lock");
             }
             audit.record(actorSubject, CLOSE, target, clock.instant());
+            PortalMeters.afterCommit(() -> meters.inquiry(tenant, "CLOSED"));
             return new IngestCommands.Outcome(0, List.of("inquiry " + id + " " + InquiryStatus.CLOSED));
         });
     }

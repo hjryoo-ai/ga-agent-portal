@@ -1,6 +1,7 @@
 package com.ga.portal.app.ingest;
 
 import com.ga.platform.core.tenant.TenantId;
+import com.ga.portal.app.PortalMeters;
 import com.ga.portal.app.inbox.NotificationParamsJson;
 import com.ga.portal.domain.notify.NotificationRecord;
 import com.ga.portal.domain.view.SyncSnapshot;
@@ -29,11 +30,13 @@ final class JdbcNotificationDeriver implements NotificationDeriver {
 
     private final NotificationRepository notifications;
     private final SyncStatusRepository settings;
+    private final PortalMeters meters;
     private final Clock clock;
 
-    JdbcNotificationDeriver(NotificationRepository notifications, SyncStatusRepository settings, Clock clock) {
+    JdbcNotificationDeriver(NotificationRepository notifications, SyncStatusRepository settings, PortalMeters meters, Clock clock) {
         this.notifications = Objects.requireNonNull(notifications, "notifications");
         this.settings = Objects.requireNonNull(settings, "settings");
+        this.meters = Objects.requireNonNull(meters, "meters");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -42,8 +45,11 @@ final class JdbcNotificationDeriver implements NotificationDeriver {
         result.change().ifPresent(change -> {
             Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);   // timestamptz 정밀도 — 재시작 비교가 바이트로 같게
             for (Candidate c : NotificationRules.candidates(envelope, change, this::thresholds)) {
-                notifications.insertIfAbsent(new NotificationRepository.Fresh(NotificationRecord.id(tenant.value(), c.agentId(), c.dedupKey()),
-                        c.agentId(), c.type().name(), c.severity().name(), c.dedupKey(), c.link(), NotificationParamsJson.write(c.params()), now));
+                boolean inserted = notifications.insertIfAbsent(new NotificationRepository.Fresh(NotificationRecord.id(tenant.value(), c.agentId(),
+                        c.dedupKey()), c.agentId(), c.type().name(), c.severity().name(), c.dedupKey(), c.link(), NotificationParamsJson.write(c.params()), now));
+                if (inserted) {
+                    PortalMeters.afterCommit(() -> meters.notificationsDerived(tenant, c.type().name(), 1));   // 넣은 행이 커밋된 것만 센다(Phase 7 — 지표.md)
+                }
             }
         });
     }

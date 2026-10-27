@@ -102,6 +102,15 @@ class IngestPollingIT {
                 .satisfies(g -> assertThat(g.value()).isZero());
         assertThat(meters.find("ingest_events_total").tag("tenant", T.value()).tag("result", "applied").counter())
                 .isNotNull().satisfies(c -> assertThat(c.count()).isEqualTo(11.0));
+        // 포털 Phase 7(docs/지표.md): notifications_derived_total = 커밋해 넣은 알림 행(종류별 합 = 테넌트의 알림 행 수)
+        java.util.List<String> rows = IngestRig.notificationRows(T);
+        assertThat(rows).isNotEmpty();
+        java.util.Map<String, Long> byType = rows.stream().collect(java.util.stream.Collectors.groupingBy(r -> r.split("\\|", -1)[2],
+                java.util.TreeMap::new, java.util.stream.Collectors.counting()));
+        java.util.Map<String, Long> counted = new java.util.TreeMap<>();
+        meters.find("notifications_derived_total").tag("tenant", T.value()).counters()
+                .forEach(c -> counted.put(c.getId().getTag("type"), (long) c.count()));
+        assertThat(counted).isEqualTo(byType);
     }
 
     private static long lastSeq(IngestRig rig) {

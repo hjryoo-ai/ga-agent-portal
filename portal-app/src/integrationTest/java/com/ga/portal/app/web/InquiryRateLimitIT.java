@@ -27,10 +27,17 @@ class InquiryRateLimitIT extends InboxIntegrationTest {
         return c == null ? 0 : c.count();
     }
 
+    /** 포털 Phase 7 {@code inquiries_total{tenant, action="CREATED"}} — 커밋된 접수만(한도 거절은 세지 않는다). */
+    double created(TenantId t) {
+        var c = meters.find("inquiries_total").tag("tenant", t.value()).tag("action", "CREATED").counter();
+        return c == null ? 0 : c.count();
+    }
+
     @Test
     void theRequestAfterTheDailyLimitIsRejectedWithoutARow() {
         String token = ISSUER_6R.token(SUB_6R, AUD_6R);
         double before = metric(T6R);
+        double createdBefore = created(T6R);
         int audits = audits(T6R).size();
         for (int i = 0; i < RATE; i++) {
             assertThat(post(INQUIRIES, token, BODY).statusCode()).as("request %d", i + 1).isEqualTo(201);
@@ -46,6 +53,7 @@ class InquiryRateLimitIT extends InboxIntegrationTest {
         assertThat(inquiryRows(T6R)).hasSize(RATE).allSatisfy(r -> assertThat(r.status()).isEqualTo("OPEN"));
         assertThat(audits(T6R)).as("no audit row").hasSize(audits);
         assertThat(metric(T6R) - before).isEqualTo(1.0);
+        assertThat(created(T6R) - createdBefore).isEqualTo((double) RATE);
         // 한도는 접수만 막는다 — 목록·상세는 그대로
         assertThat(get(INQUIRIES, token).statusCode()).isEqualTo(200);
         assertThat(get(INQUIRIES + "/" + inquiryRows(T6R).getFirst().id(), token).statusCode()).isEqualTo(200);
@@ -56,6 +64,7 @@ class InquiryRateLimitIT extends InboxIntegrationTest {
         String token = ISSUER_6B.token(SUB_6U, AUD_6B);
         int threads = RATE + 5;
         double before = metric(T6B);
+        double createdBefore = created(T6B);
         ExecutorService pool = Executors.newFixedThreadPool(threads);
         CountDownLatch start = new CountDownLatch(1);
         List<CompletableFuture<Integer>> results = new ArrayList<>();
@@ -80,6 +89,7 @@ class InquiryRateLimitIT extends InboxIntegrationTest {
             assertThat(limited).isEqualTo(threads - RATE);
             assertThat(inquiryRows(T6B)).hasSize(RATE);
             assertThat(metric(T6B) - before).isEqualTo((double) (threads - RATE));
+            assertThat(created(T6B) - createdBefore).as("inquiries_total CREATED = rows").isEqualTo((double) RATE);
         } finally {
             pool.shutdownNow();
         }

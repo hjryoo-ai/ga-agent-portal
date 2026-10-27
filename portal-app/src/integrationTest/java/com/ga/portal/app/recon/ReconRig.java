@@ -155,10 +155,11 @@ final class ReconRig implements AutoCloseable {
                 engine(),
                 new TransactionalReconLock(ingest.binder(), new ReconLockRepository(ingest.gateway())),
                 rebuildWrapper.apply(recording),
-                new MicrometerReconMetrics(Optional.of(meters)),
+                new MicrometerReconMetrics(Optional.of(meters), new com.ga.portal.app.PortalMeters(Optional.of(meters))),
                 interval -> { },
                 clock);
-        return new ReconService(runner, () -> List.of(tenant), fresh, tenants);
+        return new ReconService(runner, () -> List.of(tenant), fresh, tenants, new com.ga.portal.infra.persistence.InquiryOperatorRepository(ingest.gateway()),
+                new com.ga.portal.app.PortalMeters(Optional.of(meters)), clock);
     }
 
     ReconRunner.Outcome run(String... months) {

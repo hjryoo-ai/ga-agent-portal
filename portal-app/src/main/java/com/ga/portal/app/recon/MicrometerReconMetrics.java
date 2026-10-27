@@ -1,6 +1,7 @@
 package com.ga.portal.app.recon;
 
 import com.ga.platform.core.tenant.TenantId;
+import com.ga.portal.app.PortalMeters;
 import com.ga.portal.domain.NotificationType;
 import com.ga.portal.domain.ReconRunResult;
 import com.ga.portal.recon.port.ReconMetrics;
@@ -18,10 +19,12 @@ import java.util.concurrent.atomic.AtomicLong;
 final class MicrometerReconMetrics implements ReconMetrics {
 
     private final Optional<MeterRegistry> registry;
+    private final PortalMeters meters;
     private final Map<String, AtomicLong> unresolved = new ConcurrentHashMap<>();
 
-    MicrometerReconMetrics(Optional<MeterRegistry> registry) {
+    MicrometerReconMetrics(Optional<MeterRegistry> registry, PortalMeters meters) {
         this.registry = registry;
+        this.meters = meters;
     }
 
     @Override
@@ -50,8 +53,6 @@ final class MicrometerReconMetrics implements ReconMetrics {
 
     @Override
     public void notificationsDerived(TenantId tenant, NotificationType type, int inserted) {
-        if (inserted > 0) {
-            registry.ifPresent(r -> r.counter("notifications_derived_total", "tenant", tenant.value(), "type", type.name()).increment(inserted));
-        }
+        meters.notificationsDerived(tenant, type.name(), inserted);   // 저장 메서드가 커밋한 뒤에 불린다
     }
 }

@@ -61,6 +61,8 @@ testing {
                         "portal-infra", "portal-app", "portal-demo").forEach { m ->
                         inputs.dir(rootProject.layout.projectDirectory.dir("$m/src/main")).withPathSensitivity(PathSensitivity.RELATIVE)
                     }
+                    // MetricsCatalogTest(포털 Phase 7 C8)가 지표 목록 정본을 읽는다
+                    inputs.file(rootProject.layout.projectDirectory.file("docs/지표.md")).withPathSensitivity(PathSensitivity.RELATIVE)
                 }
             }
         }

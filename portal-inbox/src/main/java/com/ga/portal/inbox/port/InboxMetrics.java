@@ -6,4 +6,8 @@ import com.ga.platform.core.tenant.TenantId;
 public interface InboxMetrics {
 
     void inquiryRateLimited(TenantId tenant);
+
+    /** 문의 접수가 커밋됐다(포털 Phase 7 — {@code inquiries_total{action=CREATED}}). */
+    default void inquiryCreated(TenantId tenant) {
+    }
 }

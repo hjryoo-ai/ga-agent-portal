@@ -2,7 +2,9 @@ package com.ga.portal.app.recon;
 
 import com.ga.platform.core.tenant.TenantContext;
 import com.ga.platform.core.tenant.TenantId;
+import com.ga.portal.app.PortalMeters;
 import com.ga.portal.domain.ReconTrigger;
+import com.ga.portal.infra.persistence.InquiryOperatorRepository;
 import com.ga.portal.infra.persistence.TenantRecord;
 import com.ga.portal.infra.persistence.TenantRepository;
 import com.ga.portal.ingest.apply.TenantTransactions;
@@ -10,6 +12,8 @@ import com.ga.portal.recon.ReconRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -33,12 +37,19 @@ public final class ReconService {
     private final TenantDirectory directory;
     private final TenantTransactions transactions;
     private final TenantRepository tenants;
+    private final InquiryOperatorRepository inquiries;
+    private final PortalMeters meters;
+    private final Clock clock;
 
-    ReconService(ReconRunner runner, TenantDirectory directory, TenantTransactions transactions, TenantRepository tenants) {
+    ReconService(ReconRunner runner, TenantDirectory directory, TenantTransactions transactions, TenantRepository tenants,
+                 InquiryOperatorRepository inquiries, PortalMeters meters, Clock clock) {
         this.runner = runner;
         this.directory = directory;
         this.transactions = transactions;
         this.tenants = tenants;
+        this.inquiries = inquiries;
+        this.meters = meters;
+        this.clock = clock;
     }
 
     /** 스케줄러의 창({당월, 직전 달} KST) — CLI가 {@code --ym} 없이 부를 때. */
@@ -50,7 +61,10 @@ public final class ReconService {
         return scoped(tenant, () -> runner.run(tenant, trigger, actor, months));
     }
 
-    /** 스케줄러 틱 — 돌린 회차 수. */
+    /**
+     * 스케줄러 틱 — 돌린 회차 수. 테넌트마다 문의 적체 게이지({@code inquiry_open_total}·{@code inquiry_open_oldest_age_seconds} — Phase 6 수용 Q3)도
+     * 갱신한다(운영 채널 v1 = 지표 + {@code status}).
+     */
     public int tick() {
         int ran = 0;
         for (TenantId tenant : directory.tenants()) {
@@ -59,6 +73,8 @@ public final class ReconService {
                 if (record.isEmpty() || !"ACTIVE".equals(record.get().status())) {
                     continue;
                 }
+                InquiryOperatorRepository.OpenSummary open = transactions.inTransaction(tenant, inquiries::openSummary);
+                meters.inquiryBacklog(tenant, open.count(), open.oldest().map(o -> Duration.between(o, clock.instant()).toSeconds()).orElse(0L));
                 if (scoped(tenant, () -> runner.runIfDue(tenant)).isPresent()) {
                     ran++;
                 }

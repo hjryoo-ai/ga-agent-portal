@@ -1,6 +1,7 @@
 package com.ga.portal.app.recon;
 
 import com.ga.platform.spring.jdbc.TenantDirectoryReader;
+import com.ga.portal.app.PortalMeters;
 import com.ga.portal.app.ingest.IngestPollingConfiguration;
 import com.ga.portal.app.ingest.IngestProperties;
 import com.ga.portal.app.ingest.JdbcViewReset;
@@ -8,6 +9,7 @@ import com.ga.portal.app.ingest.SpringTenantTransactions;
 import com.ga.portal.infra.persistence.AuditAccessRepository;
 import com.ga.portal.infra.persistence.EarningsMonthRepository;
 import com.ga.portal.infra.persistence.IngestCursorRepository;
+import com.ga.portal.infra.persistence.InquiryOperatorRepository;
 import com.ga.portal.infra.persistence.NotificationRepository;
 import com.ga.portal.infra.persistence.ReconLockRepository;
 import com.ga.portal.infra.persistence.ReconResultRepository;
@@ -61,7 +63,8 @@ public class ReconConfiguration {
                               EarningsMonthRepository months, ReconResultRepository results, ReconRunRepository runs,
                               NotificationRepository notifications, ReconLockRepository locks, AuditAccessRepository audit, ServiceTokenSource tokens,
                               EnvelopeValidator validator, IngestStore store, IngestLock ingestLock, Projector projector, ViewResetRepository views,
-                              IngestMetrics ingestMetrics, ReconEngine engine, ObjectProvider<MeterRegistry> registry, Clock clock) {
+                              IngestMetrics ingestMetrics, ReconEngine engine, InquiryOperatorRepository inquiries, PortalMeters meters,
+                              ObjectProvider<MeterRegistry> registry, Clock clock) {
         SpringTenantTransactions fresh = SpringTenantTransactions.requiresNew(transactionManager);
         FeedClient feed = IngestPollingConfiguration.httpFeed(ingest, fresh, tenants, tokens);
         Rebuilder rebuilder = new Rebuilder(validator, store, fresh, ingestLock, projector, new JdbcViewReset(views), feed, clock, ingest.limit(),
@@ -71,11 +74,11 @@ public class ReconConfiguration {
                 engine,
                 new TransactionalReconLock(transactionManager, locks),
                 new RebuilderReconRebuild(rebuilder, audit, ingestMetrics, clock),
-                new MicrometerReconMetrics(Optional.ofNullable(registry.getIfAvailable())),
+                new MicrometerReconMetrics(Optional.ofNullable(registry.getIfAvailable()), meters),
                 interval -> sleep(interval.toMillis()),
                 clock);
         TenantDirectoryReader reader = new TenantDirectoryReader(jdbcUrl, ingest.directoryUsername(), ingest.directoryPassword());
-        return new ReconService(runner, reader::allTenants, fresh, tenants);
+        return new ReconService(runner, reader::allTenants, fresh, tenants, inquiries, meters, clock);
     }
 
     private static void sleep(long millis) {

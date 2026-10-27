@@ -111,6 +111,7 @@ public final class InboxUseCases {
             metrics.inquiryRateLimited(caller.tenant());
             throw e;
         }
+        metrics.inquiryCreated(caller.tenant());
         return new InquiryCreated(id.toString(), row.status().name(), row.category().name(), row.calcId(), row.createdAt());
     }
 

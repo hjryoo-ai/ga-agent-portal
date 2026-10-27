@@ -3,6 +3,7 @@ package com.ga.portal.app.inbox;
 import com.ga.portal.inbox.InboxUseCases;
 import com.ga.portal.inbox.port.InboxTransactions;
 import com.ga.portal.infra.persistence.InquiryRepository;
+import com.ga.portal.app.PortalMeters;
 import com.ga.portal.infra.persistence.NotificationRepository;
 import com.ga.portal.infra.persistence.TenantRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -29,7 +30,7 @@ public class InboxConfiguration {
 
     @Bean
     InboxUseCases inboxUseCases(NotificationRepository notifications, InquiryRepository inquiries, TenantRepository tenants,
-                                PlatformTransactionManager transactionManager, Clock clock, ObjectProvider<MeterRegistry> registry,
+                                PlatformTransactionManager transactionManager, Clock clock, ObjectProvider<MeterRegistry> registry, PortalMeters meters,
                                 @Value("${portal.inbox.default-inquiries-per-day:20}") int defaultInquiriesPerDay) {
         TransactionTemplate write = new TransactionTemplate(transactionManager);
         TransactionTemplate read = new TransactionTemplate(transactionManager);
@@ -46,6 +47,6 @@ public class InboxConfiguration {
             }
         };
         return new InboxUseCases(new JdbcInboxStore(notifications, inquiries, tenants), transactions,
-                new MicrometerInboxMetrics(Optional.ofNullable(registry.getIfAvailable())), clock, UUID::randomUUID, defaultInquiriesPerDay);
+                new MicrometerInboxMetrics(Optional.ofNullable(registry.getIfAvailable()), meters), clock, UUID::randomUUID, defaultInquiriesPerDay);
     }
 }

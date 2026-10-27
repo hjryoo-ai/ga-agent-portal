@@ -69,7 +69,7 @@ final class IngestRig {
     /** 운영 파생기(포털 Phase 6) — 실제 알림 표·테넌트 임계치, 고정 시계. 그 테넌트에 {@code tenant} 행이 있어야 한다({@link #seedTenant}). */
     JdbcNotificationDeriver deriver() {
         return new JdbcNotificationDeriver(new com.ga.portal.infra.persistence.NotificationRepository(gateway),
-                new com.ga.portal.infra.persistence.SyncStatusRepository(gateway), CLOCK);
+                new com.ga.portal.infra.persistence.SyncStatusRepository(gateway), com.ga.portal.app.PortalMeters.NONE, CLOCK);
     }
 
     IngestApplier applier(Projector projector, com.ga.portal.projection.NotificationDeriver deriver) {
