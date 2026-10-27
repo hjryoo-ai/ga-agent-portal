@@ -3,6 +3,7 @@ package com.ga.portal.projection.notify;
 import com.ga.portal.domain.CommType;
 import com.ga.portal.domain.DataStatus;
 import com.ga.portal.domain.DeferralStatus;
+import com.ga.portal.domain.MonthStatus;
 import com.ga.portal.domain.NotificationType;
 import com.ga.portal.domain.notify.NotificationParams;
 import com.ga.portal.domain.rule.LimitStage;
@@ -25,7 +26,8 @@ import java.util.function.Supplier;
  *   <li>라인: 삭감 &gt; 0이면 {@code LIMIT_CUT:{calcId}}, 환수 라인이면 {@code CLAWBACK:{calcId}} — 둘 다일 수 있다(각각 따로 중복 판정).</li>
  *   <li>분급: 도착 상태가 보류·취소면 {@code DEFER_{상태}:{scheduleId}}(각 상태는 한 항목에 한 번만 온다 — {@code DeferralTransitions}).</li>
  *   <li>계약 이벤트: 납입 지연·실효·해약이면 {@code POLICY_{유형}:{eventId}}, 링크 없음({@code REINSTATE}는 0).</li>
- *   <li>확정·지급: 후 달이 {@code DRIFT}가 아닐 때만 {@code STMT_CONFIRMED:{ym}}·{@code PAYOUT:{ym}}(Q17 — 맞지 않는 숫자를 "확정"으로 부르지 않는다).</li>
+ *   <li>확정·지급: 후 달이 {@code DRIFT}가 아닐 때만 {@code STMT_CONFIRMED:{ym}}·{@code PAYOUT:{ym}}(Q17 — 맞지 않는 숫자를 "확정"으로 부르지 않는다).
+ *       그 달이 DRIFT였다가 재대사가 {@code REPAIRED}로 풀면 같은 키로 {@link #monthRepaired}(Phase 7).</li>
  * </ul>
  * 수신자는 행의 설계사다(원장·분급 이벤트에는 {@code agentId}가 없다 — 행의 {@code agent_id}도 엔진 사실이다, P-1). 임계치는 전기일 때만 읽는다.
  */
@@ -60,10 +62,25 @@ public final class NotificationRules {
                     case "PayoutCompleted" -> NotificationType.PAYOUT;
                     default -> throw new IllegalStateException("a closed month from " + e.type());
                 };
-                yield List.of(new Candidate(c.after().agentId(), type, type.name() + ":" + c.after().closeYm(),
-                        new NotificationParams.Month(c.after().closeYm())));
+                yield List.of(month(c.after().agentId(), type, c.after().closeYm()));
             }
         };
+    }
+
+    /**
+     * 표의 "재대사 {@code REPAIRED}" 줄(포털 Phase 7, Phase 6 수용 Q1): 재대사가 그 달을 {@code REPAIRED}로 쓰는 트랜잭션이 넣는다 — 이벤트가 낸 것과
+     * <b>같은 키</b>({@code ON CONFLICT} — 한 번만). {@code CONFIRMED}면 확정, {@code PAID}면 확정·지급 둘, 아직 마감 전이면 0. 재구축은 부르지 않는다.
+     */
+    public static List<Candidate> monthRepaired(String agentId, String closeYm, MonthStatus status) {
+        return switch (status) {
+            case PROVISIONAL, ESTIMATED -> List.of();
+            case CONFIRMED -> List.of(month(agentId, NotificationType.STMT_CONFIRMED, closeYm));
+            case PAID -> List.of(month(agentId, NotificationType.STMT_CONFIRMED, closeYm), month(agentId, NotificationType.PAYOUT, closeYm));
+        };
+    }
+
+    private static Candidate month(String agentId, NotificationType type, String closeYm) {
+        return new Candidate(agentId, type, type.name() + ":" + closeYm, new NotificationParams.Month(closeYm));
     }
 
     /** 표의 마지막 줄 — 운영 CLI {@code inquiry answer}({@code OPEN → ANSWERED})가 같은 트랜잭션에서 넣는다. 수신자는 문의 행의 설계사. */
