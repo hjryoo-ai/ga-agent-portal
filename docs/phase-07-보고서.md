@@ -34,6 +34,7 @@
 | `4c47bff` | `ReconArithmeticScanTest` — 주입 S2가 기존 스캔을 통과했다(F4, P7-16) |
 | `0dcbc6f` | **ETag에 커서 갱신 시각·마지막 대사 회차**(E2E ⓑ가 찾은 304 묵은 본문 — F5, P7-15) |
 | `9af9ee0` | 평문 스캔이 내보낸 스팬을 읽는다(F6, P7-17), `docs/지표.md` 문구 정정 |
+| `ca4c6a0` | 덤프 디렉터리를 `integrationTest`의 출력으로(`verifyTestInputs`가 `9af9ee0`을 막았다 — F6), `docs/운영.md` §8 운영자 재구축 문단(F11) |
 | (이 커밋) | 보고서 |
 
 ```
@@ -54,7 +55,7 @@ docs            설계서 v1.10 · 지표.md(신설) · 운영.md §8 · CLAUDE.
 
 ## 2. 테스트 (CI 출처)
 
-CI run [⟦RUN⟧](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/⟦RUN⟧)(`9af9ee0` — 마지막 코드·시험 커밋, build·no-docker·web-e2e 모두 success). 수는 그 run의 아티팩트(`test-reports` — 결과 XML·Vitest junit, `web-e2e-reports` — junit·요약·누출·axe·산출물 스캔)를 내려받아 셌다. 기준선은 `main` = `b87db17`(CI run [40485573734](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/40485573734): Java 3,353·Vitest 135 — 같은 스크립트로 셌다, Phase 6 보고서와 같은 값).
+CI run [40504138779](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/40504138779)(`ca4c6a0` — 마지막 코드·시험 커밋, build·no-docker·web-e2e 모두 success). 수는 그 run의 아티팩트(`test-reports` — 결과 XML·Vitest junit, `web-e2e-reports` — junit·요약·누출·axe·산출물 스캔)를 내려받아 셌다. 기준선은 `main` = `b87db17`(CI run [40485573734](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/40485573734): Java 3,353·Vitest 135 — 같은 스크립트로 셌다, Phase 6 보고서와 같은 값).
 
 | 모듈 | 소스셋 | 건수 | `main` 대비 | 비고 |
 |---|---|---:|---:|---|
@@ -72,11 +73,11 @@ CI run [⟦RUN⟧](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/⟦
 | `portal-app` | archTest | 79 | +7 | `MetricsCatalogTest` 3, `ReconArithmeticScanTest` 3, `ArchitectureRulesTest` +1(파생 호출자 닫힌 목록·재구축기 → 대사 0) |
 | **Java 합계** | | **5,251** | **+1,898** | 실패 0, 스킵 0 |
 | `web` | Vitest | 135 | 0 | 화면 원천 변경 0 |
-| `web` | Playwright | ⟦E2E_N⟧ | ⟦E2E_D⟧ | `ga06-recon` 다섯(ⓐ~ⓔ) × 세 프로젝트 |
+| `web` | Playwright | 82 | +15 | `ga06-recon` 다섯(ⓐ~ⓔ) × 세 프로젝트 |
 
-- 같은 run의 빌드 검사: ⟦BUILD_LINES⟧
-- `no-docker` 잡: ⟦NODOCKER_LINES⟧
-- `web-e2e` 잡: ⟦E2E_SUMMARY⟧
+- 같은 run의 빌드 검사: `client lock ok (openapi-typescript@7.13.0, contract be7f09c3a915)`(계약 무변경), `dist scan ok (22 files, 17 app chunks, 28 money properties)`, `bundle size ok: initial 123612 B gzip (cap 130048), 10 lazy routes`, **`scanPlaintextLeaks: 152 files (trace dumps: 1), 130 forbidden strings, 0 hits`**(Phase 6: 134 files — 트레이스 덤프 포함, P7-17), `verifyContractChecksums: contracts/CHECKSUMS and contracts/shared/{ga-commission-engine,ga-disclosure}/CHECKSUMS match`, `verifyUpstreamContract`(명세 샘플 포함 각 파일 `== …@38cdcee2f2e0…` + SHA-256), `verifyPlatformPins: 13 com.ga.platform:0.2.0 files pinned, equal to the handoff §6 table`, `verifyTestInputs: 11 test tasks read repository files, all declared`(+`:portal-recon:test`), `verifyBootJarScreens: portal-app-0.1.0.jar ⊃ web-0.1.0.jar ⊃ portal-web/index.html + 19 scripts`, `licenses ok (257 packages, 7 bundled, 8 dev-only exceptions)`(새 npm 의존성 0), `verifySpringFree` 일곱(`portal-recon` 추가), `files containing the token: 0`.
+- `no-docker` 잡: "gradle exit code: 1", "78 tests completed, 78 failed", "result files: 12, with failures/errors: 12, skipped: 0"(Phase 6: 11 — `ReconRunSchemaIT`), "scanPlaintextLeaks: 12 files (trace dumps: 0), 130 forbidden strings, 0 hits", "token occurrences: 0".
+- `web-e2e` 잡: `summary.json` — tests 82·passed 82·skipped 0(프로젝트별 27·27·28), 누출·axe 파일 각 82, 응답 719·DOM 250·콘솔 줄 99·주소 582·요청 2,186, CSP 위반 0, 외부 요청 0, `simIds` 27, `inquiryBodies` 6, axe 상태 171·위반 0·미완 0. `artifact-scan.json` = 금지 문자열 66 + 토큰 54, hits 0.
 
 ## 3. 완료 기준 증거
 
@@ -92,7 +93,7 @@ CI run [⟦RUN⟧](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/⟦
 | C8 | 지표 이름 ↔ 태그 키 = `docs/지표.md` | `MetricsCatalogTest` 3(원천 정적 스캔 ↔ 표 양방향 20, 닫힌 태그 키, 등록 모양 셋 — P7-8), `PortalMetersTest` 5, `IngestPollingIT`(앱 조립의 레지스트리에 `ingest.`·`recon.`·`engine.` 지표 0 — Observation 타이머 없음) | S9·S10 |
 | C9 | 트레이스·로그 속성에 값 0 | `TracingLeakIT`(실제 SDK·메모리 내보내기 — 스팬 11 이름·부모·키 ⊆ 표, 값 30개 넘게 훑어 센티널·스트림 원문 0, `recon.run` 속성 = `{tenant, trigger, checked, drift_new}`), `TracedClientsTest` 2, `ReconRunnerTest`(스팬 속성은 종류·수만, 종류 꼴 아니면 `OTHER`), `IngestPollingIT`(앱 조립의 스팬), 기존 `CapturedOutput` 누출 시험 | S11·S11b |
 | C10 | `status` CLI | `CliRunnerTest` +2(사용 오류 64, 줄에 `\d{6}` 0 — 조건 B), `StatusCliIT` 3(OPERATOR 인가, 링크 없는 주체 거부, `--all` 거부 섞임 → 2, 출력에 식별자 원문 0) | S12 |
-| C11 | E2E ⓐ~ⓔ × 세 프로젝트 | `web-e2e` ⟦E2E_N⟧/⟦E2E_N⟧(§2·§4.7), axe·CSP·누출 0, 화면 원천(`web/src`) 변경 0 — 번들 gzip ⟦BUNDLE⟧ B(Phase 6과 같은 값) | S13 |
+| C11 | E2E ⓐ~ⓔ × 세 프로젝트 | `web-e2e` 82/82(§2·§4.7), axe·CSP·누출 0, 화면 원천(`web/src`) 변경 0 — 번들 gzip 123,612 B(Phase 6과 같은 값) | S13 |
 | C12 | 무손상·`no-docker`·평문 스캔·메타데이터·주입·`run.sh` | §2(기존 3,353건 전부 통과), `no-docker` 12/12 실패·스킵 0, 평문 스캔 0건(트레이스 덤프 포함 — P7-17), 새 의존성 diff 추가만(§4.8), 아래 주입 표, `run.sh` 판정 ⑤ 추가 — **미실행**(§4.11) | — |
 
 ### 주입 기록 (ID 단위 — 13 + 다시 넣은 둘)
@@ -115,7 +116,7 @@ CI run [⟦RUN⟧](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/⟦
 | S11 | C9 | `engine.statement`에 속성 `agent_id` = 원문 + `MicrometerTracing.kind`가 원문 그대로 | PR [#30](https://github.com/hjryoo-ai/ga-agent-portal/pull/30), run 40499855610: `TracingLeakIT` — "attribute keys of engine.statement ⊆ table"(키 단언이 먼저 잡아 값 스캔까지 가지 않았다 → S11b) |
 | S11b | C9 | 표에 있는 키 `mode`의 값에 설계사 ID 원문 + `kind` 원문 그대로(키 단언 통과) | PR [#33](https://github.com/hjryoo-ai/ga-agent-portal/pull/33), run 40501300566: `TracingLeakIT` — "[a value of engine.statement] expected: 0L but was: 1L"(실패 문구는 수만 — 값을 되풀이하지 않는다) |
 | S12 | C10 | `status` 줄에 `oldest=` + 첫 미해결 키(설계사·달) | PR [#31](https://github.com/hjryoo-ai/ga-agent-portal/pull/31), run 40499861450: `StatusCliIT.statusShowsCountsAndAgesOnly` |
-| S13 | C5·C11 | 재대사가 `REPAIRED` 뒤에도 `data_status = DRIFT` | **첫 판** PR [#32](https://github.com/hjryoo-ai/ga-agent-portal/pull/32), run 40499865893(`4c47bff` 위): `AutoRepairIT.turningAutoRebuildOnRepairsTheCorruptedMonthWithoutNewNotifications` — "expected: "OK" but was: "DRIFT"". 그 밑의 E2E ⓑ는 주입 없이도 실패하던 때라(F5) 화면 증거가 못 된다. **둘째 판** PR [#34](https://github.com/hjryoo-ai/ga-agent-portal/pull/34), run 40501530610(`0dcbc6f` 위): 같은 `AutoRepairIT` + ⟦S13_E2E⟧ |
+| S13 | C5·C11 | 재대사가 `REPAIRED` 뒤에도 `data_status = DRIFT` | **첫 판** PR [#32](https://github.com/hjryoo-ai/ga-agent-portal/pull/32), run 40499865893(`4c47bff` 위): `AutoRepairIT.turningAutoRebuildOnRepairsTheCorruptedMonthWithoutNewNotifications` — "expected: "OK" but was: "DRIFT"". 그 밑의 E2E ⓑ는 주입 없이도 실패하던 때라(F5) 화면 증거가 못 된다. **둘째 판** PR [#34](https://github.com/hjryoo-ai/ga-agent-portal/pull/34), run 40501530610(`0dcbc6f` 위): 같은 `AutoRepairIT` + **E2E ⓑ 세 프로젝트 모두 실패** — 재구축·재대사 뒤 `month-drift` 배지가 남았다(`toHaveCount(0)` 실패, 뒤 시험 ⓒ~ⓔ는 직렬이라 건너뜀) |
 
 ## 4. 지시문 §5 추가 항목
 
@@ -218,7 +219,17 @@ CI run [⟦RUN⟧](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/⟦
 
 ### 4.7 E2E 시나리오 (`ga06-recon.spec.ts` — 세 프로젝트 모두)
 
-⟦E2E_TABLE⟧
+대사는 하네스 제어 `/cli/<T>/recon?ym=`(실 CLI `recon run` 자식 프로세스 — 종료 코드만), 재구축 수는 `/count/<T>/rebuilds`(행위자 `recon:<T>`의 `INGEST_REBUILD_SUCCEEDED` — P7-11). 화면 확인은 8월 카드의 `row-gross`·`month-drift` 배지·금액 `amount--uncertain`(Phase 4 시험 재사용). GA06 = A-1 스트림, 자동 재구축 꺼서 시작.
+
+| # | 시나리오 | 단계와 단언 | android | iOS | desktop |
+|---|---|---|---|---|---|
+| ⓐ | 정상 | 머리 10 → `recon run` 0 → 8월 1,800,000·배지 0·흐림 0, 재구축 0 | 통과 | 통과 | 통과 |
+| ⓑ | 라인 누락 → DRIFT → 자동 복구 | 알림에 `STMT_CONFIRMED`·`PAYOUT` 있음 → 라인 1 삭제(포털 855,000 / 엔진 1,800,000) → 화면 855,000 정상 → `recon run`(끔) → **"확인 중"·흐림**, 재구축 0 → 켬 → `recon run` → 재구축 1 → **1,800,000·배지 0** → 알림 목록 그대로(추가 0 — Phase 6 Q1) | 통과 | 통과 | 통과 |
+| ⓒ | 뒤처짐 | 피드 503 + 머리 11(커서 10) → `recon run` 0 → 화면 정상(DRIFT 0), 재구축 그대로 1(추가 0), 알림 그대로 | 통과 | 통과 | 통과 |
+| ⓓ | 엔진 다운 | 머리 11까지 적용 → 명세 스텁 down → `recon run` 0 → 화면 정상(DRIFT 0), 재구축 추가 0 | 통과 | 통과 | 통과 |
+| ⓔ | 스트림 자체의 DRIFT(GA04) | 끔 → `recon run --ym=202608` → "확인 중" 그대로·재구축 0 → 켬 → 재구축 1·여전히 "확인 중"(미해결) → 다시 → 재구축 그대로 1(시도함 — Q14) | 통과 | 통과 | 통과 |
+
+`ga06-recon` 15건 모두 통과(run 40504138779 `junit.xml`). 같은 시나리오가 `0dcbc6f` 전에는 ⓑ에서 android·desktop이 실패했다(F5), S13 둘째 판에서는 ⓑ가 세 프로젝트 모두 실패했다(§3).
 
 ### 4.8 새 의존성·검증 메타데이터 (`1e17824` — 빈 `GRADLE_USER_HOME`에서 재생성)
 
@@ -252,7 +263,7 @@ CI run [⟦RUN⟧](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/⟦
 
 ### 4.10 번들
 
-화면 원천 변경 0(`git diff origin/main -- web/src` 0줄) — 초기 로드 gzip ⟦BUNDLE⟧ B, Phase 6 run 40094460151과 같은 값. 지연 경로 10 그대로. 새 npm 의존성 0(`licenses ok (257 packages …)` 그대로).
+화면 원천 변경 0(`git diff origin/main -- web/src` 0줄) — 초기 로드 gzip 123,612 B, Phase 6 run 40094460151과 같은 값. 지연 경로 10 그대로. 새 npm 의존성 0(`licenses ok (257 packages …)` 그대로).
 
 ### 4.11 실 엔진 E2E (`run.sh`)
 
@@ -278,11 +289,12 @@ CI run [⟦RUN⟧](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/⟦
 | 40498434426 | `e3ece4a` | build 실패(같은 단언) + **web-e2e ⓑ 실패 — android·desktop**(F5) |
 | 40499141094 | `3147ea6` | build·no-docker success, **web-e2e ⓑ 실패**(F5) |
 | 40499675908 | `4c47bff` | build·no-docker success, web-e2e ⓑ 실패(F5) |
-| 40499849823·40499855610·40499861450·40499865893 | 주입 S4·S11·S12·S13(PR #29~#32, `4c47bff` 위) | build 실패 — 기대한 시험 하나씩(S4·S11의 web-e2e는 결과를 본 뒤 취소) |
-| 40501130840 | `0dcbc6f` | ⟦R_0dcbc6f⟧ |
+| 40499849823·40499855610·40499861450·40499865893 | 주입 S4·S11·S12·S13(PR #29~#32, `4c47bff` 위) | build 실패 — 기대한 시험 하나씩(통합 시험 133 중 1). web-e2e: S4·S11은 build 결과가 나온 뒤 취소, S12·S13은 실패(밑 `4c47bff`의 F5 — 주입 증거 아님) |
+| 40501130840 | `0dcbc6f` | **전부 success — ⓑ 세 프로젝트 통과**(F5 수정 확인) |
 | 40501300566 | 주입 S11b(PR #33) | build 실패 — `TracingLeakIT` 값 스캔 |
-| 40501530610 | 주입 S13 둘째 판(PR #34) | ⟦R_S13b⟧ |
-| **⟦RUN⟧** | **`9af9ee0`** | ⟦R_FINAL⟧ |
+| 40501530610 | 주입 S13 둘째 판(PR #34) | build 실패(`AutoRepairIT`)·web-e2e 실패(ⓑ 세 프로젝트) — 기대한 곳 |
+| 40502293298 | `9af9ee0` | build 실패 — `verifyTestInputs`(덤프 경로 글자 — F6) |
+| **40504138779** | **`ca4c6a0`** | **전부 success**(build·no-docker·web-e2e 82/82) |
 
 ## 5. 계획과 다르게 한 것·해석·발견
 
@@ -295,13 +307,13 @@ CI run [⟦RUN⟧](https://github.com/hjryoo-ai/ga-agent-portal/actions/runs/⟦
 | F3 | `TracingLeakIT` 마지막 단언이 `spans.getFirst()`(`engine.feed`)를 `recon.run`으로 읽었다 — 시험 쪽 잘못 | `75b1a15`(이름으로 찾아 속성 지도 전체를 비교) | 기록 |
 | F4 | **주입 S2(대사의 `portal − engine`)가 기존 두 스캔을 통과했다** — 둘은 `*`·`/`·`%`만 본다. C2는 둘을 "무변경"으로 두라 했다 | 둘은 그대로, 새 `ReconArithmeticScanTest`(허용 목록 없음 — 대사 클래스의 `long` 산술·`Math` 덧셈 뺄셈, 대사 표 SQL의 `+ - * / %`) `4c47bff`(P7-16). S2a·S2b가 잡혔다 | **발견·수정** |
 | F5 | **E2E ⓑ가 묵은 304를 찾았다.** 대사가 `data_status`를 DRIFT로 바꾸거나 재구축이 뷰를 다시 써도 `seq`·설정이 같으면 ETag(`seq.sync.cfg` — 설계서 §7 v1.6)가 같아 브라우저가 "정상" 본문을 되살렸다(android·desktop, run 40498434426·40499141094·40499675908 — iOS 프로젝트는 세 번 다 통과, 이유는 확인하지 않았다). 실제 운영에서도 대사 뒤 다음 날까지 "확인 중"이 안 보일 수 있었다 | `cfg` 재료에 커서 `updated_at`·마지막 `recon_run` 행(`0dcbc6f`). 같은 문장에 붙이면 임계치 변환 `* 100`이 `ReconArithmeticScanTest`에, `ReconRunRepository`로 읽으면 `ApiLayerRulesTest`(조회 경로 저장소)에 걸려 `SyncStatusRepository.lastRecon` 한 문장으로 옮겼다 — 문장 수 +1(§4.9). `CachingIT`·`MeQueriesTest`. **설계 의미 변경이라 심사에서 승인 요청**(P7-15) | **발견·수정 — 승인 필요** |
-| F6 | C12 "평문 스캔(트레이스 exporter 출력 포함)"인데 메모리 내보내기는 파일을 남기지 않아 스캔이 스팬을 본 적이 없었다 — 보고서를 쓰다 찾았다 | `TracingLeakIT`가 단언 전에 `build/trace-export/*.log`로 쓴다, 스캔 줄에 `trace dumps: N`(`9af9ee0`, P7-17). 로컬 주입으로 확인(§4.12) | **발견·수정** |
+| F6 | C12 "평문 스캔(트레이스 exporter 출력 포함)"인데 메모리 내보내기는 파일을 남기지 않아 스캔이 스팬을 본 적이 없었다 — 보고서를 쓰다 찾았다 | `TracingLeakIT`가 단언 전에 `build/trace-export/*.log`로 쓴다, 스캔 줄에 `trace dumps: N`(`9af9ee0`, P7-17). 로컬 주입으로 확인(§4.12). 첫 판은 시험 원천에 경로를 글자로 적어 `verifyTestInputs`가 막았다(run 40502293298) — 디렉터리를 `integrationTest`의 출력으로 선언하고 속성으로 넘겼다(`ca4c6a0`, 규칙 그대로) | **발견·수정** |
 | F7 | Spring 기본 스케줄러는 스레드 하나 — 대사 회차(최대 15분 + 재구축) 동안 모든 테넌트의 인제스트 폴링이 멈췄을 것이다 | `spring.task.scheduling.pool.size: 2`, `ReconSchedulerIT.ingestAndReconTicksHaveTheirOwnThreads`(P7-5) | **발견·수정** |
 | F8 | 주입 S11은 키 단언이 먼저 잡아 값 스캔이 시험되지 않았다. S13 첫 판의 web-e2e 실패는 F5 때문에 증거가 못 된다 | S11b(값만), S13 둘째 판(고친 밑) — §3 | 기록 |
 | F9 | 커밋 보안 검토가 주입 커밋의 덩어리(S11b 원문 속성·S12 `oldest=`·S13 DRIFT)를 짚었다 | 버릴 초안 PR의 의도된 위반 — 병합 0, 가지 삭제. 작업 가지는 그대로 | 기록 |
 | F10 | 설계서 §5의 열 주석에 설명을 붙이면 `StatusEnumDdlTest`(주석의 값 목록을 읽는다)가 깨진다 | 주석은 값만 두고 설명은 §5 본문 "대사 표" 문단으로 | 기록 |
 | F11 | **운영자 `ingest rebuild`도 BATCH DRIFT 표식(`data_status`)을 지운다** — DE-28은 자동 재구축 경로(R5가 다시 쓴다)만 막는다. 운영자 재구축 뒤 다음 회차까지 그 달은 "정상"으로 보인다(`recon_result`의 미해결 행은 남아 다음 회차가 다시 DRIFT를 쓴다) | 이 Phase는 고치지 않았다 — `docs/운영.md` §8에 "운영자 재구축과 DRIFT 표식" 문단(재구축 뒤 `recon run`을 이어 부른다 — 이 커밋). §6 질문 3 | 질문 |
-| F12 | `docs/지표.md`가 "프레임워크 지표 접두사는 `MetricsCatalogTest`의 닫힌 목록"이라고 적었으나 정적 스캔에는 그런 목록이 없다(계획 ⑤의 레지스트리 방식의 흔적). §4 머리의 "Observation → 브리지"도 P7-9와 달랐다 | 문구 정정(`9af9ee0`·`0dcbc6f`) — 의미 변경 없음 | 기록 |
+| F12 | `docs/지표.md`가 "프레임워크 지표 접두사는 `MetricsCatalogTest`의 닫힌 목록"이라고 적었으나 정적 스캔에는 그런 목록이 없다(계획 ⑤의 레지스트리 방식의 흔적). §4 머리의 "Observation → 브리지"도 P7-9와 달랐다 | 문구 정정(`9af9ee0`) — 의미 변경 없음 | 기록 |
 
 ## 6. 다음 Phase 질문 (Phase 8 — 데모 생성기·compose·Keycloak PKCE·README)
 
