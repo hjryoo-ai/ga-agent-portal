@@ -40,7 +40,8 @@ public class QueryConfiguration {
                 return read.execute(status -> work.get());
             }
         };
-        return new MeQueries(new JdbcAgentQueryStore(agents), sync::snapshot, policyKeys, transaction,
+        // 대사 표식(포털 Phase 7): 대사가 같은 seq로 바꾼 달 상태를 ETag가 보게 — 마지막 회차의 시각·결과·수(값 없음)
+        return new MeQueries(new JdbcAgentQueryStore(agents), sync::snapshot, sync::lastRecon, policyKeys, transaction,
                 clock, props.defaultSyncDelaySeconds());
     }
 }

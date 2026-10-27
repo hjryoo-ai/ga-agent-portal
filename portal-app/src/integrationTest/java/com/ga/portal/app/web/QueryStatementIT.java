@@ -104,13 +104,14 @@ class QueryStatementIT extends ApiIntegrationTest {
     @Test
     void homeCallsHaveAFixedStatementCountIndependentOfData() {
         Map<String, Integer> caps = new LinkedHashMap<>();
-        caps.put("/api/v1/me", 4);
-        caps.put("/api/v1/me/earnings/202608", 5);
-        caps.put("/api/v1/me/limits?status=WARN", 4);
+        // 포털 Phase 7: 동기화 문맥을 쓰는 콜은 대사 표식 한 문장이 더 있다(ETag 재료 — 설정·커서 문장의 임계치 변환과 따로)
+        caps.put("/api/v1/me", 5);
+        caps.put("/api/v1/me/earnings/202608", 6);
+        caps.put("/api/v1/me/limits?status=WARN", 5);
         // 포털 Phase 4 P-4: 화면 홈은 status=ALL로 받는다(WARN은 정확히 WARN만 — 주의 N건은 화면이 단계 문자열로 센다). 같은 문장 수여야 한다
-        caps.put("/api/v1/me/limits?status=ALL", 4);
+        caps.put("/api/v1/me/limits?status=ALL", 5);
         // 포털 Phase 5 P-23: 홈의 넷째 콜 "다음 달 분급 예정"(한 달 범위) — 발급자 1 + 링크 1 + 설정·커서 1 + 월 합 1 + 항목 1
-        caps.put("/api/v1/me/deferrals?from=202609&to=202609", 5);
+        caps.put("/api/v1/me/deferrals?from=202609&to=202609", 6);
         // 포털 Phase 6: 홈의 다섯째 콜 "최근 알림 셋 + 안읽음 수" — 발급자 1 + 링크 1 + 페이지 1 + 수 1(설정·커서 없음 — 알림은 피드 위치와 무관)
         caps.put("/api/v1/me/notifications?size=3", 4);
         // 월 상세는 지난달 값(CR-1)을 같은 문장의 LEFT JOIN으로 — 문장 수 그대로 5(위)

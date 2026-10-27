@@ -63,7 +63,8 @@ class MeQueriesTest {
 
     final FakeStore store = new FakeStore();
     SyncSnapshot snapshot = snapshot(Optional.of(NOW.minusSeconds(10)));
-    final MeQueries queries = new MeQueries(store, () -> snapshot, (tenant, policyNo) -> key(policyNo), new ReadTransaction(),
+    Optional<String> reconMark = Optional.empty();
+    final MeQueries queries = new MeQueries(store, () -> snapshot, () -> reconMark, (tenant, policyNo) -> key(policyNo), new ReadTransaction(),
             Clock.fixed(NOW, ZoneOffset.UTC), 300);
 
     /** 가짜 키(16자 16진, 결정적). */
@@ -367,6 +368,24 @@ class MeQueriesTest {
         assertThat(late.etag()).isNotEqualTo(fresh.etag());
         assertThat(((com.ga.portal.query.api.MeResponse) late.body()).dataStatus()).isEqualTo("SYNC_DELAYED");
         assertThat(((com.ga.portal.query.api.MeResponse) fresh.body()).dataStatus()).isEqualTo("OK");
+    }
+
+    /** 포털 Phase 7: 같은 {@code seq}에서 대사 회차(달의 {@code data_status})나 재구축(커서 갱신 시각)이 뷰를 바꾸면 ETag가 바뀐다 — 304가 옛 본문을 되살리지 않게. */
+    @Test
+    void aReconRunOrARebuildAtTheSameSeqChangesTheEtag() {
+        Caller a = caller(A, Role.AGENT);
+        String before = queries.me(a).etag();
+        String prefix = before.substring(0, before.lastIndexOf('.'));
+        SyncSnapshot s = snapshot;
+        reconMark = Optional.of("2026-10-17T19:00:00Z|DRIFT|1|-");
+        String afterRecon = queries.me(a).etag();
+        assertThat(afterRecon).isNotEqualTo(before).startsWith(prefix);
+        snapshot = new SyncSnapshot(s.tenantName(), s.payoutDayRule(), s.limitWarnBp(), s.limitCritBp(), s.configuredDelaySeconds(),
+                s.forecastScenarioEnabled(), s.cursor().map(c -> new SyncSnapshot.Cursor(c.lastSeq(), c.updatedAt().plusSeconds(60), c.state(), c.caughtUpAt())));
+        String afterRebuild = queries.me(a).etag();
+        assertThat(afterRebuild).isNotEqualTo(afterRecon).startsWith(prefix);
+        assertThat(queries.me(a).etag()).as("the same marks give the same tag").isEqualTo(afterRebuild);
+        assertThat(queries.earnings(a, "202601", "202612").etag()).as("every response of the context").doesNotStartWith(before.substring(0, before.length() - 1));
     }
 
     // ------------------------------------------------------------------ 1.1.0 (포털 Phase 5 ⑦·C9, CR-1~4)

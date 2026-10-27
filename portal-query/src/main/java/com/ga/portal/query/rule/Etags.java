@@ -9,7 +9,8 @@ import java.util.List;
 /**
  * 약한 ETag(계획 ⑤ Q4 — DE-16): {@code W/"<seq>.<sync>.<cfg>"}. {@code seq} = 커서 {@code last_seq}, {@code sync} = {@code dataStatus} 한 글자,
  * {@code cfg} = 그 요청이 <b>실제로 읽은</b> 테넌트 설정 값들의 SHA-256 앞 8자(값 사이 {@code U+001F}). 같은 {@code seq}에서도 지연 배지·지급일·임계치가
- * 바뀌면 ETag가 바뀐다. 라인 목록은 뒤에 {@code .<page>.<size>.<필터 해시 8자>}.
+ * 바뀌면 ETag가 바뀐다. 포털 Phase 7(P7-15): 호출자는 설정 값 뒤에 데이터 표식(커서 갱신 시각·마지막 대사 회차)을 붙인다 — 재구축·대사는 {@code seq}를
+ * 바꾸지 않고 본문을 바꾼다. 라인 목록은 뒤에 {@code .<page>.<size>.<필터 해시 8자>}.
  */
 public final class Etags {
 

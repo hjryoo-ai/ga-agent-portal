@@ -442,6 +442,7 @@ DE-24 문구 정정(Q30): "앞으로 포털 계약 개정은 작업 브랜치 �
 | P7-12 | ⑧ C2 `ReconResultWriteIT` | 열 목록(`information_schema` — 차이 열 0) + DRIFT 행 값. 비교 안 한 필드 NULL은 `ReconRunnerTest`(확정 답에 환수 상계가 없을 때 — 엔진 샘플에 그런 답이 없다) | 샘플 밖 답은 스텁이 낼 수 없다(C1 — 샘플 밖 500) |
 | P7-13 | ⑧ C7 `ReconEngineIT` "404 둘·422·400" | 404 둘·422는 `HttpStatementClientTest`(실 HTTP·샘플), 동시 1·재시도 0·예산은 `ReconRunIT`. 400은 판정 표(`ReconRulesTest` — `ENGINE_REJECTED`)만 | 엔진 샘플에 400 답이 없다 |
 | P7-14 | (계획에 없음) | `TenantContextGuardTest`(닫힌 저장소·공개 메서드 목록)에 새 저장소 둘·메서드 다섯 | `7ed1b98`에서 빠뜨려 CI run 40495054323(`portal-infra:test`)이 잡았다 — `f4dc0d0` |
+| P7-15 | (계획에 없음 — 설계서 §7 v1.6 ETag) | ETag `cfg` 입력에 데이터 표식 둘(커서 `updated_at`, 마지막 `recon_run` 행) — 표식은 `SyncStatusRepository.lastRecon` 한 문장(문장 수 +1: `/me` 5·`/earnings/{ym}` 6·`/limits` 5·`/deferrals` 6). `CachingIT.aReconRunOrARebuildAtTheSameSeqChangesTheTag`, `MeQueriesTest.aReconRunOrARebuildAtTheSameSeqChangesTheEtag` | E2E ⓑ(run 40498434426·40499141094 — android·desktop)가 찾았다: 대사가 `data_status`를 DRIFT로 바꿔도 `seq`·설정이 같아 304가 "정상" 본문을 되살렸다(iOS 프로젝트는 두 회차 모두 통과 — 이유는 확인하지 않았다). 설정·커서 문장에 붙이면 같은 문장의 임계치 변환(`* 100`)이 `ReconArithmeticScanTest`에, `ReconRunRepository`로 읽으면 `ApiLayerRulesTest`(조회 경로 저장소)에 걸려 코드를 옮겼다. **설계 의미 변경 — 수용 심사에서 승인 요청** |
 
 ### 결정 (설계서 v1.10)
 

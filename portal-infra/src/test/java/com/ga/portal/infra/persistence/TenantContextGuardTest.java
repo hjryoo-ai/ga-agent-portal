@@ -105,7 +105,7 @@ class TenantContextGuardTest {
         assertThat(publicMethods(IdentityLinkRepository.class)).containsExactly("find");
         assertThat(publicMethods(AgentQueryRepository.class)).containsExactly("byType", "deferralPolicies", "deferrals", "deferralsOfLine", "dueMonths", "history",
                 "ledger", "ledgerIdOfPolicy", "ledgers", "line", "linePolicies", "lines", "month", "monthDetail", "months", "policies", "profile", "receivableOfLine");
-        assertThat(publicMethods(SyncStatusRepository.class)).containsExactly("snapshot");
+        assertThat(publicMethods(SyncStatusRepository.class)).containsExactly("lastRecon", "snapshot");
         assertThat(publicMethods(SimulationLogRepository.class)).containsExactly("failed", "insertRequested", "succeeded", "window");
         assertThat(publicMethods(SimulationLockRepository.class)).containsExactly("lock");
         assertThat(publicMethods(NotificationRepository.class)).containsExactly("counts", "insertIfAbsent", "markRead", "page");
@@ -182,6 +182,7 @@ class TenantContextGuardTest {
         assertThatThrownBy(() -> query.monthDetail("A-1001", "202608", "202607")).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> query.deferralPolicies("A-1001")).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(sync::snapshot).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(sync::lastRecon).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> query.policies("A-1001")).isInstanceOf(TenantNotBoundException.class);
         java.util.UUID simId = java.util.UUID.fromString("00000000-0000-4000-8000-000000000001");
         assertThatThrownBy(() -> simLog.window("A-1001", NOW)).isInstanceOf(TenantNotBoundException.class);
