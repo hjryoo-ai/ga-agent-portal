@@ -73,6 +73,10 @@ class TenantContextGuardTest {
     // Phase 5
     private final SimulationLogRepository simLog = new SimulationLogRepository(new TenantJdbcGateway(recording));
     private final SimulationLockRepository simLock = new SimulationLockRepository(new TenantJdbcGateway(recording));
+    // Phase 6
+    private final NotificationRepository notifications = new NotificationRepository(new TenantJdbcGateway(recording));
+    private final InquiryRepository inquiries = new InquiryRepository(new TenantJdbcGateway(recording));
+    private final InquiryOperatorRepository operatorInquiries = new InquiryOperatorRepository(new TenantJdbcGateway(recording));
     private static final Instant NOW = Instant.parse("2026-10-17T00:00:00Z");
     private static final IngestEventRecord ROW = new IngestEventRecord(TenantId.of("GA01"), "5eed0000-0000-4000-8000-000000000001", 1,
             "AgentSnapshot", NOW, IngestEventStatus.APPLIED, Optional.empty(), "d".repeat(64));
@@ -101,6 +105,9 @@ class TenantContextGuardTest {
         assertThat(publicMethods(SyncStatusRepository.class)).containsExactly("snapshot");
         assertThat(publicMethods(SimulationLogRepository.class)).containsExactly("failed", "insertRequested", "succeeded", "window");
         assertThat(publicMethods(SimulationLockRepository.class)).containsExactly("lock");
+        assertThat(publicMethods(NotificationRepository.class)).containsExactly("counts", "insertIfAbsent", "markRead", "page");
+        assertThat(publicMethods(InquiryRepository.class)).containsExactly("count", "find", "insert", "lock", "ownsLine", "page", "window");
+        assertThat(publicMethods(InquiryOperatorRepository.class)).containsExactly("answer", "close", "list", "lockOne");
     }
 
     /** 위 목록이 이 패키지의 저장소 전부다 — 새 저장소가 목록 밖에 남지 않는다(Phase 3: 손으로 적은 목록을 패키지와 대조). */
@@ -126,7 +133,7 @@ class TenantContextGuardTest {
                 "AuditAccessRepository", "AgentProfileRepository", "EarningsLineRepository", "EarningsMonthRepository", "PolicyLimitRepository",
                 "DeferralItemRepository", "ClawbackItemRepository", "PolicyFlagRepository", "ReconResultRepository", "ViewResetRepository",
                 "ViewRepository", "IdentityLinkRepository", "AgentQueryRepository", "SyncStatusRepository", "SimulationLogRepository",
-                "SimulationLockRepository");
+                "SimulationLockRepository", "NotificationRepository", "InquiryRepository", "InquiryOperatorRepository");
     }
 
     @Test
@@ -175,6 +182,25 @@ class TenantContextGuardTest {
         assertThatThrownBy(() -> simLog.succeeded(simId, "A-1001", "{}", "RS-1", 200)).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> simLog.failed(simId, "A-1001", "ENGINE_CONTRACT", Optional.of(400))).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> simLock.lock("A-1001")).isInstanceOf(TenantNotBoundException.class);
+        java.util.UUID id = java.util.UUID.fromString("00000000-0000-4000-8000-000000000002");
+        assertThatThrownBy(() -> notifications.page("A-1001", false, 0, 20)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> notifications.counts("A-1001", true)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> notifications.markRead("A-1001", id, NOW)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> notifications.insertIfAbsent(new NotificationRepository.Fresh(id, "A-1001", "PAYOUT", "INFO", "PAYOUT:202608",
+                Optional.of("/statements/202608"), "{\"ym\":\"202608\"}", NOW))).isInstanceOf(TenantNotBoundException.class);
+        com.ga.portal.domain.InquiryRecord inquiry = com.ga.portal.domain.InquiryRecord.open(id, "A-1001", Optional.empty(),
+                com.ga.portal.domain.InquiryCategory.OTHER, "m", NOW);
+        assertThatThrownBy(() -> inquiries.ownsLine("A-1001", "1")).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> inquiries.lock("A-1001")).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> inquiries.window("A-1001", NOW)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> inquiries.insert(inquiry)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> inquiries.page("A-1001", Optional.empty(), 0, 20)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> inquiries.count("A-1001", Optional.empty())).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> inquiries.find("A-1001", id)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> operatorInquiries.list(Optional.empty())).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> operatorInquiries.lockOne(id)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> operatorInquiries.answer(id, "a", "cli:ops", NOW)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> operatorInquiries.close(id)).isInstanceOf(TenantNotBoundException.class);
         AgentRow agent = new AgentRow("A-1001", "n", Optional.empty(), "/HQ", Optional.empty(), AgentStatus.ACTIVE, LocalDate.of(2026, 8, 1), 1);
         LineRow line = new LineRow("1", "A-1001", "P", Optional.empty(), "FY_COMM", 1, "202608", Optional.empty(), 0, Optional.empty(), "{}", "{}", 2);
         MonthRow month = MonthRow.first("A-1001", "202608", MonthStatus.PROVISIONAL, 2);

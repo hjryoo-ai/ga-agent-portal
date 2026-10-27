@@ -24,7 +24,7 @@
 - Lombok 금지. `record`·`sealed`·pattern matching 사용. DTO는 record.
 - 시간은 `java.time` + 주입된 `Clock`. `LocalDate.now()`·`Instant.now()` 직접 호출 금지.
 - 계약은 JSON Schema 2020-12 + OpenAPI 3.1(`contracts/`). 금액은 `integer`, 날짜·시각·UUID는 `format`이 아니라 `pattern`(`contracts/` 전 파일 `format` 0). `contracts/shared/`의 사본은 고치지 않는다. `CHECKSUMS`는 파일 바이트의 평문 SHA-256(`sha256sum -c` 형식)이고, JCS(`platform-canonical`)는 이벤트 payload의 정규 해시에만 쓴다.
-- 의존 방향 `app → query/ingest/sim/recon → projection → domain`, `infra`는 `app`만. `portal-domain`·`portal-projection`·`portal-query`·`portal-sim`은 Spring·DB 의존성을 갖지 않는다(`platform-core`만 가능 — Gradle `verifySpringFree`와 ArchUnit). 곱셈·나눗셈·나머지는 허용 목록 메서드에서만(절대 규칙 1). `platform-spring`은 `infra`·`app`에서만. 플랫폼 타입과 단순 이름이 같은 포털 클래스를 만들지 않는다.
+- 의존 방향 `app → query/ingest/sim/inbox/recon → projection → domain`, `infra`는 `app`만. `portal-domain`·`portal-projection`·`portal-query`·`portal-sim`·`portal-inbox`는 Spring·DB 의존성을 갖지 않는다(`platform-core`만 가능 — Gradle `verifySpringFree`와 ArchUnit). 곱셈·나눗셈·나머지는 허용 목록 메서드에서만(절대 규칙 1). `platform-spring`은 `infra`·`app`에서만. 플랫폼 타입과 단순 이름이 같은 포털 클래스를 만들지 않는다.
 - 소스셋 밖의 파일을 읽는 테스트는 그 파일(디렉터리)을 Gradle 입력으로 선언한다. 주입이 첫 시도에 실패하지 않으면 테스트보다 입력 선언을 먼저 본다(`verifyTestInputs`가 테스트 원천의 저장소 경로를 그 태스크의 입력과 대조한다).
 
 ## 인제스트 규약 (포털 Phase 1 — 설계서 §6.1)
@@ -60,6 +60,15 @@
 - **거부는 코드마다 고정 바이트**(401·404·400·500 + 422 셋·429·502·503 — `ProblemResponses`). 엔진 400·404는 502, 닿지 않으면 503.
 - 시험의 엔진 데이터는 엔진 샘플 사본(`contracts/shared/ga-commission-engine/`)뿐 — 스텁(`StubSimulationEngine`)은 요청의 JCS 정규형으로 대조하고, 샘플 밖 요청에는 500을 낸다.
 
+## 알림·문의 규약 (포털 Phase 6 — 설계서 §6.1·§6.5·§6.7·§7·§9·§10)
+- **알림은 인제스트 적용 트랜잭션 안, 프로젝터 다음에만 생긴다**(`IngestApplier` → `NotificationDeriver` — 운영 빈은 `JdbcNotificationDeriver` 하나). 커서를 따로 읽는 파생기를 두지 않는다. 파생의 예외는 그 이벤트의 `APPLY_ERROR`다(뷰·알림·`ingest_event`가 함께 롤백). 규칙은 `portal-projection` `notify.NotificationRules`의 순수 함수이고, 새 `Change` 변이는 규칙의 `switch`가 컴파일에서 받는다(sealed).
+- **재구축은 파생하지 않는다** — `Rebuilder`가 파생 규칙·포트·적용기에 전이로라도 닿으면 ArchUnit이 실패한다. 재구축은 알림·문의 행을 지우지도 않는다. 재구축이 처음 적용한 사실의 알림은 없다(설계서 §14.1 #12).
+- **중복은 키로만**: `(tenant_id, agent_id, dedup_key)` 유일 + `ON CONFLICT DO NOTHING`, 행 id는 그 셋의 이름 기반 UUID. 한도 단계 키에는 이벤트 seq가 든다(하향 뒤 재상향은 새 알림). 상태 표를 두지 않는다.
+- **`params`에 금액·증권번호 원문이 없다.** 닫힌 모양 여섯(`NotificationParams` = 계약 변이 — `InboxApiContractTest`), 증권번호는 `policyMasked`만. 서버는 문장을 만들지 않는다(`title`·`body`는 V7 `CHECK`로 NULL만) — 문장은 화면 템플릿(`messages.ko.json` `notifications.<TYPE>`). 응답에 `dedupKey`·`agentId`가 없다. `link`는 화면 경로 넷(`/lines/:calcId`·`/limits/:ledgerId`·`/statements/:ym`·`/inquiries/:id`)의 형식이고, 화면은 그 넷에 맞을 때만 이동한다(`notify/links.ts`).
+- **문의 본문은 작성자의 상세 응답과 운영 CLI `inquiry list`에만 있다.** 목록·접수 응답·알림·감사 `detail`·지표 태그·로그·예외 메시지·시험 출력에 0(센티널 `pii-sentinels.properties`의 `inbox`·`inquiry`). 거부 경로는 입력 조각을 담지 않는다(고정 바이트). 화면에서는 작성·상세 화면만.
+- **운영 답변은 파일로만**(`inquiry answer --answer-file=`) — `--answer` 같은 인자는 없다(64). 답변·알림 삽입·감사는 한 트랜잭션. CLI 출력에서 설계사가 쓴 글의 제어·서식·구분 문자는 보이는 이스케이프로만.
+- 문의 레이트 리밋은 `inquiry` 행 수(직전 24시간, 테넌트 `params.inquiry_rate_per_day`) + 설계사 권고 잠금, 429에는 행·감사가 없다. 쓰기 경로(PATCH 읽음·POST 문의·POST 시뮬레이션)는 `Authorization` 헤더만 인증이다 — 쿠키로는 401(CSRF 토큰·`Origin` 검사를 두지 않는 근거, 설계서 §9).
+
 ## 화면 규약 (포털 Phase 4 — 설계서 §6.2·§8·§9·§10)
 - **화면은 금액을 계산·비교·변환하지 않는다.** 생성 클라이언트의 금액은 불투명 `Won`(`client-lock.mjs`의 변환 훅) — 산술·비교·템플릿 보간·JSX 직접 렌더는 타입 오류이거나 ESLint `portal/no-money-arithmetic`(이름 또는 구조 표식 `__@wonBrand@`로 인식) 위반이다. 숫자로 바꾸는 곳은 `src/money/won.ts` 하나(`formatWon`·`isZero`·`present`) — 닫힌 목록. 있음/없음 확인도 `present()`로. 번들 스캔이 산출물에서 한 번 더 본다.
 - **모든 금액은 라벨과 함께만** `<Amount value label>` — `StatusLabel`은 `src/labels/labels.ts`만 만든다. 세후는 16칸 표(설계서 §6.2)를 따르고 표 밖 조합은 숨긴다. 화면 문구는 `src/messages.ko.json`만(한글 리터럴은 ESLint `portal/no-hangul-literal`), 계약 열거와 양방향 대조(`messages.test.ts`).
@@ -71,7 +80,7 @@
 - **입력 규칙은 계약의 데이터**(Phase 5): 요청 본문·쿼리의 `pattern`·길이·필수·`if/then`은 `client:lock`이 계약에서 쓴 `src/gen/portal-api.rules.json`(잠금이 해시 고정)으로 검사한다 — 화면에 손으로 다시 적지 않는다. 입력은 문자열 그대로 보낸다(숫자로 바꾸지 않는다).
 - 라벨(Phase 5): 분급 예정 합계 `forecastLabel`, 유지율 가정이 적용된 합계만 `retentionLabel(p)`, 시뮬레이션 결과의 모든 금액 `simulationLabel` — 기존 라벨 어느 것과도 다르다(`labels.test`). 시뮬레이션 화면은 소진율·전후 차이를 만들지 않고 "실수령"이라 쓰지 않는다.
 - 의존성: pnpm `--frozen-lockfile`, 정확한 판(`saveExact`), 공개 1일 미만 판 금지(`minimumReleaseAge`), 라이선스 표 `web/THIRD-PARTY.md`(`webLicenses`가 대조), `pnpm audit` 결과는 CI 아티팩트로 기록.
-- E2E 센티널(허구 증권번호·식별자)은 `pii-sentinels.properties`의 `e2e` 키 — 평문 스캔은 웹 산출물·Vitest 결과·E2E 결과도 본다.
+- E2E 센티널(허구 증권번호·식별자)은 `pii-sentinels.properties`의 `e2e` 키, 문의 본문 센티널은 `inquiry` 키(Phase 6 — 작성·상세 화면 DOM과 상세 응답에서만 허용) — 평문 스캔은 웹 산출물·Vitest 결과·E2E 결과도 본다.
 
 ## 작업 방식
 - Phase 단위: 계획 → 승인 → 단계 커밋(테스트와 같은 커밋) → 보고서 → 태그 → PR. 지시문의 완료 기준(C-n)을 전부 테스트로 증명해야 다음 Phase로 간다.

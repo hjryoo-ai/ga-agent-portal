@@ -120,7 +120,7 @@
     "simulation": "시뮬레이션",
     "notifications": "알림함",
     "inquiry": "이 항목 문의하기",
-    "comingSoon": "준비 중"
+    "inquiries": "문의 내역"
   },
   "home": {
     "thisMonth": "이번 달 · {ym}",
@@ -142,7 +142,11 @@
     "nextMonthNone": "다음 달 예정 없음",
     "previous": "전월 · {ym}",
     "previousNone": "전월 내역 없음",
-    "toTimeline": "분급 타임라인 보기"
+    "toTimeline": "분급 타임라인 보기",
+    "notifications": "최근 알림",
+    "unread": "안읽음 {n}건",
+    "noNotifications": "새 알림이 없습니다",
+    "toNotifications": "알림함 보기"
   },
   "statement": {
     "title": "월별 명세",
@@ -292,5 +296,64 @@
     "invalidRequest": "입력을 확인해 주세요",
     "failed": "시뮬레이션에 실패했습니다",
     "lastResult": "마지막 결과"
+  },
+  "notifications": {
+    "LIMIT_WARN": "계약 {policyMasked}의 한도 사용이 주의 단계에 들어섰습니다",
+    "LIMIT_CRIT": "계약 {policyMasked}의 한도 사용이 위험 단계에 들어섰습니다",
+    "LIMIT_FULL": "계약 {policyMasked}의 한도를 모두 사용했습니다",
+    "LIMIT_REBASE": "계약 {policyMasked}의 한도가 다시 산정되었습니다",
+    "LIMIT_CUT": "{closeYm} 계약 {policyMasked}의 수수료 일부가 한도 초과로 삭감되었습니다",
+    "CLAWBACK": "{closeYm} 계약 {policyMasked}에 환수가 생겼습니다",
+    "DEFER_HELD": "계약 {policyMasked}의 {dueYm} 분급이 보류되었습니다",
+    "DEFER_CANCELLED": "계약 {policyMasked}의 {dueYm} 분급이 취소되었습니다",
+    "POLICY_PAYMENT_OVERDUE": "계약 {policyMasked}의 보험료 납입 지연이 확인되었습니다({occurredOn})",
+    "POLICY_LAPSE": "계약 {policyMasked}의 실효가 확인되었습니다({occurredOn})",
+    "POLICY_CANCEL": "계약 {policyMasked}의 해약이 확인되었습니다({occurredOn})",
+    "STMT_CONFIRMED": "{ym} 명세가 확정되었습니다",
+    "PAYOUT": "{ym} 수수료 지급이 끝났습니다",
+    "INQUIRY_ANSWERED": "문의에 답변이 등록되었습니다"
+  },
+  "inbox": {
+    "title": "알림함",
+    "unread": "안읽음",
+    "more": "더 보기",
+    "empty": "알림이 없습니다",
+    "at": "{at}"
+  },
+  "inquiry": {
+    "title": "문의 내역",
+    "newTitle": "문의하기",
+    "detailTitle": "문의",
+    "new": "새 문의",
+    "empty": "문의가 없습니다",
+    "category": "분류",
+    "categories": {
+      "AMOUNT": "금액",
+      "LIMIT": "한도",
+      "CLAWBACK": "환수",
+      "DEFERRAL": "분급",
+      "OTHER": "기타"
+    },
+    "statuses": {
+      "OPEN": "접수됨",
+      "ANSWERED": "답변 완료",
+      "CLOSED": "종료"
+    },
+    "message": "문의 내용",
+    "notice": "고객 이름·연락처·증권번호를 쓰지 마세요",
+    "remaining": "{n}자 남음",
+    "over": "{n}자 넘었습니다",
+    "required": "문의 내용을 입력해 주세요",
+    "submit": "문의 보내기",
+    "submitting": "보내는 중",
+    "rateLimited": "오늘 문의 한도를 넘었습니다 — {n}초 뒤 다시 시도해 주세요",
+    "failed": "문의를 보내지 못했습니다 — 잠시 뒤 다시 시도해 주세요",
+    "lineMissing": "이 라인으로는 문의할 수 없습니다",
+    "createdAt": "접수 {at}",
+    "answer": "답변",
+    "answeredAt": "답변 {at}",
+    "noAnswer": "아직 답변이 없습니다",
+    "toLine": "문의한 라인 보기",
+    "notFound": "문의를 찾을 수 없습니다"
   }
 }

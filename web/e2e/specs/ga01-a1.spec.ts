@@ -1,7 +1,10 @@
 // GA01 — 엔진 A-1 둘째 판(+ 같은 테넌트 이웃 설계사). 지시문 ⑦ 시나리오: 상태 전이(머리를 올리며) → 홈 → 명세 → 라인 상세 → 한도 → 상세, 동기화 지연.
 // 한 프로젝트 안에서는 순서대로(머리는 되돌리지 않는다).
+// 포털 Phase 6 E1(계획 ⑨): 머리를 2 → 5 → 7 → 11로 올리며 알림함의 항목이 그 시점에만 는다 — 3 LIMIT_CUT·5 LIMIT_FULL(OK → FULL, 한 건) · 6 STMT_CONFIRMED·
+// 7 PAYOUT · 8 POLICY_CANCEL·9 CLAWBACK · 10(FULL → OK 하향)·11은 0. 이웃 설계사(12~14)의 알림은 A-1001의 알림함에 없다.
 import { advance, failFeed, streamLength, tenantOf } from '../support/env';
 import { expect, test } from '../support/fixtures';
+import { openInbox, sorted } from '../support/inbox';
 
 const AUG = '2026-08-20T03:00:00Z'; // KST 08-20 — "이번 달" 202608
 const FEB = '2027-02-20T03:00:00Z'; // KST 2027-02-20 — 202702
@@ -10,7 +13,11 @@ test.describe.configure({ mode: 'serial' });
 
 test('202608: 예상 → 확정(세후는 지급 시 확정) → 지급완료, 한도 소진 카드', async ({ page, portal }, info) => {
   const t = tenantOf(info.project.name, 'GA01');
+  await advance(t, 2);
+  expect((await openInbox(page, portal, t, AUG)).types, 'E1 seq 2').toEqual([]);
+  await portal.check('ga01 inbox empty');
   await advance(t, 5);
+  expect(sorted((await openInbox(page, portal, t, AUG)).types), 'E1 seq 5').toEqual(['LIMIT_CUT', 'LIMIT_FULL']);
   await portal.open('/', t, 'agent', AUG);
   const card = page.getByTestId('month-card');
   await expect(card.getByTestId('month-status')).toHaveText('예상');
@@ -36,11 +43,18 @@ test('202608: 예상 → 확정(세후는 지급 시 확정) → 지급완료, �
   await expect(card.getByTestId('row-tax')).toHaveText('원천세59,400원지급완료');
   await expect(card.getByTestId('paid-on')).toHaveText('지급일 2026-09-10');
   await portal.check('ga01 home paid');
+  expect(sorted((await openInbox(page, portal, t, AUG)).types), 'E1 seq 7').toEqual(['LIMIT_CUT', 'LIMIT_FULL', 'PAYOUT', 'STMT_CONFIRMED']);
 });
 
 test('202702: 환수 상계와 잠정 명세(예상, 순액 0) — 예상 이월은 보이지 않는다', async ({ page, portal }, info) => {
   const t = tenantOf(info.project.name, 'GA01');
   await advance(t, 11);
+  const inbox = await openInbox(page, portal, t, FEB);
+  expect(sorted(inbox.types), 'E1 seq 11').toEqual(['CLAWBACK', 'LIMIT_CUT', 'LIMIT_FULL', 'PAYOUT', 'POLICY_CANCEL', 'STMT_CONFIRMED']);
+  expect(inbox.response.unreadCount).toBe(6);
+  // 문장은 화면 템플릿(금액 없음 — 계획 Q1), 안읽음은 숨은 글자로도
+  await expect(page.getByTestId('notification').filter({ hasText: '안읽음 2027년 2월 계약 *********0001에 환수가 생겼습니다' })).toHaveCount(1);
+  await portal.check('ga01 inbox');
   await portal.open('/', t, 'agent', FEB);
   const card = page.getByTestId('month-card');
   await expect(card.getByTestId('month-status')).toHaveText('예상');

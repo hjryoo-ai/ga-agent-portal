@@ -46,10 +46,10 @@ class MultiplicationScanTest {
     static final List<Allowed> ALLOWLIST = List.of(
             new Allowed("com.ga.portal.query.rule.ForecastScenario#apply",
                     "분급 시나리오 floor(expected × p / 100) — 포털이 금액을 곱하는 유일한 자리(설계서 §6.4, 지시문 Phase 5 ④ 승인)"),
-            new Allowed("com.ga.portal.query.rule.LimitStage#of",
+            new Allowed("com.ga.portal.domain.rule.LimitStage#of",
                     "누적 × 10000과 한도 × 임계치 bp의 정수 비교(Phase 3 D-13) — 단계 이름만 낸다, 금액을 만들지 않는다"),
-            new Allowed("com.ga.portal.infra.persistence.AgentQueryRepository#lines",
-                    "라인 목록의 오프셋 page × size — 금액이 아니다"));
+            new Allowed("com.ga.portal.domain.rule.Paging#offset",
+                    "목록의 오프셋 page × size(라인·알림·문의 — Phase 6에 AgentQueryRepository#lines에서 옮겼다) — 금액이 아니다"));
 
     static final Set<Opcode> OPERATORS = EnumSet.of(Opcode.IMUL, Opcode.LMUL, Opcode.IDIV, Opcode.LDIV, Opcode.IREM, Opcode.LREM,
             Opcode.FMUL, Opcode.DMUL, Opcode.FDIV, Opcode.DDIV, Opcode.FREM, Opcode.DREM);

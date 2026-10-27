@@ -30,7 +30,8 @@ import java.util.Set;
  * ① 포털 DB의 GA01 뷰 9표 = 골든 뷰 {@code a1}(둘째 판 — {@code ProjectionGoldenIT}와 같은 정규형) ② {@code GET /api/v1/me/earnings/202608}(시험 발급기 토큰)이
  * 200이고 계약({@code portal-api.openapi.yaml})을 통과하며 증권번호 원문이 없다 ③ (포털 Phase 5 ⑨) 시뮬레이션 한 쌍 — 신계약(엔진 샘플 S1의 요청)과
  * 해약 영향(S5 — 그 설계사의 원장 {@code policyKey}): 실 엔진의 답이 엔진 계약 사본 스키마를 통과해야 포털이 200을 내고, 포털 응답이 계약을 통과하며,
- * {@code simulation_log}에 그 둘이 {@code SUCCEEDED}로 남는다. 결과를 RESULT.md에 날짜·커밋·해시와 함께 쓴다(토큰·subject·비밀 없음).
+ * {@code simulation_log}에 그 둘이 {@code SUCCEEDED}로 남는다 ④ (포털 Phase 6 ⑨) GA01의 {@code notification} 행 수 &gt; 0 — 알림은 피드 적용
+ * 트랜잭션에서 자연히 생긴다(종류별 수만 적는다 — 키·매개변수는 읽지 않는다). 결과를 RESULT.md에 날짜·커밋·해시와 함께 쓴다(토큰·subject·비밀 없음).
  *
  * <p>인자: {@code <stateDir> <jdbcUrl> <portalBaseUrl> <resultFile> <engineCommit> <portalCommit>}. DB는 {@code portal_app}(로컬 기본 자격 증명 —
  * {@code docker/postgres/init-roles.sql})으로 테넌트를 설정해 읽는다.
@@ -71,7 +72,7 @@ public final class EngineFeedE2eCheck {
         String body = new String(r.body(), StandardCharsets.UTF_8);
         String contract;
         try {
-            ApiContract.check("/api/v1/me/earnings/202608", r);
+            ApiContract.check("GET", "/api/v1/me/earnings/202608", r);
             contract = r.statusCode() == 200 ? "OK" : "status " + r.statusCode();
         } catch (AssertionError e) {
             contract = "VIOLATION " + e.getMessage().lines().findFirst().orElse("");
@@ -96,7 +97,7 @@ public final class EngineFeedE2eCheck {
                     HttpResponse.BodyHandlers.ofByteArray());
             String simContract;
             try {
-                ApiContract.check(e.getKey(), s);
+                ApiContract.check("POST", e.getKey(), s);
                 simContract = s.statusCode() == 200 ? "OK" : "status " + s.statusCode();
             } catch (AssertionError err) {
                 simContract = "VIOLATION " + err.getMessage().lines().findFirst().orElse("");
@@ -108,6 +109,12 @@ public final class EngineFeedE2eCheck {
         List<String> logRows = simulationLog(jdbcUrl);
         boolean logOk = logRows.equals(List.of("NEW_CONTRACT SUCCEEDED 200", "POLICY_EVENT SUCCEEDED 200"));
         ok &= logOk;
+
+        // ④ 알림 행(포털 Phase 6) — 수만
+        Map<String, Integer> notifications = notificationCounts(jdbcUrl);
+        int notificationRows = notifications.values().stream().mapToInt(Integer::intValue).sum();
+        boolean notificationsOk = notificationRows > 0;
+        ok &= notificationsOk;
 
         report.add("# 실 엔진 E2E 결과 (e2e/engine-feed)");
         report.add("");
@@ -131,6 +138,13 @@ public final class EngineFeedE2eCheck {
         report.add("");
         simResults.forEach((path, v) -> report.add("- `POST " + path + "`: " + v));
         report.add("- `simulation_log`(GA01, 시각 순): " + String.join(" · ", logRows) + " — " + (logOk ? "OK" : "기대 NEW_CONTRACT·POLICY_EVENT SUCCEEDED 200 둘"));
+        report.add("");
+        report.add("## 알림(포털 Phase 6)");
+        report.add("");
+        StringBuilder byType = new StringBuilder();
+        notifications.forEach((type, n) -> byType.append(byType.isEmpty() ? "" : " · ").append(type).append(' ').append(n));
+        report.add("- `notification`(GA01) 행 수 " + notificationRows + (byType.isEmpty() ? "" : " (" + byType + ")") + " — "
+                + (notificationsOk ? "OK" : "기대 1행 이상"));
         Files.write(result, report, StandardCharsets.UTF_8);
         System.out.println("[e2e] " + (ok ? "PASS" : "FAIL") + " — " + result);
         if (!ok) {
@@ -184,6 +198,28 @@ public final class EngineFeedE2eCheck {
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         out.add(rs.getString(1) + " " + rs.getString(2) + " " + rs.getString(3));
+                    }
+                }
+            }
+            c.rollback();
+        }
+        return out;
+    }
+
+    /** GA01의 알림 행 수(종류별) — 종류 열만 읽는다. */
+    static Map<String, Integer> notificationCounts(String jdbcUrl) throws Exception {
+        Map<String, Integer> out = new LinkedHashMap<>();
+        try (Connection c = DriverManager.getConnection(jdbcUrl, "portal_app", "app_local_only")) {
+            c.setAutoCommit(false);
+            try (PreparedStatement ps = c.prepareStatement("SELECT set_config('app.tenant_id', ?, true)")) {
+                ps.setString(1, TENANT);
+                ps.execute();
+            }
+            try (PreparedStatement ps = c.prepareStatement("SELECT type, count(*) FROM notification WHERE tenant_id = ? GROUP BY type ORDER BY type")) {
+                ps.setString(1, TENANT);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.put(rs.getString(1), rs.getInt(2));
                     }
                 }
             }

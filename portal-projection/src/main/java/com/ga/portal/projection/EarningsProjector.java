@@ -27,7 +27,7 @@ final class EarningsProjector {
     private EarningsProjector() {
     }
 
-    static void calculated(ViewStore store, Envelope e) {
+    static Change.LineAdded calculated(ViewStore store, Envelope e) {
         Payload p = new Payload(e.payload());
         String calcId = p.str("calcId");
         if (store.line(calcId).isPresent()) {
@@ -47,6 +47,7 @@ final class EarningsProjector {
                 default -> throw Projection.violation(ViolationReason.STATE_MISMATCH, e, "cut policy");
             });
         }
+        return new Change.LineAdded(line);
     }
 
     static void adjusted(ViewStore store, Envelope e) {

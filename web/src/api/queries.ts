@@ -1,5 +1,5 @@
 // 서버 상태(TanStack Query — 지시문 ①): 엔드포인트마다 훅 하나. 화면은 응답을 그대로 그리고 계산하지 않는다.
-import { MutationCache, QueryCache, QueryClient, useMutation, useQuery } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dropToken } from '../boot/token';
 import type { components } from '../gen/portal-api';
 import { ApiError, api, unwrap } from './client';
@@ -19,6 +19,11 @@ export type SimPolicyEventRequest = Schemas['SimPolicyEventRequest'];
 export type SimNewContractResponse = Schemas['SimNewContractResponse'];
 export type SimPolicyEventResponse = Schemas['SimPolicyEventResponse'];
 export type ProblemCode = Schemas['Problem']['code'];
+export type Notification = Schemas['Notification'];
+export type NotificationType = Notification['type'];
+export type InquiryCategory = Schemas['InquiryCategory'];
+export type InquiryStatus = Schemas['InquiryStatus'];
+export type InquiryRequest = Schemas['InquiryRequest'];
 
 /** 라인 목록은 그 달 전체를 받는다(계획 Q12 — 접기는 같은 달 안에서). API 페이지 크기 상한. */
 const LINE_PAGE_SIZE = 200;
@@ -149,4 +154,71 @@ export function usePolicyEventSimulation() {
 
 export function useLimit(ledgerId: string) {
   return useQuery({ queryKey: ['limit', ledgerId], queryFn: () => unwrap(api.GET('/api/v1/me/limits/{ledgerId}', { params: { path: { ledgerId } } })) });
+}
+
+// ---------------------------------------------------------------- 알림함·이의제기(포털 Phase 6, 계약 1.2.0)
+
+/** 알림 한 페이지 크기(알림함 "더 보기"). 홈은 최근 셋. */
+export const NOTIFICATION_PAGE_SIZE = 20;
+
+/** 홈의 최근 알림(size=3 한 콜 — 안읽음 수는 응답의 unreadCount). */
+export function useRecentNotifications() {
+  return useQuery({
+    queryKey: ['notifications', 'recent'],
+    queryFn: () => unwrap(api.GET('/api/v1/me/notifications', { params: { query: { size: 3 } } })),
+  });
+}
+
+/** 알림함 — 최신순, "더 보기"가 다음 페이지. */
+export function useNotificationPages() {
+  return useInfiniteQuery({
+    queryKey: ['notifications', 'pages'],
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      unwrap(api.GET('/api/v1/me/notifications', { params: { query: { page: pageParam, size: NOTIFICATION_PAGE_SIZE } } })),
+    getNextPageParam: (last) => ((last.page + 1) * last.size < last.total ? last.page + 1 : undefined),
+  });
+}
+
+/** 읽음(멱등) — 끝나면 알림 캐시를 버린다(안읽음 수·굵기가 바뀐다). */
+export function useMarkRead() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unwrap(api.PATCH('/api/v1/me/notifications/{id}/read', { params: { path: { id } } })),
+    retry: false,
+    onSettled: () => client.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+}
+
+export function useInquiries() {
+  return useQuery({ queryKey: ['inquiries'], queryFn: () => unwrap(api.GET('/api/v1/me/inquiries', { params: { query: { size: 100 } } })) });
+}
+
+export function useInquiry(id: string) {
+  return useQuery({ queryKey: ['inquiry', id], queryFn: () => unwrap(api.GET('/api/v1/me/inquiries/{id}', { params: { path: { id } } })) });
+}
+
+/** 문의 접수 거부 — 429의 Retry-After는 문자열 그대로(숫자로 바꾸지 않는다). */
+export class InquiryError extends ApiError {
+  constructor(
+    status: number,
+    readonly retryAfter: string | undefined,
+  ) {
+    super(status);
+    this.name = 'InquiryError';
+  }
+}
+
+/** 접수는 변이 — 재시도 없음(한 번 누름 = 한 행). 끝나면 목록을 버린다. */
+export function useCreateInquiry() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: InquiryRequest) => {
+      const { data, response } = await api.POST('/api/v1/me/inquiries', { body });
+      if (!response.ok || data === undefined) throw new InquiryError(response.status, response.headers.get('Retry-After') ?? undefined);
+      return data;
+    },
+    retry: false,
+    onSuccess: () => client.invalidateQueries({ queryKey: ['inquiries'] }),
+  });
 }

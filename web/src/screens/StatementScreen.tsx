@@ -11,7 +11,6 @@ import { Amount } from '../money/Amount';
 import { isZero, present } from '../money/won';
 import { ymAt, ymParts, ymShift } from '../time/kst';
 import { useNow } from '../time/useNow';
-import { ComingSoon } from '../ui/EntryPoints';
 import { LimitCut } from '../ui/LimitCut';
 import { isUncertain, MonthCard } from '../ui/MonthCard';
 import { Loading } from '../ui/States';
@@ -167,7 +166,9 @@ function MonthBody({ ym, nowMs }: { ym: string; nowMs: number }) {
         </section>
       ) : null}
       <Lines key={ym} month={data} />
-      <ComingSoon name={m.nav.inquiry} testId="entry-inquiry" />
+      <Link className="link-button" to="/inquiries/new" data-testid="entry-inquiry">
+        {m.nav.inquiry}
+      </Link>
     </>
   );
 }

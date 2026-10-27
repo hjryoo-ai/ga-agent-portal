@@ -11,6 +11,7 @@ import java.util.Optional;
  * 한도 원장(Phase 2 계획 ②): 개설 → {@code policy_limit} insert, 전기·재산정 → 원장 갱신 + {@code policy_limit_history}(키 = 이벤트 seq).
  * 전기는 그 {@code calcId}의 라인을 <b>요구하지 않는다</b>(지시문 D-6 — 순서 역전). 검사는 엔진 원장 규칙 그대로(승인 Q5·Q6):
  * 순번 = 직전 + 1, {@code accum_after − 누적 = amount}, 양수 전기 뒤 누적 ≤ 한도, 누적 ≥ 0, 재산정은 {@code oldLimit}·순번 대조만.
+ * 전기·재산정은 읽은 행과 저장한 행을 {@link Change}로 돌려준다(포털 Phase 6 — 알림 파생).
  */
 final class LimitProjector {
 
@@ -26,7 +27,7 @@ final class LimitProjector {
                 p.date("fyEnd"), p.lng("monthlyPremium"), p.str("limitMultiple"), p.lng("limitAmount"), 0, 0, 0, 0, p.str("ruleVersionId")));
     }
 
-    static void posted(ViewStore store, Envelope e) {
+    static Change.LedgerPosted posted(ViewStore store, Envelope e) {
         Payload p = new Payload(e.payload());
         LedgerRow ledger = store.ledger(p.str("ledgerId")).orElseThrow(() -> Projection.violation(ViolationReason.UNKNOWN_REFERENCE, e, "ledgerId"));
         long postingSeq = p.lng("postingSeq");
@@ -44,12 +45,14 @@ final class LimitProjector {
         if (accumAfter < 0) {
             throw Projection.violation(ViolationReason.NEGATIVE_ACCUM, e, "accumAfter");
         }
-        store.saveLedger(ledger.posted(accumAfter, postingSeq));
+        LedgerRow after = ledger.posted(accumAfter, postingSeq);
+        store.saveLedger(after);
         store.insertHistory(new HistoryRow(ledger.ledgerId(), e.seq(), Optional.of(postingSeq), "POST", Optional.of(p.str("calcId")),
                 Optional.of(amount), accumAfter, ledger.limitAmount(), Optional.empty(), e.occurredAtTime().toInstant()));
+        return new Change.LedgerPosted(ledger, after);
     }
 
-    static void rebased(ViewStore store, Envelope e) {
+    static Change.LedgerRebased rebased(ViewStore store, Envelope e) {
         Payload p = new Payload(e.payload());
         LedgerRow ledger = store.ledger(p.str("ledgerId")).orElseThrow(() -> Projection.violation(ViolationReason.UNKNOWN_REFERENCE, e, "ledgerId"));
         if (p.lng("oldLimit") != ledger.limitAmount()) {
@@ -60,8 +63,10 @@ final class LimitProjector {
             throw Projection.violation(ViolationReason.STATE_MISMATCH, e, "postingSeq");
         }
         long newLimit = p.lng("newLimit");
-        store.saveLedger(ledger.rebased(newLimit, p.lng("monthlyPremium")));
+        LedgerRow after = ledger.rebased(newLimit, p.lng("monthlyPremium"));
+        store.saveLedger(after);
         store.insertHistory(new HistoryRow(ledger.ledgerId(), e.seq(), postingSeq, "REBASE", Optional.empty(), Optional.empty(),
                 ledger.accumPaid(), newLimit, Optional.of(p.str("reason")), e.occurredAtTime().toInstant()));
+        return new Change.LedgerRebased(ledger, after);
     }
 }

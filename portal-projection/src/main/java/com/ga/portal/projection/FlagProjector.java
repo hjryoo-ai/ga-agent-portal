@@ -17,17 +17,19 @@ final class FlagProjector {
     private FlagProjector() {
     }
 
-    static void observed(ViewStore store, Envelope e) {
+    static Change.FlagObserved observed(ViewStore store, Envelope e) {
         Payload p = new Payload(e.payload());
         String policyNo = p.str("policyNo");
         String agentId = p.str("agentId");
         String eventType = p.str("eventType");
+        Change.FlagObserved change = new Change.FlagObserved(eventType, policyNo, agentId, p.date("occurredOn"));
         if (eventType.equals("REINSTATE")) {
             Instant at = e.occurredAtTime().toInstant();
             store.flags(policyNo, agentId).stream().filter(FlagRow::isOpen).forEach(f -> store.saveFlag(f.cleared(at)));
-            return;
+            return change;
         }
         FlagType type = FlagType.of(eventType).orElseThrow(() -> Projection.violation(ViolationReason.STATE_MISMATCH, e, "eventType"));
-        store.saveFlag(new FlagRow(policyNo, agentId, type, p.date("occurredOn"), Optional.empty(), Optional.of(eventType)));
+        store.saveFlag(new FlagRow(policyNo, agentId, type, change.occurredOn(), Optional.empty(), Optional.of(eventType)));
+        return change;
     }
 }

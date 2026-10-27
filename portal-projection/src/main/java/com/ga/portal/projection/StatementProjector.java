@@ -19,6 +19,10 @@ import java.util.Optional;
  */
 final class StatementProjector {
 
+    /** 확정·지급의 결과 — 저장한 월 행(포털 Phase 6 — 알림 파생)과 이 이벤트가 낸 대사 불일치. */
+    record Closed(MonthRow after, boolean drift) {
+    }
+
     private StatementProjector() {
     }
 
@@ -35,7 +39,7 @@ final class StatementProjector {
         return false;
     }
 
-    static boolean confirmed(ViewStore store, Envelope e) {
+    static Closed confirmed(ViewStore store, Envelope e) {
         Payload p = new Payload(e.payload());
         Optional<MonthRow> month = store.month(p.str("agentId"), p.str("closeYm"));
         MonthStatus next = Projection.accept(MonthTransitions.next(month.map(MonthRow::status), MonthEvent.CONFIRMED), e, "month");
@@ -46,7 +50,7 @@ final class StatementProjector {
         return reconcile(store, e, p, row);
     }
 
-    static boolean paid(ViewStore store, Envelope e) {
+    static Closed paid(ViewStore store, Envelope e) {
         Payload p = new Payload(e.payload());
         Optional<MonthRow> month = store.month(p.str("agentId"), p.str("closeYm"));
         MonthStatus next = Projection.accept(MonthTransitions.next(month.map(MonthRow::status), MonthEvent.PAYOUT), e, "month");
@@ -57,7 +61,7 @@ final class StatementProjector {
         return reconcile(store, e, p, row);
     }
 
-    private static boolean reconcile(ViewStore store, Envelope e, Payload p, MonthRow row) {
+    private static Closed reconcile(ViewStore store, Envelope e, Payload p, MonthRow row) {
         Optional<Long> gross = p.optLng("gross");
         Optional<Long> offset = p.optLng("clawbackOffset");
         Optional<Long> adjustment = p.optLng("adjustment");
@@ -67,7 +71,8 @@ final class StatementProjector {
             store.insertReconIfAbsent(new ReconRow(row.agentId(), row.closeYm(), e.occurredAtTime().toInstant(), row.gross(), row.clawbackOffset(),
                     row.adjustment(), gross, offset, adjustment, p.optLng("net"), "DRIFT", ReconSource.EVENT, e.seq()));
         }
-        store.saveMonth(drift ? row.withDataStatus(DataStatus.DRIFT) : row);
-        return drift;
+        MonthRow after = drift ? row.withDataStatus(DataStatus.DRIFT) : row;
+        store.saveMonth(after);
+        return new Closed(after, drift);
     }
 }

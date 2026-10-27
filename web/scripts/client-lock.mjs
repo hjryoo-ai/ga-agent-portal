@@ -18,7 +18,7 @@ const LOCK = resolve(web, 'contracts-client.lock.json');
 const CONTRACT = 'contracts/api/v1/portal-api.openapi.yaml';
 const OUTPUT = 'src/gen/portal-api.ts';
 const RULES = 'src/gen/portal-api.rules.json';
-const REQUEST_SCHEMAS = ['SimNewContractRequest', 'SimPolicyEventRequest'];
+const REQUEST_SCHEMAS = ['SimNewContractRequest', 'SimPolicyEventRequest', 'InquiryRequest'];
 const QUERY_RULES = { 'listDeferrals.p': '#/paths/~1api~1v1~1me~1deferrals/get/parameters/query/p' };
 const CONSTRAINTS = ['pattern', 'minLength', 'maxLength', 'enum'];
 const MONEY_SCHEMAS = new Set(['#/components/schemas/Won', '#/components/schemas/NonNegativeWon']);
@@ -59,12 +59,14 @@ function rules(seenSchemas) {
       if (Object.keys(c).length === 0) throw new Error(`${name}.${field} has no input constraint`);
       fields[field] = c;
     }
-    // if/then(그 필드가 그 값이면 더 필수) — 계약이 쓰는 모양 하나만 읽는다: if.properties.<필드>.const, then.required
+    // if/then(그 필드가 그 값들 중 하나면 더 필수) — 계약이 쓰는 모양 둘만 읽는다: if.properties.<필드>.const(Phase 5) 또는 .enum(Phase 6 문의 분류), then.required.
+    // 규칙 파일에는 한 모양 {field, in, required}로 쓴다.
     const when = [];
     if (schema.if !== undefined) {
       const [[field, cond] = []] = Object.entries(schema.if.properties ?? {});
-      if (field === undefined || cond.const === undefined || schema.then?.required === undefined) throw new Error(`${name}: unsupported if/then`);
-      when.push({ field, equals: cond.const, required: [...schema.then.required].sort() });
+      const values = cond?.const !== undefined ? [cond.const] : cond?.enum;
+      if (field === undefined || values === undefined || schema.then?.required === undefined) throw new Error(`${name}: unsupported if/then`);
+      when.push({ field, in: [...values].sort(), required: [...schema.then.required].sort() });
     }
     requests[name] = { required: [...schema.required].sort(), when, fields };
   }

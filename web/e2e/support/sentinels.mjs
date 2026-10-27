@@ -9,6 +9,7 @@ const STREAMS = [
   'contracts/events/v1/samples/a1/a1_portal_150000_e2.jsonl',
   'web/e2e/streams/ga01-neighbor.jsonl',
   'web/e2e/streams/edges.jsonl',
+  'web/e2e/streams/ga05-limits.jsonl',
   'portal-projection/src/test/resources/golden-streams/engine-e2-estimate/estimate_cycle_01_기본.jsonl',
   'portal-projection/src/test/resources/golden-streams/engine-e1-cycle.jsonl',
 ];
@@ -27,4 +28,14 @@ export function sentinels() {
     }
   }
   return [...values].sort();
+}
+
+// 문의 본문 센티널(포털 Phase 6 계획 ⑨ E7 — 허구, 이름 꼴·전화번호 꼴·증권번호 꼴): 원본은 pii-sentinels.properties의 inquiry 줄(Gradle 평문 스캔과 한 목록).
+// 본문이 보여도 되는 곳은 작성 화면·상세 화면의 DOM과 그 상세 응답뿐 — 고정 장치(fixtures.ts)와 산출물 스캔(run.mjs)이 나머지 전부에서 0을 본다.
+export function inquirySentinels() {
+  const props = readFileSync(resolve(repo, 'portal-infra/src/testFixtures/resources/pii-sentinels.properties'), 'utf8');
+  const line = props.split('\n').find((l) => l.startsWith('inquiry='));
+  const values = (line ?? '').slice('inquiry='.length).split(',').map((v) => v.trim()).filter((v) => v !== '');
+  if (values.length !== 3) throw new Error('pii-sentinels.properties: the inquiry line must have three sentinels');
+  return values;
 }

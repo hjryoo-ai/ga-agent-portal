@@ -10,6 +10,7 @@ import com.ga.portal.ingest.feed.FileFeedAdapter;
 import com.ga.portal.ingest.testing.InMemoryIngest;
 import com.ga.portal.ingest.testing.Samples;
 import com.ga.portal.projection.RecordingProjector;
+import com.ga.portal.projection.testing.NoopNotificationDeriver;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -31,7 +32,7 @@ class CaughtUpTest {
     private final FeedClient a1 = new FileFeedAdapter(t -> Samples.stream("a1-golden.jsonl"));
 
     private IngestWorker worker(FeedClient feed, Clock clock, int limit) {
-        IngestApplier applier = new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), db, db, db, new RecordingProjector(), clock);
+        IngestApplier applier = new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), db, db, db, new RecordingProjector(), new NoopNotificationDeriver(), clock);
         return new IngestWorker(feed, db, db, applier, IngestMetrics.NONE, clock, limit);
     }
 
@@ -79,7 +80,7 @@ class CaughtUpTest {
         worker(a1, at(T0), 200).runOnce(T);
         db.holdLockElsewhere(true);
         IngestApplier applier = new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), db, db, db, new RecordingProjector(),
-                at(T0.plusSeconds(60)));
+                new NoopNotificationDeriver(), at(T0.plusSeconds(60)));
         assertThat(applier.markCaughtUp(T, 17)).isFalse();
         assertThat(db.caughtUpAtOf(T)).contains(T0);
     }

@@ -2,10 +2,15 @@ package com.ga.portal.ingest;
 
 import com.ga.portal.domain.IngestErrorCode;
 import com.ga.portal.ingest.testing.Samples;
+import com.ga.portal.projection.testing.Envelopes;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,6 +31,29 @@ class EnvelopeValidatorTest {
         for (ObjectNode e : events) {
             assertThat(validator.validate(e)).as("seq %d %s", e.path("seq").asLong(), e.path("type").asString())
                     .isInstanceOf(EnvelopeVerdict.Valid.class);
+        }
+    }
+
+    /**
+     * 화면 E2E 손 스트림(web/e2e/streams — 포털 Phase 4 Q11, Phase 6 GA05): 하네스가 시작할 때 하는 검증과 같은 판정을 Docker 없이 먼저 — 모든 줄이 계약 스키마를
+     * 통과하고 seq가 1부터 이어진다(GA01 이웃 스트림은 A-1 뒤에 붙으므로 12부터).
+     */
+    @Test
+    void everyHandMadeE2eStreamLineIsValidAndContiguous() throws IOException {
+        Path dir = Envelopes.repoRoot().resolve("web/e2e/streams");
+        List<Path> files;
+        try (Stream<Path> s = Files.list(dir)) {
+            files = s.filter(f -> f.getFileName().toString().endsWith(".jsonl")).sorted().toList();
+        }
+        assertThat(files).extracting(f -> f.getFileName().toString()).containsExactly("edges.jsonl", "ga01-neighbor.jsonl", "ga05-limits.jsonl");
+        for (Path f : files) {
+            List<ObjectNode> events = Envelopes.nodes(f);
+            long first = f.getFileName().toString().equals("ga01-neighbor.jsonl") ? Envelopes.nodes(Envelopes.a1()).size() + 1 : 1;
+            for (int i = 0; i < events.size(); i++) {
+                ObjectNode e = events.get(i);
+                assertThat(e.path("seq").asLong()).as("%s line %d", f.getFileName(), i + 1).isEqualTo(first + i);
+                assertThat(validator.validate(e)).as("%s seq %d", f.getFileName(), e.path("seq").asLong()).isInstanceOf(EnvelopeVerdict.Valid.class);
+            }
         }
     }
 

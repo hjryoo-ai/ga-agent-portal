@@ -7,6 +7,7 @@ import com.ga.portal.domain.access.Caller;
 import com.ga.portal.domain.access.DenyReason;
 import com.ga.portal.domain.access.NotFound;
 import com.ga.portal.domain.access.UseCaseEntry;
+import com.ga.portal.domain.rule.RateLimitRule;
 import com.ga.portal.sim.EngineOutcomes.Failure;
 import com.ga.portal.sim.EngineOutcomes.Outcome;
 import com.ga.portal.sim.EngineOutcomes.Success;
@@ -24,6 +25,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
@@ -44,6 +46,8 @@ public final class SimulationUseCases {
 
     private static final System.Logger LOG = System.getLogger(SimulationUseCases.class.getName());
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    /** 레이트 리밋 창(설계서 §9 — 설계사당 분당 N). */
+    static final Duration RATE_WINDOW = Duration.ofSeconds(60);
 
     private final SimulationLogStore log;
     private final SimTransactions transactions;
@@ -104,8 +108,8 @@ public final class SimulationUseCases {
                 log.lock(caller.agentId());
                 Settings settings = log.settings();
                 Facts current = facts.current();
-                Window window = log.window(caller.agentId(), now.minus(RateLimitRule.WINDOW));
-                RateLimitRule.retryAfter(window.count(), window.oldest(), settings.ratePerMinute().orElse(defaultRatePerMinute), now)
+                Window window = log.window(caller.agentId(), now.minus(RATE_WINDOW));
+                RateLimitRule.retryAfter(window.count(), window.oldest(), settings.ratePerMinute().orElse(defaultRatePerMinute), RATE_WINDOW, now)
                         .ifPresent(seconds -> {
                             throw new RateLimited(seconds);
                         });

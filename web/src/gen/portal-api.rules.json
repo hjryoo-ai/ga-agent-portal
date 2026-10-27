@@ -39,7 +39,9 @@
       "when": [
         {
           "field": "eventType",
-          "equals": "REDUCE",
+          "in": [
+            "REDUCE"
+          ],
           "required": [
             "newMonthlyPremium"
           ]
@@ -67,6 +69,46 @@
         },
         "policyKey": {
           "pattern": "^[0-9a-f]{16}$"
+        }
+      }
+    },
+    "InquiryRequest": {
+      "required": [
+        "category",
+        "message"
+      ],
+      "when": [
+        {
+          "field": "category",
+          "in": [
+            "AMOUNT",
+            "CLAWBACK",
+            "DEFERRAL",
+            "LIMIT"
+          ],
+          "required": [
+            "calcId"
+          ]
+        }
+      ],
+      "fields": {
+        "calcId": {
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "category": {
+          "enum": [
+            "AMOUNT",
+            "LIMIT",
+            "CLAWBACK",
+            "DEFERRAL",
+            "OTHER"
+          ]
+        },
+        "message": {
+          "pattern": "\\S",
+          "minLength": 1,
+          "maxLength": 1000
         }
       }
     }

@@ -185,7 +185,7 @@ abstract class ApiIntegrationTest {
         try {
             HttpRequest built = request.build();
             HttpResponse<byte[]> response = http.send(built, HttpResponse.BodyHandlers.ofByteArray());
-            ApiContract.check(built.uri().getPath(), response);
+            ApiContract.check(built.method(), built.uri().getPath(), response);
             return response;
         } catch (IOException e) {
             throw new java.io.UncheckedIOException(e);

@@ -18,7 +18,8 @@ import com.ga.portal.infra.persistence.EarningsMonthRepository;
 import com.ga.portal.infra.persistence.PolicyFlagRepository;
 import com.ga.portal.infra.persistence.PolicyLimitRepository;
 import com.ga.portal.infra.persistence.ReconResultRepository;
-import com.ga.portal.projection.NoopNotificationDeriver;
+import com.ga.portal.infra.persistence.NotificationRepository;
+import com.ga.portal.infra.persistence.SyncStatusRepository;
 import com.ga.portal.projection.NotificationDeriver;
 import com.ga.portal.projection.Projector;
 import com.ga.portal.projection.ViewProjector;
@@ -83,10 +84,10 @@ public class IngestConfiguration {
         return new ViewProjector(store);
     }
 
-    /** 알림 파생 — Phase 6까지 no-op(지시문 D-15). */
+    /** 알림 파생(포털 Phase 6 — 적용 트랜잭션 안, 프로젝터 다음). no-op 구현은 시험 픽스처에만 있다. */
     @Bean
-    NotificationDeriver notificationDeriver() {
-        return new NoopNotificationDeriver();
+    NotificationDeriver notificationDeriver(NotificationRepository notifications, SyncStatusRepository settings, Clock clock) {
+        return new JdbcNotificationDeriver(notifications, settings, clock);
     }
 
     @Bean

@@ -17,6 +17,7 @@ import com.ga.portal.projection.Envelope;
 import com.ga.portal.projection.ProjectionResult;
 import com.ga.portal.projection.Projector;
 import com.ga.portal.projection.RecordingProjector;
+import com.ga.portal.projection.testing.NoopNotificationDeriver;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -46,7 +47,7 @@ class IngestApplierTest {
     private final RecordingProjector recorder = new RecordingProjector();
 
     private IngestApplier applier(Projector projector) {
-        return new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), db, db, db, projector, CLOCK);
+        return new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), db, db, db, projector, new NoopNotificationDeriver(), CLOCK);
     }
 
     private IngestWorker worker(Path stream, Projector projector) {
@@ -186,6 +187,41 @@ class IngestApplierTest {
             assertThat(f.error()).hasValueSatisfying(e -> assertThat(e).contains("IllegalStateException").doesNotContain("invariant broken"));
         });
         assertThat(cursor().lastSeq()).isEqualTo(4);
+    }
+
+    /** 포털 Phase 6(계획 Q16·C4): 파생기의 예외는 프로젝터 거부가 아니다 — FAILED 행 없이 APPLY_ERROR, 그 이벤트의 적용 행·커서는 롤백. */
+    @Test
+    void aDerivationFailureIsAnApplyErrorWithoutAFailedRow() {
+        com.ga.portal.projection.NotificationDeriver failingAt5 = (tenant, e, result) -> {
+            if (e.seq() == 5) {
+                throw new IllegalStateException("derivation broken");
+            }
+        };
+        IngestApplier applier = new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), db, db, db, recorder, failingAt5, CLOCK);
+        IngestWorker.Round r = new IngestWorker(new FileFeedAdapter(t -> Samples.stream("a1-golden.jsonl")), db, db, applier, IngestMetrics.NONE,
+                CLOCK, 200).runOnce(T);
+        assertThat(r.applied()).isEqualTo(4);
+        assertThat(stoppedBy(r)).contains(IngestErrorCode.APPLY_ERROR);
+        assertThat(appliedSeqs()).containsExactly(1L, 2L, 3L, 4L);
+        assertThat(failedRows()).as("an apply error writes no FAILED row").isEmpty();
+        assertThat(cursor().lastSeq()).isEqualTo(4);
+        assertThat(cursor().error()).hasValueSatisfying(e -> assertThat(e).contains("IllegalStateException").doesNotContain("derivation broken"));
+    }
+
+    /** 파생기는 프로젝터 다음, 커서 전에 — 그 이벤트의 프로젝터 결과를 받는다. */
+    @Test
+    void theDeriverRunsAfterTheProjectorWithItsResultAndBeforeTheCursorMoves() {
+        List<String> calls = new java.util.ArrayList<>();
+        Projector projector = (tenant, e) -> {
+            calls.add("project " + e.seq());
+            return ProjectionResult.of(List.of("t" + e.seq()));
+        };
+        com.ga.portal.projection.NotificationDeriver deriver = (tenant, e, result) -> {
+            calls.add("derive " + e.seq() + " " + result.appliedTo() + " cursor " + db.cursorOf(T).orElseThrow().lastSeq());
+        };
+        IngestApplier applier = new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), db, db, db, projector, deriver, CLOCK);
+        new IngestWorker(new FileFeedAdapter(t -> Samples.stream("a1-golden.jsonl")), db, db, applier, IngestMetrics.NONE, CLOCK, 2).runOnce(T);
+        assertThat(calls).containsExactly("project 1", "derive 1 [t1] cursor 0", "project 2", "derive 2 [t2] cursor 1");
     }
 
     // C7

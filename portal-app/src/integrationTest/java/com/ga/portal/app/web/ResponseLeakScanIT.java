@@ -24,8 +24,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * C6: 두 테넌트 × 설계사 넷(T1의 A·B·A-1001(A-1 둘째 판, 실제 적용기), T2의 A2)이 <b>모든 엔드포인트 × 모든 키</b>(월·라인 전부·페이지 전부·원장 전부·단계
  * 필터 전부)를 부른다. 응답 본문 전체 ∩ 증권번호 원문(센티널 파일의 증권번호 전부) = ∅, 다른 설계사의 ID·키·이름 ∅, {@code policyMasked}는 끝 4자,
  * {@code policyKey}는 16자 16진이고 같은 계약이면 엔드포인트가 달라도 같다. 엔드포인트별 응답 수를 표로 낸다(보고서).
+ * 포털 Phase 6(C5): 알림함·문의 다섯 엔드포인트도 — 설계사 셋(A·B·I)이 알림 전 페이지·필터, 문의 목록 전 필터·자기 상세 전부를 부른다. 응답 ∩ 증권번호 원문
+ * ({@code inbox}의 증권번호 전부)·다른 설계사의 ID·{@code dedup_key} 형식({@code 종류:…})·{@code agentId}·{@code answeredBy} = ∅.
  */
-class ResponseLeakScanIT extends ApiIntegrationTest {
+class ResponseLeakScanIT extends InboxIntegrationTest {
 
     static final JsonMapper JSON = JsonMapper.builder().build();
     static final Pattern KEY = Pattern.compile("[0-9a-f]{16}");
@@ -142,5 +144,83 @@ class ResponseLeakScanIT extends ApiIntegrationTest {
         responses.forEach((endpoint, n) -> System.out.println("RESPONSE_SCAN " + endpoint + " = " + n));
         System.out.println("RESPONSE_SCAN total = " + total);
         assertThat(responses).hasSize(8);
+    }
+
+    static final Pattern DEDUP_KEY = Pattern.compile("\"(LIMIT|CLAWBACK|DEFER|POLICY|STMT|PAYOUT|INQUIRY)[A-Z_]*:");
+
+    /** 센티널 파일 {@code inbox}의 증권번호(POL-…). */
+    static List<String> inboxPolicyNumbers() {
+        Properties p = new Properties();
+        try (InputStream in = ResponseLeakScanIT.class.getClassLoader().getResourceAsStream("pii-sentinels.properties")) {
+            p.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return List.of(p.getProperty("inbox").split(",")).stream().map(String::trim).filter(s -> s.startsWith("POL-")).toList();
+    }
+
+    List<String> crawlInbox(String subject, Map<String, Integer> counts) {
+        List<String> bodies = new ArrayList<>();
+        String token = t6(subject);
+        java.util.function.BiConsumer<String, String> call = (endpoint, path) -> {
+            HttpResponse<byte[]> r = get(path, token);
+            assertThat(r.statusCode()).as("%s %s", subject, path).isEqualTo(200);
+            bodies.add(new String(r.body(), StandardCharsets.UTF_8));
+            counts.merge(endpoint, 1, Integer::sum);
+        };
+        for (String unread : List.of("false", "true")) {
+            for (int page = 0; ; page++) {
+                call.accept("GET /api/v1/me/notifications", NOTIFICATIONS + "?size=2&unreadOnly=" + unread + "&page=" + page);
+                if ((long) (page + 1) * 2 >= JSON.readTree(bodies.getLast()).path("total").asLong()) {
+                    break;
+                }
+            }
+        }
+        List<String> ids = new ArrayList<>();
+        for (String status : List.of("ALL", "OPEN", "ANSWERED", "CLOSED")) {
+            call.accept("GET /api/v1/me/inquiries", INQUIRIES + "?size=100&status=" + status);
+            if (status.equals("ALL")) {
+                JSON.readTree(bodies.getLast()).path("items").forEach(i -> ids.add(i.path("id").asString()));
+            }
+        }
+        for (String id : ids) {
+            call.accept("GET /api/v1/me/inquiries/{id}", INQUIRIES + "/" + id);
+        }
+        return bodies;
+    }
+
+    @Test
+    void noInboxResponseCarriesAPolicyNumberAKeyOrAnotherAgentsData() {
+        // 각자 문의 하나(목록·상세가 비지 않게) — 본문은 허구 문장
+        for (String[] s : new String[][] {{SUB_6A, "AMOUNT", CALC_6A}, {SUB_6B, "LIMIT", CALC_6B}, {SUB_6I, "OTHER", null}}) {
+            assertThat(post(INQUIRIES, t6(s[0]), inquiryJson(s[1], s[2], "누출 시험 문의")).statusCode()).isEqualTo(201);
+        }
+        List<String> policies = inboxPolicyNumbers();
+        assertThat(policies).containsExactlyInAnyOrder(POLICY_6A, POLICY_6B, POLICY_6I);
+        List<String> agents = List.of(AGENT_6A, AGENT_6B, AGENT_6I, AGENT_6M);
+        Map<String, Integer> counts = new TreeMap<>();
+        int total = 0;
+        for (String[] who : new String[][] {{SUB_6A, AGENT_6A, CALC_6A}, {SUB_6B, AGENT_6B, CALC_6B}, {SUB_6I, AGENT_6I, CALC_6I}}) {
+            List<String> bodies = crawlInbox(who[0], counts);
+            total += bodies.size();
+            String all = String.join("\n", bodies);
+            assertThat(all).as("%s inbox responses are not empty", who[1]).contains("\"items\":[{");
+            for (String policy : policies) {
+                assertThat(all).as("%s inbox responses contain a policy number", who[1]).doesNotContain(policy);
+            }
+            for (String agent : agents) {
+                assertThat(all).as("%s inbox responses contain an agent ID", who[1]).doesNotContain(agent + "\"");
+            }
+            for (String other : List.of(CALC_6A, CALC_6B, CALC_6I)) {
+                if (!other.equals(who[2])) {
+                    assertThat(all).as("%s inbox responses contain another agent's line", who[1]).doesNotContain(other);
+                }
+            }
+            assertThat(DEDUP_KEY.matcher(all).find()).as("%s inbox responses contain a dedup key", who[1]).isFalse();
+            assertThat(all).doesNotContain("\"agentId\"").doesNotContain("\"answeredBy\"").doesNotContain("\"dedupKey\"");
+        }
+        counts.forEach((endpoint, n) -> System.out.println("RESPONSE_SCAN " + endpoint + " = " + n));
+        System.out.println("RESPONSE_SCAN inbox total = " + total);
+        assertThat(counts).hasSize(3);
     }
 }

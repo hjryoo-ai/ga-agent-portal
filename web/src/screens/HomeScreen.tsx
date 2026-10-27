@@ -1,16 +1,17 @@
 // 홈(설계서 §8 — 계획 ⑥): 이번 달 카드(KST 달력 월 — Q16), 주의 계약 N건·납입 지연/실효 M건 → 한도 현황, 진입점.
 // Phase 5(계획 ⑧): 전월 대비(CR-1 previous — 지난달 값과 그 달 라벨을 나란히, 차감 없음), 다음 달 분급(/me/deferrals 한 칸 — forecastLabel, 없거나 0이면
-// "다음 달 예정 없음"), 타임라인·시뮬레이션 진입점이 살아난다. 알림은 자리만(Phase 6).
+// "다음 달 예정 없음"), 타임라인·시뮬레이션 진입점이 살아난다. Phase 6(계획 ⑧): 최근 알림 셋 + 안읽음 수(/me/notifications?size=3 한 콜 — 홈 다섯째),
+// 없으면 "새 알림이 없습니다", 알림함·문의 내역 진입점.
 import { Link } from 'react-router';
 import { ApiError } from '../api/client';
-import { useDeferrals, useLimits, useMonth, type MonthResponse } from '../api/queries';
+import { useDeferrals, useLimits, useMonth, useRecentNotifications, type MonthResponse } from '../api/queries';
 import { forecastLabel, monthLabel, netView } from '../labels/labels';
 import { fill, m } from '../messages';
 import { Amount } from '../money/Amount';
 import { isZero, present } from '../money/won';
 import { ymAt, ymParts, ymShift } from '../time/kst';
+import { NotificationItem } from '../notify/NotificationItem';
 import { useNow } from '../time/useNow';
-import { ComingSoon } from '../ui/EntryPoints';
 import { MonthCard } from '../ui/MonthCard';
 import { Loading } from '../ui/States';
 
@@ -70,6 +71,37 @@ function NextMonthDeferral({ ym }: { ym: string }) {
   );
 }
 
+/** 최근 알림 셋 + 안읽음 수(응답의 unreadCount 그대로). */
+function RecentNotifications() {
+  const recent = useRecentNotifications();
+  return (
+    <section className="card" data-testid="recent-notifications">
+      <div className="card__head">
+        <h2>{m.home.notifications}</h2>
+        {recent.data === undefined || recent.data.unreadCount === 0 ? null : (
+          <span className="badge" data-testid="unread-count">
+            {fill(m.home.unread, { n: String(recent.data.unreadCount) })}
+          </span>
+        )}
+      </div>
+      {recent.data === undefined ? (
+        recent.isPending ? <Loading /> : null
+      ) : recent.data.items.length === 0 ? (
+        <p data-testid="notifications-none">{m.home.noNotifications}</p>
+      ) : (
+        <ul className="notice-list">
+          {recent.data.items.map((n) => (
+            <NotificationItem key={n.id} notification={n} />
+          ))}
+        </ul>
+      )}
+      <Link className="link-button" to="/notifications" data-testid="entry-notifications">
+        {m.home.toNotifications}
+      </Link>
+    </section>
+  );
+}
+
 export function HomeScreen() {
   const nowMs = useNow();
   const ym = ymAt(nowMs);
@@ -101,6 +133,7 @@ export function HomeScreen() {
           </Link>
         </>
       )}
+      <RecentNotifications />
       <NextMonthDeferral ym={ymShift(ym, 1)} />
       <section className="card" data-testid="attention">
         <h2>{m.home.attention}</h2>
@@ -126,7 +159,9 @@ export function HomeScreen() {
         <Link className="link-button" to="/simulations" data-testid="entry-simulation">
           {m.nav.simulation}
         </Link>
-        <ComingSoon name={m.nav.notifications} testId="entry-notifications" />
+        <Link className="link-button" to="/inquiries" data-testid="entry-inquiries">
+          {m.nav.inquiries}
+        </Link>
       </section>
     </>
   );

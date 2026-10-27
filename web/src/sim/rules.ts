@@ -12,9 +12,27 @@ interface Constraint {
   enum?: string[];
 }
 
+/**
+ * 길이는 유니코드 코드 포인트(JSON Schema minLength·maxLength와 서버 char_length와 같은 단위 — UTF-16 length는 이모지에서 갈린다, Phase 6 계획 Q27).
+ * 서로게이트 짝을 하나로 센다. 자소 묶음(그래핌)이 아니라 코드 포인트를 세는 것이 의도다 — 계약이 그 단위다.
+ */
+export function codePoints(value: string): number {
+  let n = 0;
+  for (let i = 0; i < value.length; i++) {
+    const unit = value.charCodeAt(i);
+    // 높은 서로게이트 뒤에 낮은 서로게이트가 오면 둘이 한 코드 포인트
+    if (unit >= 0xd800 && unit <= 0xdbff && i + 1 < value.length) {
+      const next = value.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) i++;
+    }
+    n++;
+  }
+  return n;
+}
+
 function fits(c: Constraint, value: string): boolean {
-  if (c.minLength !== undefined && value.length < c.minLength) return false;
-  if (c.maxLength !== undefined && value.length > c.maxLength) return false;
+  if (c.minLength !== undefined && codePoints(value) < c.minLength) return false;
+  if (c.maxLength !== undefined && codePoints(value) > c.maxLength) return false;
   if (c.enum !== undefined && !c.enum.includes(value)) return false;
   return c.pattern === undefined || new RegExp(c.pattern, 'u').test(value);
 }
@@ -24,7 +42,7 @@ export function check(name: RequestName, values: Readonly<Record<string, string>
   const request = rules.requests[name];
   const required = new Set<string>(request.required);
   for (const w of request.when) {
-    if (values[w.field] === w.equals) for (const f of w.required) required.add(f);
+    if (w.in.includes(values[w.field] ?? '')) for (const f of w.required) required.add(f);
   }
   const fields: Record<string, Constraint> = request.fields;
   const problems: Record<string, FieldProblem> = {};
@@ -43,6 +61,14 @@ export function check(name: RequestName, values: Readonly<Record<string, string>
 export function body(name: RequestName, values: Readonly<Record<string, string>>): Record<string, string> {
   const fields: Record<string, Constraint> = rules.requests[name].fields;
   return Object.fromEntries(Object.keys(fields).flatMap((f) => (values[f] === undefined || values[f] === '' ? [] : [[f, values[f]]])));
+}
+
+/** 그 필드의 최대 길이(코드 포인트 — 계약 maxLength). 문의 작성의 남은 글자 수(포털 Phase 6). */
+export function maxLength(name: RequestName, field: string): number {
+  const fields: Record<string, Constraint> = rules.requests[name].fields;
+  const max = fields[field]?.maxLength;
+  if (max === undefined) throw new Error(`no maxLength for ${name}.${field}`);
+  return max;
 }
 
 /** 타임라인 유지율 p(쿼리) — 계약 pattern. */
