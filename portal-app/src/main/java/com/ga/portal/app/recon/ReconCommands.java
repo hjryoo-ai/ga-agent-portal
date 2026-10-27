@@ -134,8 +134,10 @@ public final class ReconCommands {
                         inquiries.openSummary()));
             });
             denied |= facts.isEmpty();
-            lines.add(facts.map(f -> statusLine(t, f, f.cursor().map(c -> engine.feedHead(t, c.lastSeq())).orElse(OptionalLong.empty()), clock.instant()))
-                    .orElse(t.value() + " not authorized"));
+            String injected = transactions.inTransaction(t, () -> Episodes.unresolved(results.driftAndRepaired(), runs.rebuilds()).keySet().stream()
+                    .map(Object::toString).findFirst().orElse("-"));   // 주입 S12: status에 설계사·달
+            lines.add(facts.map(f -> statusLine(t, f, f.cursor().map(c -> engine.feedHead(t, c.lastSeq())).orElse(OptionalLong.empty()), clock.instant())
+                    + " oldest=" + injected).orElse(t.value() + " not authorized"));
         }
         return new IngestCommands.Outcome(denied ? 2 : 0, List.copyOf(lines));
     }
