@@ -396,3 +396,11 @@ DE-24 문구 정정(Q30): "앞으로 포털 계약 개정은 작업 브랜치 �
 - `CLAUDE.md` "알림·문의 규약" 절, 의존 방향에 `inbox`, E2E 센티널 `inquiry` 키.
 - 문의 보존기간은 설계서에 없다 — 정하지 않았다(`docs/운영.md` §7 — 다음 Phase 질문). 알림 보존은 1년(운영 SQL).
 - 영문 번역(`docs/en/`)은 v1.6 그대로.
+
+## 2026-10-24 — Phase 6 수용 심사 (`docs/phase-06-수용심사.md`)
+
+판정: **수용, 조건 없음** — PR #20 병합(merge commit `b87db17`), `phase-6` = `f865034` 유지. F1~F13·P6-1~18 전부 수용. 새 RM·DE 없음(DE-25·DE-26·DD-18 그대로). 사용자 직접 계획 승인 세 번째 Phase — 사후 확인, 뒤집은 것 없음.
+
+- 습관(조건 아님): 다음 Phase부터 본문 센티널 단언은 `.describedAs` 없이 `contains` 결과만 단언한다 — 실패 메시지가 잡은 출력을 되풀이하지 않게(F13).
+- Phase 7 재료(심사 §3): Q1 `REPAIRED` 달의 확정·지급 알림은 **같은 키로 낸다** — 파생 지점은 재대사가 `REPAIRED`를 쓰는 트랜잭션(§6.5에 이벤트 아닌 둘째 파생 행), 재구축은 여전히 파생 0, 새 종류 없음. Q2 재구축이 처음 적용한 사실의 알림은 메우지 않는다 — §14.1 #12 "공백은 달 알림 범위에서만 메워진다". Q3 운영 알림 v1 = 지표 + CLI `status`(DRIFT 수·`APPLY_ERROR`·커서 정지·`REPAIRED` 실패·문의 적체 `inquiry_open_oldest_age_seconds{tenant}`·`inquiry_open_total{tenant}`), 이메일·웹훅 v2. Q4 지표 태그 지금 고정 — `notifications_derived_total{tenant, type}`, `inquiries_total{tenant, action}`(`CREATED`·`ANSWERED`·`CLOSED`), `recon_runs_total{tenant, result}`(`OK`·`DRIFT`·`REPAIRED`·`FAILED`). Q5 문의 보존 = 감사와 같은 기간(예시값 5년, `inquiry_retention_years`), 삭제 잡 없음. Q6 적용 트랜잭션 스팬 하나 + 프로젝터·파생·커서 자식 스팬, 속성에 값 0. 엔진은 `GET /internal/v1/agents/{agentId}/statements/{ym}`(계약 1.4.0) 사용만.
+- 실 엔진 E2E는 병합 뒤 `main`에서 사용자가 실행 → `RESULT.md`(판정 넷).
