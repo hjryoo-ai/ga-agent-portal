@@ -37,6 +37,9 @@ class ReconSchedulerIT {
     @TestBean
     Clock clock;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler taskScheduler;
+
     static Clock clock() {
         return Clock.fixed(AT, java.time.ZoneOffset.UTC);
     }
@@ -73,5 +76,11 @@ class ReconSchedulerIT {
         }
         Thread.sleep(1_500);   // 일곱 틱 더
         assertThat(runs()).singleElement().satisfies(r -> assertThat(r).startsWith("SCHEDULE|recon:" + T.value() + "|"));
+    }
+
+    @Test
+    void ingestAndReconTicksHaveTheirOwnThreads() {
+        // P7-5: 기본 스케줄러 스레드 하나면 대사 회차 동안 모든 테넌트의 폴링이 멈춘다
+        assertThat(taskScheduler.getScheduledThreadPoolExecutor().getCorePoolSize()).isEqualTo(2);
     }
 }

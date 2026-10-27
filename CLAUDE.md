@@ -69,6 +69,16 @@
 - **운영 답변은 파일로만**(`inquiry answer --answer-file=`) — `--answer` 같은 인자는 없다(64). 답변·알림 삽입·감사는 한 트랜잭션. CLI 출력에서 설계사가 쓴 글의 제어·서식·구분 문자는 보이는 이스케이프로만.
 - 문의 레이트 리밋은 `inquiry` 행 수(직전 24시간, 테넌트 `params.inquiry_rate_per_day`) + 설계사 권고 잠금, 429에는 행·감사가 없다. 쓰기 경로(PATCH 읽음·POST 문의·POST 시뮬레이션)는 `Authorization` 헤더만 인증이다 — 쿠키로는 401(CSRF 토큰·`Origin` 검사를 두지 않는 근거, 설계서 §9).
 
+## 대사·관측성 규약 (포털 Phase 7 — 설계서 §3.4·§5·§6.5·§6.6·§6.7·§10, `docs/지표.md`)
+- **대사는 세 정수의 동등 비교뿐이다.** 차이·비율·순액을 계산하지 않는다 — `portal - engine` 같은 값을 담는 열·필드·로그·지표가 없다. 판정은 `portal-recon` `rule.ReconRules`의 순수 함수, ESTIMATE 달은 환수 상계·정정만 보고 DRIFT를 내지 않는다(Q1 ⓑ′), 세후는 비교하지 않는다(`engine_net`은 NULL).
+- **`recon_result`에는 `DRIFT`·`REPAIRED`만.** `MATCH`·`INCONCLUSIVE`는 행 0 — 지표와 `recon_run`의 수로만. DRIFT 행과 그 달 `data_status`는 한 트랜잭션, 같은 값의 미해결 DRIFT는 다시 쓰지 않는다. 재대사가 `MATCH`가 아니면 `data_status`를 DRIFT로 다시 쓴다(재구축이 지운다 — 판정 불가여도 행은 0).
+- **엔진 호출은 재시도 0, 동시 1, 예산 안에서.** 엔진 불가·404·422·스키마 위반은 정지도 DRIFT도 아니다(`INCONCLUSIVE(사유)`). 뒤처진 포털(커서 비`RUNNING`·`caught_up_at` 오래됨·`basisSeq` > `last_seq`·피드 머리 > `last_seq`)은 DRIFT가 아니라 `LAGGING`.
+- **자동 재구축은 테넌트 하루 한 번, 시도한 DRIFT에는 다시 하지 않는다**(행위자 `recon:<tenant>`). 재구축기는 대사에 의존하지 않고, 알림 파생 규칙을 부르는 곳은 닫힌 셋(운영 파생기·CLI 답변·대사 회차 — ArchUnit). 재대사 `REPAIRED`의 알림은 §6.5의 같은 키(`ON CONFLICT`).
+- **회차는 같은 진입점 하나**(`ReconRunner.run` — 앱 안 스케줄러와 CLI `recon run`), 회차 잠금은 테넌트 권고 잠금(`portal.recon` 공간)을 회차 내내. 시험·E2E 프로세스는 스케줄러를 끈다(`PORTAL_RECON_SCHEDULER_ENABLED=false`).
+- **지표는 `docs/지표.md`의 닫힌 표가 정본이다.** 등록 문장은 이름·태그 키가 글자 그대로(`counter("이름", "키", 값…)`·`Gauge.builder("이름", …).tag("키", …)…register(`) — `MetricsCatalogTest`가 원천을 읽어 양쪽으로 대조한다. 지표를 더하면 표와 설계서 §10을 같은 커밋에서. 태그 값에 식별자 원문이 없다(예외 `tenant`·`issuer_hash`). 여러 경로가 같이 세는 지표는 `PortalMeters` 한 곳에서, **커밋된 것만**(`afterCommit`).
+- **스팬은 포트 `Tracing`으로만, 속성은 테넌트·수·종류 이름뿐**(종류 꼴이 아닌 문자열은 `OTHER`). `ym`·`agent_id`·`calcId`·금액·본문은 속성이 될 수 없다. Observation API를 쓰지 않는다(표 밖 타이머).
+- **운영 CLI `status`는 값을 찍지 않는다** — 달은 나이(일)로만, 식별자는 해시. 운영 알림 채널 v1 = 지표 + `status`(이메일·웹훅 없음).
+
 ## 화면 규약 (포털 Phase 4 — 설계서 §6.2·§8·§9·§10)
 - **화면은 금액을 계산·비교·변환하지 않는다.** 생성 클라이언트의 금액은 불투명 `Won`(`client-lock.mjs`의 변환 훅) — 산술·비교·템플릿 보간·JSX 직접 렌더는 타입 오류이거나 ESLint `portal/no-money-arithmetic`(이름 또는 구조 표식 `__@wonBrand@`로 인식) 위반이다. 숫자로 바꾸는 곳은 `src/money/won.ts` 하나(`formatWon`·`isZero`·`present`) — 닫힌 목록. 있음/없음 확인도 `present()`로. 번들 스캔이 산출물에서 한 번 더 본다.
 - **모든 금액은 라벨과 함께만** `<Amount value label>` — `StatusLabel`은 `src/labels/labels.ts`만 만든다. 세후는 16칸 표(설계서 §6.2)를 따르고 표 밖 조합은 숨긴다. 화면 문구는 `src/messages.ko.json`만(한글 리터럴은 ESLint `portal/no-hangul-literal`), 계약 열거와 양방향 대조(`messages.test.ts`).

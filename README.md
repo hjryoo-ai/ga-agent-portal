@@ -22,7 +22,9 @@ Phase 5(분급 타임라인·시뮬레이션) 수용(2026-10-23, 조건 B1 → `
 
 Phase 6(알림 파생·이의제기) 수용(2026-10-24, 조건 없음) — [지시문](docs/phase-06-지시문.md)·[계획](docs/phase-06-계획.md)·[승인](docs/phase-06-계획승인.md)·[보고서](docs/phase-06-보고서.md)·[수용 심사](docs/phase-06-수용심사.md). 태그 `phase-6`.
 
-정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.9), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
+Phase 7(대사·DRIFT 자동 복구·관측성) 구현 완료, 수용 심사 대기 — [지시문](docs/phase-07-지시문.md)·[계획](docs/phase-07-계획.md)·[승인](docs/phase-07-계획승인.md)·[보고서](docs/phase-07-보고서.md). 태그 `phase-7`. 지표·로그·스팬의 닫힌 표 [`docs/지표.md`](docs/지표.md).
+
+정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.10), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## 실행
 
@@ -53,6 +55,8 @@ java -jar portal-app.jar --spring.profiles.active=cli ingest rebuild --tenant=GA
 java -jar portal-app.jar --spring.profiles.active=cli inquiry list --tenant=GA01 [--status=OPEN]   # Phase 6 — docs/운영.md §7
 java -jar portal-app.jar --spring.profiles.active=cli inquiry answer --tenant=GA01 --id=<uuid> --answer-file=<path>   # 답변은 파일로만
 java -jar portal-app.jar --spring.profiles.active=cli inquiry close --tenant=GA01 --id=<uuid>
+java -jar portal-app.jar --spring.profiles.active=cli recon run --tenant=GA01 [--ym=202608,202702]   # Phase 7 — docs/운영.md §8
+java -jar portal-app.jar --spring.profiles.active=cli status [--tenant=GA01 | --all]                 # 값 없는 한 줄 — 운영 알림 채널 v1
 ```
 
 전 건 `audit_access`에 남는다(거부도). `--from-seq`는 마지막으로 적용한 seq 이하만 — 건너뛰기는 재구축으로만. **인가(Phase 3)**: 행위자는 실행한 OS 사용자이고, `cli:<OS 사용자>`가 그 테넌트의 `identity_link`에 `OPERATOR`로 등록돼 있어야 한다(등록 SQL은 `docs/운영.md` §3). `--actor`는 없어졌다(종료 코드 64). 거부는 `T not authorized` + 종료 코드 2.

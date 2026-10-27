@@ -11,6 +11,12 @@ spring:
   # 조회 API 응답(포털 Phase 3): 비어 있는 선택 필드(Optional.empty)는 응답에서 뺀다 — 계약 portal-api.openapi.yaml의 선택 필드
   jackson:
     default-property-inclusion: non_absent
+  # 스케줄러 스레드 둘(포털 Phase 7 P7-5): 인제스트 틱과 대사 틱이 서로를 기다리지 않게 — 기본 하나면 대사 회차(최대 recon max-seconds + 재구축)
+  # 동안 모든 테넌트의 폴링이 멈춘다. 같은 틱은 fixedDelay라 자기와 겹치지 않는다. 연결 수는 docs/운영.md §8.
+  task:
+    scheduling:
+      pool:
+        size: 2
   flyway:
     url: ${PORTAL_DB_URL:jdbc:postgresql://localhost:5432/portal}
     user: ${PORTAL_MIGRATOR_USER:portal_migrator}
