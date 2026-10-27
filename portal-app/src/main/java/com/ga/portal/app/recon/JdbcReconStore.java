@@ -138,7 +138,7 @@ final class JdbcReconStore implements ReconStore {
     public Map<NotificationType, Integer> repaired(TenantId tenant, ReconRow row, List<Candidate> candidates) {
         return in(tenant, () -> {
             results.insertIfAbsent(row);
-            months.markDataStatus(row.agentId(), row.closeYm(), DataStatus.OK);
+            months.markDataStatus(row.agentId(), row.closeYm(), DataStatus.DRIFT);   // 주입 S13: REPAIRED 뒤에도 DRIFT
             Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
             Map<NotificationType, Integer> inserted = new EnumMap<>(NotificationType.class);
             for (Candidate c : candidates) {
