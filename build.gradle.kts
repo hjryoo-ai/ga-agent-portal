@@ -405,7 +405,9 @@ val scanPlaintextLeaks = tasks.register("scanPlaintextLeaks") {
         if (hits.isNotEmpty()) {
             throw GradleException("평문 센티널이 시험 출력에 나타났다(값은 앞 1자만 표시):\n" + hits.joinToString("\n"))
         }
-        logger.lifecycle("scanPlaintextLeaks: ${files.size} files, ${forbidden.size} forbidden strings, 0 hits")
+        // 트레이스(포털 Phase 7 C12): TracingLeakIT가 내보낸 스팬을 build/trace-export/*.log로 쓴다 — 위 .log 규칙이 읽는다, 수만 따로 보인다
+        val traceDumps = files.count { it.path.contains("${File.separator}trace-export${File.separator}") }
+        logger.lifecycle("scanPlaintextLeaks: ${files.size} files (trace dumps: $traceDumps), ${forbidden.size} forbidden strings, 0 hits")
     }
 }
 subprojects {

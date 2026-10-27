@@ -36,10 +36,12 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 포털 Phase 7 C8(계획 ⑤·Q6): 실제 OpenTelemetry SDK(메모리 내보내기)로 인제스트 → 대사(DRIFT → 재구축 → 재대사 REPAIRED)를 돌린 뒤 스팬을 훑는다.
+ * 포털 Phase 7 C9(계획 ⑤·Q6): 실제 OpenTelemetry SDK(메모리 내보내기)로 인제스트 → 대사(DRIFT → 재구축 → 재대사 REPAIRED)를 돌린 뒤 스팬을 훑는다.
  * <ul>
  *   <li>스팬 이름·부모가 {@code docs/지표.md} §4 표와 같고, 속성 키 ⊆ 표의 그 스팬 키.</li>
  *   <li>속성 값 어디에도 센티널({@code pii-sentinels.properties} 전 키)·스트림의 식별자·날짜·금액 원문이 없다(0건).</li>
+ *   <li>내보낸 스팬 전부(이름·부모·속성)를 단언 전에 {@code portal-app/build/trace-export/}의 {@code .log}로 쓴다 — 평문 스캔({@code scanPlaintextLeaks})이
+ *       시험 출력과 함께 읽는다(C12 “트레이스 exporter 출력 파일 포함”).</li>
  * </ul>
  */
 class TracingLeakIT {
@@ -96,6 +98,20 @@ class TracingLeakIT {
         return out;
     }
 
+    /** 스팬 한 줄 = 이름 · 부모 이름 · 속성 {@code 키=값}(키 순). */
+    static Path dump(List<SpanData> spans) throws IOException {
+        Map<String, String> nameById = spans.stream().collect(Collectors.toMap(SpanData::getSpanId, SpanData::getName));
+        List<String> lines = new ArrayList<>();
+        for (SpanData s : spans) {
+            Map<String, String> attributes = new TreeMap<>();
+            s.getAttributes().forEach((k, v) -> attributes.put(k.getKey(), String.valueOf(v)));
+            lines.add(s.getName() + " parent=" + nameById.getOrDefault(s.getParentSpanId(), "-") + " " + attributes);
+        }
+        Path file = Path.of(System.getProperty("ga.repoRoot")).resolve("portal-app/build/trace-export/TracingLeakIT.spans.log");
+        Files.createDirectories(file.getParent());
+        return Files.write(file, lines, StandardCharsets.UTF_8);
+    }
+
     @Test
     void theSpansOfIngestAndAutoRepairCarryNoValues() throws IOException {
         InMemorySpanExporter exporter = InMemorySpanExporter.create();
@@ -113,6 +129,7 @@ class TracingLeakIT {
                 assertThat(run.result()).isEqualTo(ReconRunResult.REPAIRED);
                 spans = exporter.getFinishedSpanItems();
             }
+            assertThat(Files.readAllLines(dump(spans))).as("every exported span is in the dump the plaintext scan reads").hasSize(spans.size());
             assertThat(forbidden).as("the scan is not vacuous").contains("A-1001", "202608", "1800000").hasSizeGreaterThan(20);
 
             Map<String, SpanRow> table = table();
