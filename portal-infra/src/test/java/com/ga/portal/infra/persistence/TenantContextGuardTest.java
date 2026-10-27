@@ -77,6 +77,9 @@ class TenantContextGuardTest {
     private final NotificationRepository notifications = new NotificationRepository(new TenantJdbcGateway(recording));
     private final InquiryRepository inquiries = new InquiryRepository(new TenantJdbcGateway(recording));
     private final InquiryOperatorRepository operatorInquiries = new InquiryOperatorRepository(new TenantJdbcGateway(recording));
+    // Phase 7
+    private final ReconLockRepository reconLock = new ReconLockRepository(new TenantJdbcGateway(recording));
+    private final ReconRunRepository reconRuns = new ReconRunRepository(new TenantJdbcGateway(recording));
     private static final Instant NOW = Instant.parse("2026-10-17T00:00:00Z");
     private static final IngestEventRecord ROW = new IngestEventRecord(TenantId.of("GA01"), "5eed0000-0000-4000-8000-000000000001", 1,
             "AgentSnapshot", NOW, IngestEventStatus.APPLIED, Optional.empty(), "d".repeat(64));
@@ -91,12 +94,12 @@ class TenantContextGuardTest {
         assertThat(publicMethods(AuditAccessRepository.class)).containsExactly("recent", "record", "recordDenial");
         assertThat(publicMethods(AgentProfileRepository.class)).containsExactly("find", "save");
         assertThat(publicMethods(EarningsLineRepository.class)).containsExactly("find", "insert", "sums");
-        assertThat(publicMethods(EarningsMonthRepository.class)).containsExactly("find", "save");
+        assertThat(publicMethods(EarningsMonthRepository.class)).containsExactly("find", "findByMonths", "markDataStatus", "save");
         assertThat(publicMethods(PolicyLimitRepository.class)).containsExactly("find", "findByPolicy", "insert", "insertHistory", "save");
         assertThat(publicMethods(DeferralItemRepository.class)).containsExactly("find", "insert", "save");
         assertThat(publicMethods(ClawbackItemRepository.class)).containsExactly("find", "save");
         assertThat(publicMethods(PolicyFlagRepository.class)).containsExactly("find", "save");
-        assertThat(publicMethods(ReconResultRepository.class)).containsExactly("insertIfAbsent");
+        assertThat(publicMethods(ReconResultRepository.class)).containsExactly("driftAndRepaired", "insertIfAbsent");
         assertThat(publicMethods(ViewResetRepository.class)).containsExactly("deleteViews", "violations");
         assertThat(publicMethods(ViewRepository.class)).isEmpty();
         assertThat(publicMethods(IdentityLinkRepository.class)).containsExactly("find");
@@ -107,7 +110,10 @@ class TenantContextGuardTest {
         assertThat(publicMethods(SimulationLockRepository.class)).containsExactly("lock");
         assertThat(publicMethods(NotificationRepository.class)).containsExactly("counts", "insertIfAbsent", "markRead", "page");
         assertThat(publicMethods(InquiryRepository.class)).containsExactly("count", "find", "insert", "lock", "ownsLine", "page", "window");
-        assertThat(publicMethods(InquiryOperatorRepository.class)).containsExactly("answer", "close", "list", "lockOne");
+        assertThat(publicMethods(InquiryOperatorRepository.class)).containsExactly("answer", "close", "list", "lockOne", "openSummary");
+        assertThat(publicMethods(ReconLockRepository.class)).containsExactly("tryLock");
+        assertThat(publicMethods(ReconRunRepository.class)).containsExactly("insert", "last", "lastRebuild", "rebuilds", "rebuiltBetween", "scheduledBetween",
+                "update");
     }
 
     /** 위 목록이 이 패키지의 저장소 전부다 — 새 저장소가 목록 밖에 남지 않는다(Phase 3: 손으로 적은 목록을 패키지와 대조). */
@@ -133,7 +139,8 @@ class TenantContextGuardTest {
                 "AuditAccessRepository", "AgentProfileRepository", "EarningsLineRepository", "EarningsMonthRepository", "PolicyLimitRepository",
                 "DeferralItemRepository", "ClawbackItemRepository", "PolicyFlagRepository", "ReconResultRepository", "ViewResetRepository",
                 "ViewRepository", "IdentityLinkRepository", "AgentQueryRepository", "SyncStatusRepository", "SimulationLogRepository",
-                "SimulationLockRepository", "NotificationRepository", "InquiryRepository", "InquiryOperatorRepository");
+                "SimulationLockRepository", "NotificationRepository", "InquiryRepository", "InquiryOperatorRepository", "ReconLockRepository",
+                "ReconRunRepository");
     }
 
     @Test
@@ -201,6 +208,17 @@ class TenantContextGuardTest {
         assertThatThrownBy(() -> operatorInquiries.lockOne(id)).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> operatorInquiries.answer(id, "a", "cli:ops", NOW)).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> operatorInquiries.close(id)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(operatorInquiries::openSummary).isInstanceOf(TenantNotBoundException.class);
+        ReconRunRepository.Run run = new ReconRunRepository.Run(NOW, "recon:GA01", com.ga.portal.domain.ReconTrigger.SCHEDULE, 0, 0, 0, 0, 0, 0,
+                com.ga.portal.domain.ReconRunResult.OK, Optional.empty(), Optional.empty());
+        assertThatThrownBy(reconLock::tryLock).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> reconRuns.insert(run)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> reconRuns.update(run)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> reconRuns.scheduledBetween(NOW, NOW)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> reconRuns.rebuiltBetween(NOW, NOW)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(reconRuns::rebuilds).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(reconRuns::last).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(reconRuns::lastRebuild).isInstanceOf(TenantNotBoundException.class);
         AgentRow agent = new AgentRow("A-1001", "n", Optional.empty(), "/HQ", Optional.empty(), AgentStatus.ACTIVE, LocalDate.of(2026, 8, 1), 1);
         LineRow line = new LineRow("1", "A-1001", "P", Optional.empty(), "FY_COMM", 1, "202608", Optional.empty(), 0, Optional.empty(), "{}", "{}", 2);
         MonthRow month = MonthRow.first("A-1001", "202608", MonthStatus.PROVISIONAL, 2);
@@ -220,6 +238,8 @@ class TenantContextGuardTest {
         assertThatThrownBy(() -> lines.sums("A-1001", "202608")).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> months.find("A-1001", "202608")).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> months.save(month)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> months.findByMonths(java.util.List.of("202608"))).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(() -> months.markDataStatus("A-1001", "202608", com.ga.portal.domain.DataStatus.DRIFT)).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> limits.find("1")).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> limits.findByPolicy("P", "A-1001")).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> limits.insert(ledger)).isInstanceOf(TenantNotBoundException.class);
@@ -233,6 +253,7 @@ class TenantContextGuardTest {
         assertThatThrownBy(() -> flags.find("P", "A-1001")).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> flags.save(flag)).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> recon.insertIfAbsent(reconRow)).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(recon::driftAndRepaired).isInstanceOf(TenantNotBoundException.class);
         assertThat(recording.connectionsObtained()).isZero();
         assertThat(recording.statements()).isEmpty();
     }
