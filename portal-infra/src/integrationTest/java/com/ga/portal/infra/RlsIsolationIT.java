@@ -29,8 +29,8 @@ class RlsIsolationIT {
 
     private static final PostgresHarness DB = PostgresHarness.get();
 
-    /** V1 기준 테넌트 테이블 수(설계서 §5). 테이블을 추가하는 마이그레이션은 이 값과 SeedData를 함께 고친다. */
-    private static final int EXPECTED_TABLE_COUNT = 17;
+    /** 테넌트 테이블 수(설계서 §5 — V1의 17 + V8 {@code recon_run}). 테이블을 추가하는 마이그레이션은 이 값과 SeedData를 함께 고친다. */
+    private static final int EXPECTED_TABLE_COUNT = 18;
 
     static final List<String> TABLES = catalogTables();
 

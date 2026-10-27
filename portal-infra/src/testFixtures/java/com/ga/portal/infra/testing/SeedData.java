@@ -9,7 +9,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 테넌트 하나에 대해 17개 테넌트 테이블 전부에 행을 하나씩 넣는다(허구 값, 개인정보 없음). RLS 격리 시험(C2)의 바탕.
+ * 테넌트 하나에 대해 18개 테넌트 테이블(V8 {@code recon_run} 포함) 전부에 행을 하나씩 넣는다(허구 값, 개인정보 없음). RLS 격리 시험(C2)의 바탕.
  * 테이블 목록은 {@link #ROWS}의 키이고, RlsIsolationIT가 DB 카탈로그와 같은지 대조한다(테이블이 늘면 여기도 늘어야 한다).
  */
 public final class SeedData {
@@ -37,6 +37,7 @@ public final class SeedData {
         rows.put("ingest_cursor", "INSERT INTO ingest_cursor (tenant_id, last_seq, state, updated_at) VALUES (?, 0, 'RUNNING', TIMESTAMPTZ '2026-08-20T10:00:00+09:00')");
         rows.put("ingest_event", "INSERT INTO ingest_event (tenant_id, event_id, seq, event_type, received_at, status, payload_hash) VALUES (?, '" + UUID.nameUUIDFromBytes(new byte[] {4}) + "', 1, 'LimitLedgerOpened', TIMESTAMPTZ '2026-08-20T10:00:00+09:00', 'APPLIED', '" + "b".repeat(64) + "')");
         rows.put("recon_result", "INSERT INTO recon_result (tenant_id, agent_id, close_ym, run_at, status, source, source_seq) VALUES (?, 'A0001', '202608', TIMESTAMPTZ '2026-08-21T02:00:00+09:00', 'MATCH', 'BATCH', 0)");
+        rows.put("recon_run", "INSERT INTO recon_run (tenant_id, run_at, actor, trigger, checked, matched, drift_new, drift_unresolved, inconclusive, engine_calls, result) VALUES (?, TIMESTAMPTZ '2026-08-21T04:00:00+09:00', 'cli:ops', 'CLI', 2, 2, 0, 0, 0, 2, 'OK')");
         rows.put("audit_access", "INSERT INTO audit_access (tenant_id, actor_subject, action, target, at) VALUES (?, 'ops', 'REBUILD', 'tenant', TIMESTAMPTZ '2026-08-21T02:00:00+09:00')");
         ROWS = Map.copyOf(rows);
     }
