@@ -117,8 +117,12 @@ testing {
                     // 화면 E2E 하네스(WebE2eHarness — 같은 소스셋)가 읽는 포털 손 스트림
                     inputs.dir(rootProject.layout.projectDirectory.dir("web/e2e/streams")).withPathSensitivity(PathSensitivity.RELATIVE)
                     inputs.dir(rootProject.layout.projectDirectory.dir("contracts/shared/ga-commission-engine")).withPathSensitivity(PathSensitivity.RELATIVE)
-                    // TracingLeakIT(포털 Phase 7 C8): 스팬 표(docs/지표.md §4)
+                    // TracingLeakIT(포털 Phase 7 C9): 스팬 표(docs/지표.md §4)
                     inputs.file(rootProject.layout.projectDirectory.file("docs/지표.md")).withPathSensitivity(PathSensitivity.RELATIVE)
+                    // TracingLeakIT(포털 Phase 7 C12 — P7-17): 내보낸 스팬 덤프는 이 태스크의 출력 — scanPlaintextLeaks가 build/**/*.log로 읽는다
+                    val traceExport = layout.buildDirectory.dir("trace-export")
+                    outputs.dir(traceExport)
+                    systemProperty("ga.traceExport", traceExport.get().asFile.absolutePath)
                     // 대사 스케줄러(포털 Phase 7 P-11): 앱 문맥을 띄우는 시험에서 1분 틱이 회차를 쓰지 않게 끈다 — 회차는 시험이 직접 부른다
                     environment("PORTAL_RECON_SCHEDULER_ENABLED", "false")
                 }

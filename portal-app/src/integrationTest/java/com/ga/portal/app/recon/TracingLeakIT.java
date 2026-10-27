@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <ul>
  *   <li>스팬 이름·부모가 {@code docs/지표.md} §4 표와 같고, 속성 키 ⊆ 표의 그 스팬 키.</li>
  *   <li>속성 값 어디에도 센티널({@code pii-sentinels.properties} 전 키)·스트림의 식별자·날짜·금액 원문이 없다(0건).</li>
- *   <li>내보낸 스팬 전부(이름·부모·속성)를 단언 전에 {@code portal-app/build/trace-export/}의 {@code .log}로 쓴다 — 평문 스캔({@code scanPlaintextLeaks})이
+ *   <li>내보낸 스팬 전부(이름·부모·속성)를 단언 전에 이 태스크의 출력 디렉터리({@code ga.traceExport} — {@code portal-app/build/trace-export})의 {@code .log}로 쓴다 — 평문 스캔({@code scanPlaintextLeaks})이
  *       시험 출력과 함께 읽는다(C12 “트레이스 exporter 출력 파일 포함”).</li>
  * </ul>
  */
@@ -107,7 +107,7 @@ class TracingLeakIT {
             s.getAttributes().forEach((k, v) -> attributes.put(k.getKey(), String.valueOf(v)));
             lines.add(s.getName() + " parent=" + nameById.getOrDefault(s.getParentSpanId(), "-") + " " + attributes);
         }
-        Path file = Path.of(System.getProperty("ga.repoRoot")).resolve("portal-app/build/trace-export/TracingLeakIT.spans.log");
+        Path file = Path.of(System.getProperty("ga.traceExport")).resolve("TracingLeakIT.spans.log");   // 이 태스크의 출력 디렉터리(빌드 파일)
         Files.createDirectories(file.getParent());
         return Files.write(file, lines, StandardCharsets.UTF_8);
     }
