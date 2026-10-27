@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -35,6 +36,28 @@ public class EarningsMonthRepository extends ViewRepository {
                        net_basis, last_seq
                   FROM earnings_month WHERE tenant_id = :tenantId AND agent_id = :agentId AND close_ym = :closeYm
                 """, Map.of("agentId", agentId, "closeYm", closeYm), MAPPER);
+    }
+
+    /** 대사 대상(포털 Phase 7 R0): 그 달들의 행 전부(설계사·달 순). */
+    public List<MonthRow> findByMonths(List<String> closeYms) {
+        if (closeYms.isEmpty()) {
+            return List.of();
+        }
+        return query("""
+                SELECT agent_id, close_ym, gross, clawback_offset, adjustment, withholding_tax, net, status, data_status, estimate_as_of,
+                       estimate_basis_seq, confirmed_at, paid_at, paid_amount, receivable_offset, carried_receivable, payable, run_seq,
+                       net_basis, last_seq
+                  FROM earnings_month WHERE tenant_id = :tenantId AND close_ym IN (:closeYms)
+                 ORDER BY agent_id, close_ym
+                """, Map.of("closeYms", closeYms), MAPPER);
+    }
+
+    /** 대사가 그 달의 데이터 상태만 바꾼다(R2·R5 — 금액·상태는 그대로). 바꾼 행 수. */
+    public int markDataStatus(String agentId, String closeYm, DataStatus status) {
+        return update("""
+                UPDATE earnings_month SET data_status = :dataStatus
+                 WHERE tenant_id = :tenantId AND agent_id = :agentId AND close_ym = :closeYm
+                """, Map.of("agentId", agentId, "closeYm", closeYm, "dataStatus", status.name()));
     }
 
     public void save(MonthRow r) {

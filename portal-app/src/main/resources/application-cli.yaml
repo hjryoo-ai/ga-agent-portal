@@ -7,3 +7,5 @@ spring:
 portal:
   ingest:
     enabled: false
+  recon:
+    scheduler-enabled: false

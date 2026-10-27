@@ -60,3 +60,17 @@ portal:
     connect-timeout: ${PORTAL_SIM_CONNECT_TIMEOUT:2s}
     read-timeout: ${PORTAL_SIM_READ_TIMEOUT:10s}
     default-rate-per-minute: 10
+  # 대사(포털 Phase 7 — 설계서 §6.6): 앱 안 스케줄러(1분 틱, 테넌트 recon_hour_kst의 KST 하루 한 번), 엔진 명세 조회 시간 초과(재시도 0).
+  # defaults는 tenant.params에 키가 없을 때의 값(코드 상수가 아니다). 스케줄러는 통합 시험·E2E·CLI에서 끈다.
+  recon:
+    scheduler-enabled: ${PORTAL_RECON_SCHEDULER_ENABLED:true}
+    tick: 1m
+    connect-timeout: ${PORTAL_RECON_CONNECT_TIMEOUT:2s}
+    read-timeout: ${PORTAL_RECON_READ_TIMEOUT:10s}
+    defaults:
+      recon-hour-kst: 4
+      auto-rebuild-enabled: true
+      caught-up-within-seconds: 900
+      call-interval-ms: 200
+      max-calls: 500
+      max-seconds: 900

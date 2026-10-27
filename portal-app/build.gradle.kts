@@ -71,7 +71,9 @@ testing {
                 implementation(testFixtures(project(":portal-ingest")))
                 implementation(testFixtures(project(":portal-projection")))
                 implementation(testFixtures(project(":portal-sim")))
+                implementation(testFixtures(project(":portal-recon")))
                 implementation(project(":portal-sim"))
+                implementation(project(":portal-recon"))
                 implementation(project(":portal-inbox"))
                 implementation(project(":portal-ingest"))
                 implementation(project(":portal-infra"))
@@ -111,6 +113,8 @@ testing {
                     // 화면 E2E 하네스(WebE2eHarness — 같은 소스셋)가 읽는 포털 손 스트림
                     inputs.dir(rootProject.layout.projectDirectory.dir("web/e2e/streams")).withPathSensitivity(PathSensitivity.RELATIVE)
                     inputs.dir(rootProject.layout.projectDirectory.dir("contracts/shared/ga-commission-engine")).withPathSensitivity(PathSensitivity.RELATIVE)
+                    // 대사 스케줄러(포털 Phase 7 P-11): 앱 문맥을 띄우는 시험에서 1분 틱이 회차를 쓰지 않게 끈다 — 회차는 시험이 직접 부른다
+                    environment("PORTAL_RECON_SCHEDULER_ENABLED", "false")
                 }
             }
         }
