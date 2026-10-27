@@ -127,8 +127,11 @@ final class JdbcReconStore implements ReconStore {
 
     @Override
     public void drift(TenantId tenant, AgentMonth key, Optional<ReconRow> row) {
-        in(tenant, () -> {
+        in(tenant, () -> {   // 주입 S4: DRIFT 행과 data_status를 다른 트랜잭션으로
             row.ifPresent(results::insertIfAbsent);
+            return null;
+        });
+        in(tenant, () -> {
             months.markDataStatus(key.agentId(), key.ym(), DataStatus.DRIFT);
             return null;
         });
