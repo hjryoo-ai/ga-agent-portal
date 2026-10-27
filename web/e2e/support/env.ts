@@ -14,7 +14,7 @@ const run = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../build/e2
 export const baseUrl = run.baseUrl;
 
 /** 그 프로젝트의 테넌트 한 벌(GA01 → GA01A 등). */
-export function tenantOf(projectName: string, base: 'GA01' | 'GA02' | 'GA03' | 'GA04' | 'GA05'): string {
+export function tenantOf(projectName: string, base: 'GA01' | 'GA02' | 'GA03' | 'GA04' | 'GA05' | 'GA06'): string {
   const suffix = run.projects[projectName];
   if (suffix === undefined) throw new Error(`unknown project ${projectName}`);
   return base + suffix;
@@ -57,6 +57,11 @@ export async function advance(tenant: string, seq: number): Promise<void> {
   }
 }
 
+/** 피드 머리만 연다 — 포털이 따라잡기를 기다리지 않는다(피드를 막아 둔 채 머리를 올릴 때 — 포털 Phase 7 ⓒ). */
+export async function openHead(tenant: string, seq: number): Promise<void> {
+  await control(`/head/${tenant}/${String(seq)}`);
+}
+
 export async function failFeed(tenant: string, on: boolean): Promise<void> {
   await control(`/fail/${tenant}/${on ? 'on' : 'off'}`);
 }
@@ -87,6 +92,42 @@ export async function rebuild(tenant: string): Promise<number> {
 /** {@code inquiry answer --tenant=T --id=<id> --answer-file=<상태 디렉터리의 파일>} — 답변 문장은 하네스의 허구 고정 문장({@link ANSWER}). */
 export async function answer(tenant: string, inquiryId: string): Promise<number> {
   return cli(`${tenant}/answer/${inquiryId}`);
+}
+
+/**
+ * {@code recon run --tenant=T --ym=…}(포털 Phase 7 계획 ⑦). 0 = 회차 끝(OK·DRIFT·REPAIRED), 1 = FAILED, 2 = 거부·잠금. 잠금(2 — 진행 중인 회차·적용)이면
+ * 몇 번 다시 친다 — 운영자가 하는 것과 같다.
+ */
+export async function recon(tenant: string, months: string[]): Promise<number> {
+  let code = -1;
+  for (let i = 0; i < 5; i++) {
+    code = await cli(`${tenant}/recon?ym=${months.join(',')}`);
+    if (code !== 2) return code;
+    await new Promise((ok) => setTimeout(ok, 1_000));
+  }
+  return code;
+}
+
+/** 인위적 라인 누락 — 하네스가 포털 DB에서 라인 한 행을 지우고 그 달 합을 다시 쓴다(시험 전용 경로). */
+export async function corruptLine(tenant: string, calcId: string): Promise<void> {
+  await control(`/corrupt/${tenant}/line/${calcId}`);
+}
+
+/** 테넌트 {@code params.auto_rebuild_enabled}. */
+export async function autoRebuild(tenant: string, on: boolean): Promise<void> {
+  await control(`/params/${tenant}/auto_rebuild/${on ? 'on' : 'off'}`);
+}
+
+/** 엔진 명세 스텁: down 503 · up 정상. */
+export async function statementEngine(tenant: string, mode: 'down' | 'up'): Promise<void> {
+  await control(`/statement/${tenant}/${mode}`);
+}
+
+/** 행위자 {@code recon:<T>}의 재구축 성공 감사 행 수(하네스가 수만 돌려준다). */
+export async function reconRebuilds(tenant: string): Promise<number> {
+  const r = await fetch(`${run.controlUrl}/count/${tenant}/rebuilds`, { method: 'POST' });
+  if (r.status !== 200) throw new Error(`harness count control answered ${String(r.status)}`);
+  return Number(await r.text());
 }
 
 /** 하네스의 답변 파일 문장(WebE2eHarness.ANSWER — 끝 줄바꿈 하나는 CLI가 뺀다). */

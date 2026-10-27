@@ -18,16 +18,19 @@ ENGINE_REPO=/path/to/ai-comm/commission-system e2e/engine-feed/run.sh
 2. 일회용 PostgreSQL 컨테이너 `ga-portal-e2e-pg` — 이미지는 `gradle/libs.versions.toml`의 `postgres-image`(digest 고정), `docker/postgres/init-roles.sql`, **볼륨 없음**(사용자의 compose 볼륨과 무관).
 3. 비밀 파일(`.state/`, 권한 600): 엔진 서비스 토큰 사본 `tokens/GA01`, `policyKey` 비밀 32바이트, 허구 subject `e2e-<무작위>`.
 4. 시험 발급기 `./gradlew :portal-app:runTestIssuer --args=<.state>` — 인프로세스 RS256 발급기(`TestIssuer`)가 그 subject의 토큰(대상 `portal-e2e`, 1시간)과 발급자 URL을 `.state/`에 쓴다.
-5. 포털 bootJar 기동(`PORTAL_INGEST_ENABLED=true`, Flyway가 V1~V5 적용).
+5. 포털 bootJar 기동(`PORTAL_INGEST_ENABLED=true`, 대사 스케줄러 끔 `PORTAL_RECON_SCHEDULER_ENABLED=false` — 회차는 8에서 CLI로, Flyway가 마이그레이션 전부 적용).
 6. 테넌트 `GA01`(`engine_base_url` = 로컬 엔진, `oidc_issuer` = 시험 발급기)·설계사 링크(`A-1001`, `AGENT`)를 **파일 SQL**로 등록(`docs/운영.md` §1·§2와 같은 문장).
 7. 따라잡기 대기 — 커서 `caught_up_at`이 생길 때까지(`last_seq = headSeq`·`RUNNING`으로 끝난 회차 = `ingest_lag_seq` 0. actuator는 `health`만 노출하므로 지표 대신 같은 조건을 DB에서 본다).
-8. 판정 `./gradlew :portal-app:e2eCheck` → `RESULT.md`:
+8. (포털 Phase 7) 대사 — 실행한 OS 사용자의 운영자 링크(`cli:<OS 사용자>`, `OPERATOR`)를 **파일 SQL**로 등록(`docs/운영.md` §3과 같은 문장)하고 bootJar로
+   `recon run --tenant=GA01 --ym=202608,202702`(`cli` 프로파일, 인제스트 끔). 종료 코드만 `.state/recon.exit`에, 출력은 `.state/recon.log`(한 줄 요약 — 값 없음).
+9. 판정 `./gradlew :portal-app:e2eCheck` → `RESULT.md`:
    - 뷰 9표 = `portal-projection/src/test/resources/golden-views/a1/`(둘째 판 — `ProjectionGoldenIT`와 같은 정규형: `tenant_id` 제외, 시각 UTC). **제외 열 없음** — 엔진 `up.sh verify`가 피드를 계약 사본 `a1_portal_150000_e2.jsonl`과 바이트 비교하므로 `seq`·`eventId`·`occurredAt`도 같아야 한다(자리 단계 README의 "제외 규칙"은 필요 없어졌다).
    - `GET /api/v1/me/earnings/202608`(시험 발급기 토큰)이 200, 계약 `contracts/api/v1/portal-api.openapi.yaml` 통과, 증권번호 원문 없음.
    - (포털 Phase 5) 시뮬레이션 한 쌍: 신계약(엔진 샘플 S1의 요청 — `WHOLE-LIFE-20Y`·150,000·2026-08-01)과 해약 영향(S5 — 원장의 `policyKey`, `CANCEL`·2027-02-15·7회차)을 포털 API로 보낸다. 실 엔진의 답이 엔진 계약 사본 스키마를 통과해야 포털이 200을 내고(아니면 502), 포털 응답이 계약을 통과하고 증권번호 원문이 없으며, `simulation_log`(GA01)에 `NEW_CONTRACT`·`POLICY_EVENT`가 `SUCCEEDED`·엔진 상태 200으로 남는다. 값은 엔진 시드에 따라 다를 수 있어 대조하지 않는다(값 대조는 엔진 `SimulationContractTest`가 샘플로 한다).
    - (포털 Phase 6) `notification`(GA01) 행 수 > 0 — 알림은 피드를 적용하는 트랜잭션에서 자연히 생긴다(`run.sh` 무변경). 종류별 수만 적고 키·매개변수는 읽지 않는다. 손 계산(A-1 — 3 `LIMIT_CUT`·5 `LIMIT_FULL`·6 `STMT_CONFIRMED`·7 `PAYOUT`·8 `POLICY_CANCEL`·9 `CLAWBACK`)과의 대조는 `NotificationDerivationIT`가 계약 사본으로 한다.
+   - (포털 Phase 7) 대사 판정 ⑤: `recon run` 종료 코드 0, 마지막 CLI 회차 = 검사 2·일치 2·새 DRIFT 0·미해결 0·판정 불가 0·`OK`(202608은 CONFIRMED — 세전·정정·환수 상계 셋 비교, 202702는 ESTIMATE — 환수 상계·정정 둘 비교), `recon_result`(GA01) 0행.
 
-`ingest rebuild` 뒤 재대조(자리 단계 README의 4번)는 넣지 않았다 — D-16 범위 밖이고, 재구축 = 골든은 `RebuildIT`가 계약 사본으로 증명한다. 운영자 링크(`cli:<OS 사용자>`)를 등록하는 단계가 늘어 실행 표면만 커진다.
+`ingest rebuild` 뒤 재대조(자리 단계 README의 4번)는 넣지 않았다 — D-16 범위 밖이고, 재구축 = 골든은 `RebuildIT`가 계약 사본으로 증명한다. 운영자 링크는 포털 Phase 7부터 8단계(대사)가 등록한다.
 
 ## 비밀·개인정보
 

@@ -6,6 +6,7 @@ import com.ga.portal.ingest.ContractSchemas;
 import com.ga.portal.ingest.EnvelopeValidator;
 import com.ga.portal.ingest.EnvelopeVerdict;
 import com.ga.portal.ingest.testing.StubFeedServer;
+import com.ga.portal.recon.testing.StubStatementEngine;
 import com.ga.portal.sim.testing.StubSimulationEngine;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -54,6 +55,11 @@ import java.util.regex.Pattern;
  *       {@code POST /cli/<tenant>/answer/<inquiryId>}는 <b>실 CLI</b>를 자식 프로세스로 띄운다 — 운영자와 같은 명령({@code java -jar <포털 jar>
  *       --spring.profiles.active=cli …}, 포털 프로세스와 같은 DB 주소·토큰 디렉터리). 답변은 허구 고정 문장을 상태 디렉터리의 파일(600)에 쓰고 경로만 넘기며, 끝나면 지운다.
  *       자식의 표준 출력은 버리고(파일·아티팩트에 남기지 않는다) 응답은 종료 코드 하나(200, 본문 = 숫자).</li>
+ *   <li>Phase 7(계획 ⑦·P-2·P-5·P-10): 피드 스텁에 엔진 명세 스텁({@link StubStatementEngine} — 엔진 샘플 사본, 요청 대조, 샘플 밖 500)을 붙인다. 명세 상태:
+ *       GA01·GA04·GA06 {@code a1}, GA02 {@code estimate-cycle-01}, 나머지 {@code a1}. 새 테넌트 GA06(A-1 둘째 판만 — 이웃 없음). GA04·GA06은
+ *       {@code auto_rebuild_enabled=false}로 시작한다. 제어 {@code POST /corrupt/<T>/line/<calcId>}(포털 DB에서 라인 한 행을 지우고 그 달 합을 남은 라인으로 다시 쓴다 —
+ *       시드 롤 직접 SQL, 제품 코드 0), {@code POST /params/<T>/auto_rebuild/on|off}, {@code POST /cli/<T>/recon?ym=…}(실 CLI {@code recon run} 자식 — 종료 코드),
+ *       {@code POST /count/<T>/rebuilds}(행위자 {@code recon:<T>}의 재구축 성공 감사 행 수 — 200, 본문 = 숫자). 엔진 명세 스텁 모드는 {@code POST /statement/<T>/down|up}.</li>
  * </ul>
  * 인자: 상태 디렉터리, 쉼표로 이은 프로젝트 접미사(예 {@code A,B,C}). 시스템 속성: {@code ga.repoRoot}, {@code ga.portalJar}(CLI 자식이 실행하는 bootJar — Phase 6).
  */
@@ -63,8 +69,12 @@ public final class WebE2eHarness {
     static final String AUDIENCE = "portal-e2e";
     static final SecureRandom RANDOM = new SecureRandom();
 
-    /** 스트림 + 엔진 상태(샘플 묶음) + 시뮬레이션 레이트 + 유지율 시나리오 허용 + 문의 한도(0이면 두지 않는다 — 앱 기본). */
-    record Base(String id, List<Path> streams, String engineState, int simRatePerMinute, boolean forecastScenario, int inquiryRatePerDay) {
+    /**
+     * 스트림 + 엔진 상태(샘플 묶음) + 시뮬레이션 레이트 + 유지율 시나리오 허용 + 문의 한도(0이면 두지 않는다 — 앱 기본) + 명세 상태(포털 Phase 7 샘플 묶음) +
+     * 자동 재구축(대사 — 앱 기본은 켬).
+     */
+    record Base(String id, List<Path> streams, String engineState, int simRatePerMinute, boolean forecastScenario, int inquiryRatePerDay,
+                String statementState, boolean autoRebuild) {
     }
 
     /** CLI 자식의 답변 파일 문장(허구 고정 — 화면의 상세에 그대로 나온다). */
@@ -73,8 +83,12 @@ public final class WebE2eHarness {
     /** {@code IngestCommands.actorSubject}와 같은 형식 — 형식 밖이면 하네스가 뜨지 않는다(CLI가 거부할 것을 미리). */
     static final Pattern OS_USER = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$");
     static final long CLI_TIMEOUT_SECONDS = 150;
+    /** {@code /corrupt/<T>/line/<calcId>}의 calcId — 스트림의 계산 ID 꼴. */
+    static final Pattern CALC_ID = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$");
+    /** {@code /cli/<T>/recon?ym=…} — 대상 달(쉼표, 최대 6 — CLI가 다시 본다). */
+    static final Pattern YMS = Pattern.compile("^ym=[0-9]{6}(,[0-9]{6}){0,5}$");
 
-    record Tenant(String id, TestIssuer issuer, StubFeedServer feed, StubSimulationEngine engine, List<JsonNode> events) {
+    record Tenant(String id, TestIssuer issuer, StubFeedServer feed, StubSimulationEngine engine, StubStatementEngine statements, List<JsonNode> events) {
     }
 
     /** {@code slow}의 지연 — 앱 기본 읽기 시간 초과(10초)보다 1초 길게(계획 ⑨). */
@@ -90,13 +104,15 @@ public final class WebE2eHarness {
         Path golden = root.resolve("portal-projection/src/test/resources/golden-streams");
         Path hand = root.resolve("web/e2e/streams");
         Path samples = StubSimulationEngine.samplesDir(root);
+        Path a1 = root.resolve("contracts/events/v1/samples/a1/a1_portal_150000_e2.jsonl");
+        Path statementSamples = StubStatementEngine.samplesDir(root);
         List<Base> bases = List.of(
-                new Base("GA01", List.of(root.resolve("contracts/events/v1/samples/a1/a1_portal_150000_e2.jsonl"), hand.resolve("ga01-neighbor.jsonl")),
-                        "standard", 100, false, 0),
-                new Base("GA02", List.of(golden.resolve("engine-e2-estimate/estimate_cycle_01_기본.jsonl")), "ambiguous", 100, false, 0),
-                new Base("GA03", List.of(golden.resolve("engine-e1-cycle.jsonl")), "standard", 2, false, 0),
-                new Base("GA04", List.of(hand.resolve("edges.jsonl")), "standard", 100, true, 0),
-                new Base("GA05", List.of(hand.resolve("ga05-limits.jsonl")), "standard", 100, false, 3));
+                new Base("GA01", List.of(a1, hand.resolve("ga01-neighbor.jsonl")), "standard", 100, false, 0, "a1", true),
+                new Base("GA02", List.of(golden.resolve("engine-e2-estimate/estimate_cycle_01_기본.jsonl")), "ambiguous", 100, false, 0, "estimate-cycle-01", true),
+                new Base("GA03", List.of(golden.resolve("engine-e1-cycle.jsonl")), "standard", 2, false, 0, "a1", true),
+                new Base("GA04", List.of(hand.resolve("edges.jsonl")), "standard", 100, true, 0, "a1", false),
+                new Base("GA05", List.of(hand.resolve("ga05-limits.jsonl")), "standard", 100, false, 3, "a1", true),
+                new Base("GA06", List.of(a1), "standard", 100, false, 0, "a1", false));
         Path portalJar = Path.of(System.getProperty("ga.portalJar"));
         String osUser = System.getProperty("user.name", "");
         if (!OS_USER.matcher(osUser).matches()) {
@@ -121,7 +137,9 @@ public final class WebE2eHarness {
                 String engineToken = hex(24);
                 writeSecret(engineTokens.resolve(id), engineToken);
                 StubSimulationEngine engine = StubSimulationEngine.of(samples, base.engineState()).slowMillis(SLOW_MILLIS);
-                StubFeedServer feed = new StubFeedServer(id, engineToken).events(List.of()).route(StubSimulationEngine.PATH_PREFIX, engine);
+                StubStatementEngine statements = StubStatementEngine.of(statementSamples, base.statementState());
+                StubFeedServer feed = new StubFeedServer(id, engineToken).events(List.of()).route(StubSimulationEngine.PATH_PREFIX, engine)
+                        .route(StubStatementEngine.PATH_PREFIX, statements);
                 register(db, id, feed, issuer, base);
                 String agentSubject = "e2e-" + id.toLowerCase(java.util.Locale.ROOT) + "-agent-" + hex(4);
                 String unlinkedSubject = "e2e-" + id.toLowerCase(java.util.Locale.ROOT) + "-unlinked-" + hex(4);
@@ -134,7 +152,7 @@ public final class WebE2eHarness {
                         b -> b.expirationTime(Date.from(now.plus(Duration.ofHours(3))))));
                 writeSecret(tokens.resolve(id + "-expired.jwt"), issuer.token(agentSubject, AUDIENCE,
                         b -> b.issueTime(Date.from(now.minus(Duration.ofHours(2)))).expirationTime(Date.from(now.minus(Duration.ofMinutes(10))))));
-                tenants.put(id, new Tenant(id, issuer, feed, engine, events));
+                tenants.put(id, new Tenant(id, issuer, feed, engine, statements, events));
             }
         }
 
@@ -163,6 +181,37 @@ public final class WebE2eHarness {
                 default -> throw new IllegalArgumentException("unknown engine mode");
             });
         }));
+        control.createContext("/statement/", ex -> handle(ex, () -> {
+            String[] parts = ex.getRequestURI().getPath().split("/");
+            tenant(tenants, parts[2]).statements().mode(switch (parts[3]) {
+                case "down" -> StubStatementEngine.Mode.DOWN;
+                case "up" -> StubStatementEngine.Mode.UP;
+                default -> throw new IllegalArgumentException("unknown statement mode");
+            });
+        }));
+        control.createContext("/corrupt/", ex -> handle(ex, () -> {
+            String[] parts = ex.getRequestURI().getPath().split("/");
+            if (parts.length != 5 || !"line".equals(parts[3]) || !CALC_ID.matcher(parts[4]).matches()) {
+                throw new IllegalArgumentException("corrupt control");
+            }
+            corruptLine(db, tenant(tenants, parts[2]).id(), parts[4]);
+        }));
+        control.createContext("/params/", ex -> handle(ex, () -> {
+            String[] parts = ex.getRequestURI().getPath().split("/");
+            if (parts.length != 5 || !"auto_rebuild".equals(parts[3]) || !List.of("on", "off").contains(parts[4])) {
+                throw new IllegalArgumentException("params control");
+            }
+            String t = tenant(tenants, parts[2]).id();
+            db.seed(t, c -> SeedData.exec(c, "UPDATE tenant SET params = jsonb_set(params, '{auto_rebuild_enabled}', to_jsonb(?::boolean)) WHERE tenant_id = ?",
+                    "on".equals(parts[4]), t));
+        }));
+        control.createContext("/count/", ex -> exitCode(ex, () -> {
+            String[] parts = ex.getRequestURI().getPath().split("/");
+            if (parts.length != 4 || !"rebuilds".equals(parts[3])) {
+                throw new IllegalArgumentException("count control");
+            }
+            return rebuildsBy(db, tenant(tenants, parts[2]).id());
+        }));
         Cli cli = new Cli(ProcessHandle.current().info().command().orElseThrow(), portalJar,
                 Map.of("PORTAL_DB_URL", db.jdbcUrl(), "PORTAL_ENGINE_TOKEN_DIR", engineTokens.toString(),
                         "PORTAL_POLICY_KEY_SECRET_FILE", state.resolve("policy-key").toString(), "PORTAL_INGEST_ENABLED", "false"));
@@ -171,6 +220,13 @@ public final class WebE2eHarness {
             Tenant t = tenant(tenants, parts[2]);
             return switch (parts.length == 4 ? parts[3] : parts.length == 5 ? parts[3] + "/" : "") {
                 case "rebuild" -> cli.run(List.of("ingest", "rebuild", "--tenant=" + t.id()));
+                case "recon" -> {
+                    String query = ex.getRequestURI().getRawQuery();
+                    if (query == null || !YMS.matcher(query).matches()) {
+                        throw new IllegalArgumentException("recon months");
+                    }
+                    yield cli.run(List.of("recon", "run", "--tenant=" + t.id(), "--" + query));
+                }
                 case "answer/" -> {
                     if (!UUID_TEXT.matcher(parts[4]).matches()) {
                         throw new IllegalArgumentException("inquiry id");
@@ -241,10 +297,55 @@ public final class WebE2eHarness {
         if (base.inquiryRatePerDay() > 0) {
             params.put("inquiry_rate_per_day", base.inquiryRatePerDay());
         }
+        params.put("auto_rebuild_enabled", base.autoRebuild());
         db.seed(tenant, c -> SeedData.exec(c, """
                 INSERT INTO tenant (tenant_id, name, engine_base_url, status, payout_day_rule, params, oidc_issuer, oidc_audience)
                 VALUES (?, ?, ?, 'ACTIVE', 'NEXT_MONTH_D10', ?::jsonb, ?, ?)
                 """, tenant, "E2E " + tenant, feed.baseUrl().toString(), JSON.writeValueAsString(params), issuer.issuer(), AUDIENCE));
+    }
+
+    /**
+     * 인위적 라인 누락(포털 Phase 7 계획 Q8): 포털 DB에서 라인 한 행을 지우고 그 달 {@code gross}를 남은 라인(정정·환수 제외)의 합으로 다시 쓴다 — 하네스의 시드 롤로만,
+     * 제품 코드 0. {@code ReconRig.corruptLine}과 같은 문장.
+     */
+    static void corruptLine(PostgresHarness db, String tenant, String calcId) {
+        db.seed(tenant, c -> {
+            String[] key = new String[2];
+            try (java.sql.PreparedStatement ps = c.prepareStatement("SELECT agent_id, close_ym FROM earnings_line WHERE tenant_id = ? AND calc_id = ?")) {
+                ps.setString(1, tenant);
+                ps.setString(2, calcId);
+                try (java.sql.ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        throw new IllegalArgumentException("no such line");
+                    }
+                    key[0] = rs.getString(1);
+                    key[1] = rs.getString(2);
+                }
+            }
+            SeedData.exec(c, "DELETE FROM earnings_line WHERE tenant_id = ? AND calc_id = ?", tenant, calcId);
+            SeedData.exec(c, """
+                    UPDATE earnings_month m
+                       SET gross = (SELECT coalesce(sum(l.amount), 0) FROM earnings_line l WHERE l.tenant_id = m.tenant_id AND l.agent_id = m.agent_id
+                                       AND l.close_ym = m.close_ym AND l.comm_type NOT IN ('CLAWBACK', 'ADJUSTMENT'))
+                     WHERE m.tenant_id = ? AND m.agent_id = ? AND m.close_ym = ?
+                    """, tenant, key[0], key[1]);
+        });
+    }
+
+    /** 행위자 {@code recon:<T>}의 재구축 성공 감사 행 수(수만 — 행 내용은 내보내지 않는다). */
+    static int rebuildsBy(PostgresHarness db, String tenant) {
+        return db.asApp(tenant, c -> {
+            try (java.sql.PreparedStatement ps = c.prepareStatement(
+                    "SELECT count(*) FROM audit_access WHERE tenant_id = ? AND actor_subject = ? AND action = ?")) {
+                ps.setString(1, tenant);
+                ps.setString(2, "recon:" + tenant);
+                ps.setString(3, com.ga.portal.app.ingest.IngestCommands.REBUILD_SUCCEEDED);
+                try (java.sql.ResultSet rs = ps.executeQuery()) {
+                    rs.next();
+                    return rs.getInt(1);
+                }
+            }
+        });
     }
 
     /** docs/운영.md §3의 등록 SQL 그대로 — 운영자는 설계사가 아니다(agent_id·org_path 없음). */

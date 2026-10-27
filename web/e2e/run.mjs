@@ -91,6 +91,8 @@ try {
     PORTAL_INGEST_ENABLED: 'true',
     PORTAL_ENGINE_TOKEN_DIR: env.engineTokenDir,
     PORTAL_POLICY_KEY_SECRET_FILE: env.policyKeyFile,
+    // 포털 Phase 7 P-11: 대사 회차는 시험이 CLI로 부른다 — 앱 안 스케줄러(실제 시계)가 시험 테넌트에 회차를 내지 않게
+    PORTAL_RECON_SCHEDULER_ENABLED: 'false',
   });
   await until('the portal', 180_000, async () => {
     if (portal.exitCode !== null) throw new Error(`portal exited with ${portal.exitCode} — see build/e2e/logs/portal.log`);
