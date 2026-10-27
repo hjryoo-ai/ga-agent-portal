@@ -59,9 +59,13 @@ class HttpStatementClientTest {
         assertThat(client.fetch(base(), TOKEN, "A-1001", "202608", ReconMode.CONFIRMED)).isEqualTo(new EngineAnswer.Confirmed(1_800_000, 0, OptionalLong.of(0)));
         assertThat(client.fetch(base(), TOKEN, "A-1001", "202702", ReconMode.ESTIMATE)).isEqualTo(new EngineAnswer.Estimated(10, 0, -720_000, 0));
         assertThat(client.fetch(base(), TOKEN, "A-9999-NONE", "202608", ReconMode.CONFIRMED)).isEqualTo(new EngineAnswer.Failed(InconclusiveReason.AGENT_NOT_FOUND));
+        // 포털 Phase 7 C7: 엔진의 404 둘(설계사 없음·확정 전)과 422(마감된 달의 예상)는 각자의 판정 불가 사유 — 정지·DRIFT 없음
+        assertThat(client.fetch(base(), TOKEN, "A-1001", "202702", ReconMode.CONFIRMED)).isEqualTo(new EngineAnswer.Failed(InconclusiveReason.NOT_CONFIRMED));
+        assertThat(client.fetch(base(), TOKEN, "A-1001", "202608", ReconMode.ESTIMATE)).isEqualTo(new EngineAnswer.Failed(InconclusiveReason.MONTH_CLOSED));
         assertThat(authorization).isEqualTo("Bearer stub-token");
         assertThat(stub.received()).containsExactly(new StubStatementEngine.Request("A-1001", "202608", "CONFIRMED"),
-                new StubStatementEngine.Request("A-1001", "202702", "ESTIMATE"), new StubStatementEngine.Request("A-9999-NONE", "202608", "CONFIRMED"));
+                new StubStatementEngine.Request("A-1001", "202702", "ESTIMATE"), new StubStatementEngine.Request("A-9999-NONE", "202608", "CONFIRMED"),
+                new StubStatementEngine.Request("A-1001", "202702", "CONFIRMED"), new StubStatementEngine.Request("A-1001", "202608", "ESTIMATE"));
     }
 
     @Test

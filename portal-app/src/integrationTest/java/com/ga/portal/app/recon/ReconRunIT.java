@@ -128,6 +128,26 @@ class ReconRunIT {
     }
 
     @Test
+    void theEngineIsCalledOnceASubjectOneAtATimeAndTheBudgetLeavesTheRestUncalled() {
+        // C7: 호출 수 = 대상 수, 재시도 0, 동시 1(스텁이 처리 중 요청 수의 최대값을 센다), 상한 1 → 둘째 대상은 BUDGET·호출 0
+        try (ReconRig r = new ReconRig("RCN_BUDGET", "a1", ReconRig.a1(), "{\"auto_rebuild_enabled\": false, \"recon_max_calls\": 1}").ingestAll()) {
+            RunRecord run = done(r.run("202608", "202702"));
+            assertThat(List.of(run.checked(), run.matched(), run.inconclusive(), run.engineCalls())).containsExactly(2, 1, 1, 1);
+            assertThat(r.stub.calls()).isEqualTo(1);
+            assertThat(r.stub.maxConcurrent()).isEqualTo(1);
+            assertThat(r.counter("recon_inconclusive_total", "tenant", r.tenant.value(), "reason", "BUDGET")).isEqualTo(1.0);
+            assertThat(r.reconResults()).isEmpty();
+        }
+        try (ReconRig r = new ReconRig("RCN_SEQ", "a1", ReconRig.a1(), AUTO_OFF).ingestAll()) {
+            r.stub.mode(StubStatementEngine.Mode.SLOW).slowMillis(300);
+            RunRecord run = done(r.run("202608", "202702"));
+            assertThat(run.engineCalls()).isEqualTo(2);
+            assertThat(r.stub.calls()).as("no retry").isEqualTo(2);
+            assertThat(r.stub.maxConcurrent()).as("one call at a time").isEqualTo(1);
+        }
+    }
+
+    @Test
     void aLaggingCursorCallsNothing() {
         try (ReconRig r = new ReconRig("RCN_LAG", "a1", ReconRig.a1(), AUTO_OFF).ingestAll()) {
             r.corruptLine("1");

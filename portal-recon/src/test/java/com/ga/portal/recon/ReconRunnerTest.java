@@ -394,6 +394,20 @@ class ReconRunnerTest {
     }
 
     @Test
+    void anEngineFieldThatWasNotComparedIsNull() {
+        // C2·P-15: 확정 답에 환수 상계가 없으면(지급 전 확정) 비교하지 않았으므로 엔진 상계 칸은 비어 있다, 세후(net)는 늘 비어 있다(Q3)
+        corruptAug();
+        engine.answers.put(AUG, new EngineAnswer.Confirmed(1_800_000, 0, OptionalLong.empty()));
+        cli();
+        assertThat(store.rows("DRIFT")).singleElement().satisfies(row -> {
+            assertThat(row.engineGross()).contains(1_800_000L);
+            assertThat(row.engineAdjustment()).contains(0L);
+            assertThat(row.engineOffset()).isEmpty();
+            assertThat(row.engineNet()).isEmpty();
+        });
+    }
+
+    @Test
     void theRunSpansCarryKindsAndCountsOnly() {
         corruptAug();
         store.params = new ReconParams(4, true, Duration.ofSeconds(900), Duration.ofMillis(200), 500, Duration.ofSeconds(900));

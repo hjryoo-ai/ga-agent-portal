@@ -45,6 +45,8 @@ public final class StubStatementEngine implements HttpHandler {
     private final String engineState;
     private final List<Sample> samples;
     private final AtomicInteger calls = new AtomicInteger();
+    private final AtomicInteger inFlight = new AtomicInteger();
+    private final AtomicInteger maxConcurrent = new AtomicInteger();
     private final List<Request> received = new CopyOnWriteArrayList<>();
     private volatile Mode mode = Mode.UP;
     private volatile long slowMillis;
@@ -114,6 +116,11 @@ public final class StubStatementEngine implements HttpHandler {
         return calls.get();
     }
 
+    /** 같은 때 처리 중이던 요청 수의 최대값(포털 Phase 7 C7 — 대사의 엔진 호출은 동시 1). */
+    public int maxConcurrent() {
+        return maxConcurrent.get();
+    }
+
     public List<Request> received() {
         return List.copyOf(received);
     }
@@ -125,6 +132,15 @@ public final class StubStatementEngine implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         calls.incrementAndGet();
+        maxConcurrent.accumulateAndGet(inFlight.incrementAndGet(), Math::max);
+        try {
+            serve(exchange);
+        } finally {
+            inFlight.decrementAndGet();
+        }
+    }
+
+    private void serve(HttpExchange exchange) throws IOException {
         Matcher m = PATH.matcher(exchange.getRequestURI().getRawPath());
         String query = exchange.getRequestURI().getRawQuery();
         if (!exchange.getRequestMethod().equals("GET") || !m.matches() || query == null || !query.startsWith("mode=") || query.contains("&")) {

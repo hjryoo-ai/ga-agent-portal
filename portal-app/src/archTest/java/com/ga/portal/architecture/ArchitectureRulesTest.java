@@ -246,6 +246,26 @@ class ArchitectureRulesTest {
                 .check(classes);
     }
 
+    /**
+     * 포털 Phase 7(C6, 계획 ⑧): 알림 파생 규칙({@code projection.notify})을 부르는 곳은 닫힌 목록 — 운영 파생기(이벤트), 운영 CLI 답변(문의), 대사 회차
+     * (재대사 {@code REPAIRED} — Phase 6 수용 Q1). 재구축기에서 대사로 가는 의존도 0(대사가 재구축을 부르지, 거꾸로가 아니다 — 레이어 규칙과 같은 뜻을 이름으로).
+     */
+    @Test
+    void theDerivationRulesHaveAClosedSetOfCallers() {
+        Set<String> callers = classes.stream()
+                .filter(c -> !c.getPackageName().startsWith("com.ga.portal.projection.notify"))
+                .filter(c -> c.getDirectDependenciesFromSelf().stream().anyMatch(d -> d.getTargetClass().getPackageName().equals("com.ga.portal.projection.notify")
+                        && d.getTargetClass().getSimpleName().startsWith("NotificationRules")))
+                .map(c -> c.getName().replaceFirst("\\$.*$", ""))
+                .collect(Collectors.toCollection(java.util.TreeSet::new));
+        assertThat(callers).containsExactly("com.ga.portal.app.cli.InquiryCommands", "com.ga.portal.app.ingest.JdbcNotificationDeriver",
+                "com.ga.portal.recon.ReconRunner");
+        noClasses().that().haveFullyQualifiedName("com.ga.portal.ingest.apply.Rebuilder")
+                .should().transitivelyDependOnClassesThat().resideInAPackage("com.ga.portal.recon..")
+                .as("the rebuilder never reaches the reconciler")
+                .check(classes);
+    }
+
     @Test
     void allowlistsHaveNoStaleEntries() throws NoSuchMethodException {
         List<Allowed> all = new ArrayList<>(dbAnchors());
