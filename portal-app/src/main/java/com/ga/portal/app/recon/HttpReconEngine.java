@@ -43,7 +43,7 @@ final class HttpReconEngine implements ReconEngine {
     @Override
     public EngineAnswer statement(TenantId tenant, String agentId, String ym, ReconMode mode) {
         // 스팬 engine.statement — 방식과 답의 종류만(설계사·달·금액은 싣지 않는다)
-        Tracing.Span span = tracing.start("engine.statement").kind("mode", mode);
+        Tracing.Span span = tracing.start("engine.statement").kind("mode", mode).kind("agent_id", agentId);   // 주입 S11
         try {
             EngineAnswer answer = fetch(tenant, agentId, ym, mode);
             span.kind("outcome", switch (answer) {
