@@ -404,3 +404,22 @@ DE-24 문구 정정(Q30): "앞으로 포털 계약 개정은 작업 브랜치 �
 - 습관(조건 아님): 다음 Phase부터 본문 센티널 단언은 `.describedAs` 없이 `contains` 결과만 단언한다 — 실패 메시지가 잡은 출력을 되풀이하지 않게(F13).
 - Phase 7 재료(심사 §3): Q1 `REPAIRED` 달의 확정·지급 알림은 **같은 키로 낸다** — 파생 지점은 재대사가 `REPAIRED`를 쓰는 트랜잭션(§6.5에 이벤트 아닌 둘째 파생 행), 재구축은 여전히 파생 0, 새 종류 없음. Q2 재구축이 처음 적용한 사실의 알림은 메우지 않는다 — §14.1 #12 "공백은 달 알림 범위에서만 메워진다". Q3 운영 알림 v1 = 지표 + CLI `status`(DRIFT 수·`APPLY_ERROR`·커서 정지·`REPAIRED` 실패·문의 적체 `inquiry_open_oldest_age_seconds{tenant}`·`inquiry_open_total{tenant}`), 이메일·웹훅 v2. Q4 지표 태그 지금 고정 — `notifications_derived_total{tenant, type}`, `inquiries_total{tenant, action}`(`CREATED`·`ANSWERED`·`CLOSED`), `recon_runs_total{tenant, result}`(`OK`·`DRIFT`·`REPAIRED`·`FAILED`). Q5 문의 보존 = 감사와 같은 기간(예시값 5년, `inquiry_retention_years`), 삭제 잡 없음. Q6 적용 트랜잭션 스팬 하나 + 프로젝터·파생·커서 자식 스팬, 속성에 값 0. 엔진은 `GET /internal/v1/agents/{agentId}/statements/{ym}`(계약 1.4.0) 사용만.
 - 실 엔진 E2E는 병합 뒤 `main`에서 사용자가 실행 → `RESULT.md`(판정 넷).
+
+## 2026-10-27 — Phase 7 계획 승인 (`docs/phase-07-계획승인.md`)
+
+승인: 계획 Q1~Q14 권장안 전부(Q1 = ⓑ′ — ESTIMATE 달은 DRIFT 없음, `clawbackOffset`·`adjustment`만 `MATCH`/`INCONCLUSIVE(ESTIMATE_DIFF)`), P-1~P-15 그대로. 돌이킬 수 없는 결정 셋 모두 예 — 엔진 샘플 PR(엔진 CI 통과 뒤 직접 병합, 포털 `UPSTREAM` = 병합 커밋), 새 의존성 `spring-boot-micrometer-tracing-opentelemetry`·`opentelemetry-sdk-testing`(Boot 4.1.1 BOM 판, 내보내기 0 — 재생성 diff는 추가만·전이 목록 표), V8 `recon_run`(값 열 0 — `CHECK` 시험). 조건 A: R5에서 `INCONCLUSIVE`로 끝난 달에 `data_status = DRIFT`를 다시 쓸 때 `recon_result` 행은 쓰지 않는다. 조건 B: `status` 출력에 `ym` 꼴 0(시험). Q9: 회차 잠금 연결과 풀 크기 관계를 `docs/운영.md` §8에.
+
+### 지시문 오류
+
+| # | 지시문 문구 | 무엇이 틀렸나 | 정한 것 |
+|---|---|---|---|
+| DE-27 | 질문 1 "E2 `estimate_cycle_01`의 분급 도래" | 분급 도래 스트림은 `estimate_cycle_05`(측정 — ESTIMATE 378,000 vs 포털 0) | 샘플에 `cycle_05` ESTIMATE 하나 추가(P-1) |
+| DE-28 | ② "여전히 DRIFT면 행은 그대로(미해결)" | 재구축은 `earnings_month`를 이벤트로 다시 만들어 BATCH DRIFT의 `data_status`를 지운다 — 행만 보고 표식을 못 봤다 | 재대사가 `MATCH`가 아닌 모든 미해결 달에 `data_status = DRIFT`를 다시 쓴다(P-6, 조건 A) |
+
+지시문 ⑤ 하네스 제어 경로 모양(P-10 — `/<동작>/<테넌트>/…`), ⓪ A-1·`cycle_01` 설계사가 둘 다 `A-1001`(P-2 — 엔진 상태별 샘플 묶음)도 같은 표에 둔다.
+
+### 설계서·계약 결함
+
+| # | 무엇 | 처리 |
+|---|---|---|
+| DD-19 | 포털 계약 `contracts/events/v1/payloads/StatementEstimated` 설명문 "gross = Σ 그 달 `CommissionCalculated` 라인"이 엔진 동작(도래 예정 미리보기 포함)과 다르다 | **이 Phase에서 고치지 않는다**(엔진 사본·`CHECKSUMS`가 묶여 있다) — 다음 이벤트 계약 개정(Phase 8 또는 E3) 때 "미리보기 포함" 표기 정정 + 엔진 사본 갱신 PR(선승인 패턴). 보고서 질문에 |

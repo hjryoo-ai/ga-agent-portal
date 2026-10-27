@@ -2,6 +2,8 @@
 
 > 이 계획은 지시문 `docs/phase-07-지시문.md` v1.0(2026-10-27)에 대한 것이다. 브랜치는 `work/phase-7`(`main` = `b87db17` 위 `1a8b871` — Phase 6 심사 보관)이다. **이 계획이 승인되기 전에는 엔진 샘플·계약 사본·코드를 쓰지 않는다.**
 >
+> **승인**(2026-10-27 — `docs/phase-07-계획승인.md`): Q1~Q14 권장안 전부(Q1 = ⓑ′), 돌이킬 수 없는 결정 셋(엔진 샘플 PR — 엔진 CI 뒤 직접 병합, 트레이스 의존성 둘, V8 `recon_run`) 모두 예. 작은 조건 A·B(③ R5·⑤ `status` — 아래 반영), Q9 운영 문서 한 줄, Q6 재생성 diff는 추가만·제거 0·전이 목록 표, P-7 값 열 0은 `CHECK` 시험으로. `docs/DECISIONS.md` "Phase 7 계획 승인"(DE-27·DE-28·DD-19). 구현에서 달라진 곳은 같은 파일 P7-n과 보고서 §5.
+>
 > **돌이킬 수 없는 결정 — 승인 전에 확인을 바라는 셋**(지시문 형식 절):
 > 1. **엔진 샘플 커밋**(⓪) — 엔진 `ga-commission-engine`에 시험 코드만 바꾸는 PR 하나(Phase 5 #8과 같은 방식), 자체 CI 통과 뒤 병합해도 되는지(Q11).
 > 2. **새 의존성**(Q6) — Micrometer Tracing의 OpenTelemetry 브리지와 시험용 in-memory exporter. 전부 Boot 4.1.1 BOM이 관리하는 판이다.
@@ -93,12 +95,12 @@
 
 | 단계 | 트랜잭션 | 하는 일 |
 |---|---|---|
-| R0 | 회차 잠금 tx(회차 내내 — 권고 잠금은 세션 수준, 연결 하나) | `pg_try_advisory_lock(portal.recon, tenant)` — 못 잡으면 회차 없음(지표). 커서 고정(Q2), 대상 = `earnings_month` 행이 있는 설계사 × 대상 달 |
+| R0 | 회차 잠금 tx(회차 내내 — 권고 잠금은 세션 수준, 풀에서 연결 하나를 최대 `recon_max_seconds` 동안 — 풀 크기 ≥ 인제스트 워커 + 조회 + 1을 `docs/운영.md` §8에 한 줄, 승인 Q9) | `pg_try_advisory_lock(portal.recon, tenant)` — 못 잡으면 회차 없음(지표). 커서 고정(Q2), 대상 = `earnings_month` 행이 있는 설계사 × 대상 달 |
 | R1 | 없음(엔진 호출) | 설계사 순차, 호출 간격 `recon_call_interval_ms`(기본 200), 예산 `recon_max_calls`(기본 500)·`recon_max_seconds`(기본 900). 재시도 0 |
 | R2 | 설계사×달마다 한 tx | `DRIFT`: `recon_result`(BATCH, `run_at` = 회차 시작) + `earnings_month.data_status = DRIFT` + 지표. Q13(같은 값이면 행 없음). `MATCH`·`INCONCLUSIVE`: 쓰기 없음 |
 | R3 | 회차 기록 tx | `recon_run` 행(수·결과 — 재구축 전 임시 결과) |
 | R4 | `Rebuilder`의 txA/txB/txC 그대로 | 조건(Q14)이면 재구축, 행위자 `recon:<tenant>`(감사 `INGEST_REBUILD*` 그대로). 성공·실패를 `recon_run.rebuilt_at`·`rebuild_outcome`에(별도 짧은 tx). 실패면 커서 `FAILED`(기존 규약), 회차 결과 `FAILED`, 재대사 없음 |
-| R5 | 설계사×달마다 한 tx | 미해결 DRIFT 설계사×달만 엔진 재호출(Q4) → `MATCH`: `recon_result` `REPAIRED`(`run_at` = 그 시각) + `data_status = OK` + Q1 알림(`CONFIRMED`면 `STMT_CONFIRMED:{ym}`, `PAID`면 그것과 `PAYOUT:{ym}` — `NotificationRules`의 같은 후보 함수, `ON CONFLICT DO NOTHING`). 아니면 `data_status = DRIFT`(P-6) |
+| R5 | 설계사×달마다 한 tx | 미해결 DRIFT 설계사×달만 엔진 재호출(Q4) → `MATCH`: `recon_result` `REPAIRED`(`run_at` = 그 시각) + `data_status = OK` + Q1 알림(`CONFIRMED`면 `STMT_CONFIRMED:{ym}`, `PAID`면 그것과 `PAYOUT:{ym}` — `NotificationRules`의 같은 후보 함수, `ON CONFLICT DO NOTHING`). 아니면 `data_status = DRIFT`(P-6) — **`INCONCLUSIVE`로 끝난 달에는 `recon_result` 행을 쓰지 않는다**(승인 조건 A — 행은 DRIFT·REPAIRED만, 그 달이 왜 "확인 중"인지는 `recon_run` 수와 지표로만). `DRIFT`로 끝난 달은 Q13 규칙(같은 값이면 행 없음) |
 | R6 | 회차 기록 tx | `recon_run.result` 확정, 게이지 `recon_unresolved_drift{tenant}` |
 
 - 파생 함수: `NotificationRules.monthRepaired(agentId, ym, status)` — 순수 함수, 같은 키·`params`·`link`(계약 무변경). 호출하는 곳은 `Reconciler`(R5)뿐 — ArchUnit: `Rebuilder`가 닿는 전이 의존에 `notify..`·파생 포트·적용기 0(Phase 6 규칙 그대로), `Reconciler` → `Rebuilder` 허용, `Rebuilder` → `Reconciler` 0(C6).
@@ -118,7 +120,7 @@
 - **`notifications_derived_total{tenant, type}`**: 파생기·CLI 답변·재대사가 실제로 넣은 행만(`ON CONFLICT`로 0이면 세지 않는다 — `insertIfAbsent`가 삽입 수를 돌려준다).
 - **트레이스 스팬**(이름 · 속성 키 — 값은 해시·수·종류만): `ingest.apply`(`tenant`·`seq`·`event.type`) → 자식 `ingest.project`·`ingest.derive`(`notifications` 수)·`ingest.cursor`; `engine.feed`·`engine.simulation`·`engine.statement`(`mode`·`outcome`); `recon.run`(`tenant`·`checked`·`drift_new`·`trigger`) → 자식 `recon.check`(`mode`·`result`)·`recon.rebuild`·`recon.recheck`. `agent_id`·`calcId`·증권번호·`ym`·본문 없음(`ym`도 뺀다 — 설계사×달 조합이 식별에 가까워진다).
 - **C9 시험**: `TracingLeakIT` — in-memory exporter가 모은 스팬의 이름·속성 전부를 센티널 파일(`pii-sentinels.properties` 전 키)로 훑어 0, 속성 키 ⊆ 위 표. 로그는 기존 `CapturedOutput` 패턴.
-- **`status --tenant=T|--all`**(`CliRunner` 첫 단어 `status` — 한 단어 명령): 한 줄 표 — 테넌트 · 커서 상태 · lag(seq·초) · `caught_up_at` · DRIFT 미해결 수 · 가장 오래된 미해결 달의 나이(일) · 마지막 회차 시각·결과 · 마지막 재구축 결과 · 문의 `OPEN` 수 · 가장 오래된 `OPEN` 나이(시간). 설계사·달·증권번호 없음. 감사 `STATUS`(target `cli:status`). 종료 0·2·64.
+- **`status --tenant=T|--all`**(`CliRunner` 첫 단어 `status` — 한 단어 명령): 한 줄 표 — 테넌트 · 커서 상태 · lag(seq·초) · `caught_up_at` · DRIFT 미해결 수 · 가장 오래된 미해결 달의 나이(일) · 마지막 회차 시각·결과 · 마지막 재구축 결과 · 문의 `OPEN` 수 · 가장 오래된 `OPEN` 나이(시간). 설계사·달·증권번호 없음 — 미해결 달은 **나이(일)만**, 달 자체(`ym`)는 내지 않는다(승인 조건 B — `CliRunnerTest`가 출력에 `ym` 꼴 `\d{6}` 0을 단언). 감사 `STATUS`(target `cli:status`). 종료 0·2·64.
 
 ## ⑥ V8 (`V8__recon_run.sql`, P-7)
 
