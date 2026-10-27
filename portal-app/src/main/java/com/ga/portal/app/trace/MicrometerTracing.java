@@ -40,7 +40,7 @@ public final class MicrometerTracing implements Tracing {
 
         @Override
         public Span kind(String key, String value) {
-            span.tag(key, Tracing.kind(value));
+            span.tag(key, value);   // 주입 S11b: 종류 꼴 검사 없이 원문
             return this;
         }
 
