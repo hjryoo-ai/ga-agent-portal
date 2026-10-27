@@ -9,6 +9,7 @@ import com.ga.portal.domain.RebuildOutcome;
 import com.ga.portal.domain.ReconRunResult;
 import com.ga.portal.domain.ReconSource;
 import com.ga.portal.domain.ReconTrigger;
+import com.ga.portal.domain.trace.Tracing;
 import com.ga.portal.domain.view.ReconRow;
 import com.ga.portal.projection.notify.Candidate;
 import com.ga.portal.recon.port.ReconEngine;
@@ -31,7 +32,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -65,6 +68,48 @@ class ReconRunnerTest {
     private boolean lockFree;
     private int pauses;
     private ReconRunner runner;
+    private final RecordingTracing tracing = new RecordingTracing();
+
+    /** 스팬 기록기 — 이름·부모·속성(포털 Phase 7, docs/지표.md §4). */
+    static final class RecordingTracing implements Tracing {
+        record Recorded(String name, String parent, Map<String, String> attrs) {
+        }
+
+        final List<Recorded> closed = new ArrayList<>();
+        private final Deque<String> open = new ArrayDeque<>();
+
+        @Override
+        public Span start(String name) {
+            String parent = open.isEmpty() ? "-" : open.peek();
+            open.push(name);
+            Map<String, String> attrs = new TreeMap<>();
+            return new Span() {
+                @Override
+                public Span tenant(TenantId tenant) {
+                    attrs.put("tenant", tenant.value());
+                    return this;
+                }
+
+                @Override
+                public Span count(String key, long value) {
+                    attrs.put(key, Long.toString(value));
+                    return this;
+                }
+
+                @Override
+                public Span kind(String key, String value) {
+                    attrs.put(key, Tracing.kind(value));
+                    return this;
+                }
+
+                @Override
+                public void close() {
+                    assertThat(open.pop()).as("spans close innermost first").isEqualTo(name);
+                    closed.add(new Recorded(name, parent, attrs));
+                }
+            };
+        }
+    }
 
     static final class MutableClock extends Clock {
         Instant now;
@@ -264,7 +309,7 @@ class ReconRunnerTest {
         metrics = new FakeMetrics();
         lockFree = true;
         runner = new ReconRunner(store, engine, tenant -> lockFree ? Optional.of(() -> { }) : Optional.empty(), rebuild, metrics,
-                interval -> pauses++, clock);
+                interval -> pauses++, clock, tracing);
         // A-1: 202608 지급완료 1,800,000, 202702 예상(환수 상계 −720,000)
         store.months.put(AUG, paid(1_800_000));
         store.months.put(FEB, new PortalMonth(MonthStatus.ESTIMATED, 0, -720_000, 0));
@@ -346,6 +391,29 @@ class ReconRunnerTest {
                 .containsEntry(NotificationType.STMT_CONFIRMED, 0).containsEntry(NotificationType.PAYOUT, 0);
         assertThat(r.engineCalls()).as("2 checks + 1 recheck").isEqualTo(3);
         assertThat(metrics.unresolved).isZero();
+    }
+
+    @Test
+    void theRunSpansCarryKindsAndCountsOnly() {
+        corruptAug();
+        store.params = new ReconParams(4, true, Duration.ofSeconds(900), Duration.ofMillis(200), 500, Duration.ofSeconds(900));
+        cli();
+        assertThat(tracing.closed).extracting(r -> r.name() + "<" + r.parent())
+                .containsExactly("recon.check<recon.run", "recon.check<recon.run", "recon.rebuild<recon.run", "recon.recheck<recon.run", "recon.run<-");
+        assertThat(tracing.closed.getLast().attrs()).containsExactlyEntriesOf(new TreeMap<>(Map.of("checked", "2", "drift_new", "1", "tenant", "GA06",
+                "trigger", "CLI")));
+        assertThat(tracing.closed.get(0).attrs()).containsExactlyEntriesOf(new TreeMap<>(Map.of("mode", "CONFIRMED", "result", "DRIFT")));
+        assertThat(tracing.closed.get(2).attrs()).containsExactlyEntriesOf(Map.of("outcome", "SUCCEEDED"));
+        assertThat(tracing.closed.get(3).attrs()).containsExactlyEntriesOf(new TreeMap<>(Map.of("mode", "CONFIRMED", "result", "MATCH")));
+        assertThat(tracing.closed).flatExtracting(r -> List.copyOf(r.attrs().values()))
+                .noneMatch(v -> v.contains("A-1001") || v.contains("2026") || v.contains("2027") || v.contains("1800000") || v.contains("900000"));
+    }
+
+    @Test
+    void aSpanKindIsAnEnumNameOrOther() {
+        assertThat(List.of("CONFIRMED", "LimitLedgerRebased", "ENGINE_TIMEOUT")).allSatisfy(v -> assertThat(Tracing.kind(v)).isEqualTo(v));
+        assertThat(List.of("A-1001", "202608", "홍길동", "a b", "", "x".repeat(3), "P".repeat(65))).allSatisfy(v -> assertThat(Tracing.kind(v)).isEqualTo("OTHER"));
+        assertThat(Tracing.kind(null)).isEqualTo("OTHER");
     }
 
     @Test

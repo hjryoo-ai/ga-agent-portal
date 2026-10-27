@@ -1,5 +1,6 @@
 package com.ga.portal.app.ingest;
 
+import com.ga.portal.domain.trace.Tracing;
 import com.ga.portal.infra.persistence.IngestCursorRepository;
 import com.ga.portal.infra.persistence.IngestEventRepository;
 import com.ga.portal.infra.persistence.IngestLockRepository;
@@ -104,7 +105,7 @@ public class IngestConfiguration {
 
     @Bean
     IngestApplier ingestApplier(EnvelopeValidator validator, IngestStore store, TenantTransactions transactions, IngestLock lock,
-                                Projector projector, NotificationDeriver notifications, Clock clock) {
-        return new IngestApplier(validator, store, transactions, lock, projector, notifications, clock);
+                                Projector projector, NotificationDeriver notifications, Clock clock, Tracing tracing) {
+        return new IngestApplier(validator, store, transactions, lock, projector, notifications, clock, tracing);
     }
 }

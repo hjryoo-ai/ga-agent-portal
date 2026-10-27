@@ -38,7 +38,7 @@ class ReconEngineIT {
         HttpFeedClient feed = new HttpFeedClient(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build(), t -> server.baseUrl(), tokens,
                 Duration.ofSeconds(2));
         return new HttpReconEngine(new HttpStatementClient(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build(), Duration.ofSeconds(2)),
-                feed, fresh, tenants, tokens);
+                feed, fresh, tenants, tokens, com.ga.portal.domain.trace.Tracing.NONE);
     }
 
     @Test

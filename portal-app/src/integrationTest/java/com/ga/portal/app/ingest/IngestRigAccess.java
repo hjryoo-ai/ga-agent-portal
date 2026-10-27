@@ -39,6 +39,12 @@ public final class IngestRigAccess {
         return rig.lock;
     }
 
+    /** 파생 워커의 적용기가 쓸 스팬 포트. */
+    public IngestRigAccess tracing(com.ga.portal.domain.trace.Tracing tracing) {
+        rig.tracing = tracing;
+        return this;
+    }
+
     public static TenantTransactions transactions(IngestRigAccess access) {
         return access.rig.transactions;
     }

@@ -6,6 +6,7 @@ import com.ga.portal.domain.RebuildOutcome;
 import com.ga.portal.domain.ReconRunResult;
 import com.ga.portal.domain.ReconSource;
 import com.ga.portal.domain.ReconTrigger;
+import com.ga.portal.domain.trace.Tracing;
 import com.ga.portal.domain.view.ReconRow;
 import com.ga.portal.projection.notify.NotificationRules;
 import com.ga.portal.recon.Episodes.Episode;
@@ -72,8 +73,11 @@ public final class ReconRunner {
     private final ReconMetrics metrics;
     private final Pacer pacer;
     private final Clock clock;
+    private final Tracing tracing;
 
-    public ReconRunner(ReconStore store, ReconEngine engine, ReconLock lock, ReconRebuild rebuild, ReconMetrics metrics, Pacer pacer, Clock clock) {
+    /** 스팬(포털 Phase 7 — {@code docs/지표.md} §4): 회차 {@code recon.run}, 그 안에 {@code recon.check}·{@code recon.rebuild}·{@code recon.recheck}. */
+    public ReconRunner(ReconStore store, ReconEngine engine, ReconLock lock, ReconRebuild rebuild, ReconMetrics metrics, Pacer pacer, Clock clock,
+                       Tracing tracing) {
         this.store = Objects.requireNonNull(store, "store");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.lock = Objects.requireNonNull(lock, "lock");
@@ -81,6 +85,7 @@ public final class ReconRunner {
         this.metrics = Objects.requireNonNull(metrics, "metrics");
         this.pacer = Objects.requireNonNull(pacer, "pacer");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.tracing = Objects.requireNonNull(tracing, "tracing");
     }
 
     /** 스케줄러의 창 — {당월, 직전 달}(KST, 계획 Q12). */
@@ -106,9 +111,13 @@ public final class ReconRunner {
         if (held.isEmpty()) {
             return new Outcome.Locked();
         }
+        Tracing.Span span = tracing.start("recon.run").tenant(tenant).kind("trigger", trigger);
         try {
-            return new Outcome.Done(runLocked(tenant, trigger, actor, List.copyOf(months)));
+            RunRecord run = runLocked(tenant, trigger, actor, List.copyOf(months));
+            span.count("checked", run.checked()).count("drift_new", run.driftNew());
+            return new Outcome.Done(run);
         } finally {
+            span.close();
             held.get().close();
         }
     }
@@ -147,7 +156,7 @@ public final class ReconRunner {
         int inconclusive = 0;
         for (Map.Entry<AgentMonth, PortalMonth> t : targets.entrySet()) {
             AgentMonth key = t.getKey();
-            Check c = check(tenant, cursor, runAt, params, budget, key, t.getValue());
+            Check c = check("recon.check", tenant, cursor, runAt, params, budget, key, t.getValue());
             checked++;
             switch (c.verdict()) {
                 case Verdict.Match m -> {
@@ -174,7 +183,14 @@ public final class ReconRunner {
 
         boolean untried = afterChecks.values().stream().anyMatch(e -> !e.tried());
         if ((driftNew > 0 || untried) && params.autoRebuild() && !store.rebuiltOn(tenant, kstDay(runAt))) {
-            Optional<RebuildOutcome> outcome = rebuild.rebuild(tenant, "recon:" + tenant.value());   // R4
+            Tracing.Span rebuildSpan = tracing.start("recon.rebuild");
+            Optional<RebuildOutcome> outcome;
+            try {
+                outcome = rebuild.rebuild(tenant, "recon:" + tenant.value());   // R4
+                outcome.ifPresent(o -> rebuildSpan.kind("outcome", o));
+            } finally {
+                rebuildSpan.close();
+            }
             if (outcome.isPresent()) {
                 run = run.withRebuild(now(), outcome.get(), outcome.get() == RebuildOutcome.FAILED ? ReconRunResult.FAILED : interim);
                 store.updateRun(tenant, run);
@@ -211,12 +227,24 @@ public final class ReconRunner {
             if (month.isEmpty()) {
                 continue;   // 재구축이 그 달을 만들지 않았다 — 쓸 행이 없다
             }
-            Check c = check(tenant, cursor, now(), params, budget, key, month.get());
+            Check c = check("recon.recheck", tenant, cursor, now(), params, budget, key, month.get());
             switch (c.verdict()) {
                 case Verdict.Match m -> repair(tenant, key, month.get(), c.answer().orElseThrow());
                 case Verdict.Drift d -> drift(tenant, key, month.get(), c.answer().orElseThrow(), Optional.of(u.getValue()), now());
                 case Verdict.Inconclusive i -> store.drift(tenant, key, Optional.empty());   // 행 0(조건 A), 화면은 "확인 중"(P-6)
             }
+        }
+    }
+
+    private Check check(String spanName, TenantId tenant, CursorSnapshot cursor, Instant at, ReconParams params, Budget budget, AgentMonth key,
+                        PortalMonth month) {
+        Tracing.Span span = tracing.start(spanName).kind("mode", ReconMode.of(month.status()));
+        try {
+            Check c = check(tenant, cursor, at, params, budget, key, month);
+            span.kind("result", c.verdict().result());
+            return c;
+        } finally {
+            span.close();
         }
     }
 

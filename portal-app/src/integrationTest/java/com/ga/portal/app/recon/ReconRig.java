@@ -3,6 +3,8 @@ package com.ga.portal.app.recon;
 import com.ga.platform.core.tenant.TenantId;
 import com.ga.portal.app.ingest.IngestCommands;
 import com.ga.portal.app.ingest.IngestRigAccess;
+import com.ga.portal.app.trace.TracedFeedClient;
+import com.ga.portal.domain.trace.Tracing;
 import com.ga.portal.app.ingest.JdbcViewReset;
 import com.ga.portal.app.ingest.SpringTenantTransactions;
 import com.ga.portal.domain.ReconTrigger;
@@ -115,7 +117,16 @@ final class ReconRig implements AutoCloseable {
 
     /** 스트림 전부를 운영 파생기와 함께 적용(커서 RUNNING·{@code caught_up_at} = 고정 시계). */
     ReconRig ingestAll() {
-        ingest.derivingWorker(feed).runOnce(tenant);
+        ingest.derivingWorker(new TracedFeedClient(feed, tracing)).runOnce(tenant);
+        return this;
+    }
+
+    /** 스팬 포트(인제스트·대사·엔진 장식 모두) — 기본은 없음. */
+    Tracing tracing = Tracing.NONE;
+
+    ReconRig tracing(Tracing t) {
+        this.tracing = t;
+        ingest.tracing(t);
         return this;
     }
 
@@ -134,7 +145,7 @@ final class ReconRig implements AutoCloseable {
         SpringTenantTransactions fresh = SpringTenantTransactions.requiresNew(ingest.binder());
         ServiceTokenSource tokens = t -> Optional.of(new ServiceTokenSource.ServiceToken(TOKEN));
         return new HttpReconEngine(new HttpStatementClient(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build(), Duration.ofSeconds(2)),
-                feed, fresh, new TenantRepository(ingest.gateway()), tokens);
+                new TracedFeedClient(feed, tracing), fresh, new TenantRepository(ingest.gateway()), tokens, tracing);
     }
 
     ReconService service() {
@@ -157,7 +168,8 @@ final class ReconRig implements AutoCloseable {
                 rebuildWrapper.apply(recording),
                 new MicrometerReconMetrics(Optional.of(meters), new com.ga.portal.app.PortalMeters(Optional.of(meters))),
                 interval -> { },
-                clock);
+                clock,
+                tracing);
         return new ReconService(runner, () -> List.of(tenant), fresh, tenants, new com.ga.portal.infra.persistence.InquiryOperatorRepository(ingest.gateway()),
                 new com.ga.portal.app.PortalMeters(Optional.of(meters)), clock);
     }

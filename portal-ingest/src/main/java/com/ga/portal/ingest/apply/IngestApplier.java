@@ -7,6 +7,7 @@ import com.ga.portal.domain.IngestEventRecord;
 import com.ga.portal.domain.IngestEventStatus;
 import com.ga.portal.domain.IngestState;
 import com.ga.portal.domain.IngestTransitions;
+import com.ga.portal.domain.trace.Tracing;
 import com.ga.portal.ingest.EnvelopeValidator;
 import com.ga.portal.projection.Envelope;
 import com.ga.portal.projection.NotificationDeriver;
@@ -74,6 +75,7 @@ public final class IngestApplier {
     private final Projector projector;
     private final NotificationDeriver notifications;
     private final Clock clock;
+    private final Tracing tracing;
 
     /**
      * {@code notifications}는 프로젝터 다음, 같은 트랜잭션에서 불린다(포털 Phase 6 — 규칙은 설계서 §6.5). 파생의 예외는 프로젝터의 거부가 아니다 — {@code FAILED}
@@ -81,6 +83,15 @@ public final class IngestApplier {
      */
     public IngestApplier(EnvelopeValidator validator, IngestStore store, TenantTransactions transactions, IngestLock lock,
                          Projector projector, NotificationDeriver notifications, Clock clock) {
+        this(validator, store, transactions, lock, projector, notifications, clock, Tracing.NONE);
+    }
+
+    /**
+     * 스팬(포털 Phase 7 — {@code docs/지표.md} §4): 이벤트마다 {@code ingest.apply}(테넌트·{@code seq}·이벤트 종류), 그 안에 {@code ingest.project}·
+     * {@code ingest.derive}·{@code ingest.cursor}.
+     */
+    public IngestApplier(EnvelopeValidator validator, IngestStore store, TenantTransactions transactions, IngestLock lock,
+                         Projector projector, NotificationDeriver notifications, Clock clock, Tracing tracing) {
         this.validator = Objects.requireNonNull(validator, "validator");
         this.store = Objects.requireNonNull(store, "store");
         this.transactions = Objects.requireNonNull(transactions, "transactions");
@@ -88,9 +99,12 @@ public final class IngestApplier {
         this.projector = Objects.requireNonNull(projector, "projector");
         this.notifications = Objects.requireNonNull(notifications, "notifications");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.tracing = Objects.requireNonNull(tracing, "tracing");
     }
 
     public Result apply(TenantId tenant, JsonNode event) {
+        Tracing.Span span = tracing.start("ingest.apply").tenant(tenant).count("seq", event.path("seq").asLong(-1))
+                .kind("event.type", event.path("type").asString(""));
         try {
             return transactions.inTransaction(tenant, () -> applyInTransaction(tenant, event));
         } catch (Stop stop) {
@@ -99,6 +113,8 @@ public final class IngestApplier {
             // 분류하지 못한 오류(DB 제약 위반 등) — 멈춘다. 메시지는 값을 담을 수 있어 예외 이름만 쓴다.
             String keys = keysOf(event);
             return stop(tenant, IngestErrorCode.APPLY_ERROR, keys + " " + e.getClass().getSimpleName(), Optional.empty());
+        } finally {
+            span.close();
         }
     }
 
@@ -163,7 +179,7 @@ public final class IngestApplier {
                 IngestEventStatus.APPLIED, Optional.empty(), hash));
         ProjectionResult projected;
         try {
-            projected = projector.apply(tenant, envelope);
+            projected = tracing.in("ingest.project", () -> projector.apply(tenant, envelope));
         } catch (ProjectionViolation v) {
             // 사유가 먼저: "CLOSED_MONTH seq n eventId … month" — 키·필드 이름만(값 없음)
             String detail = v.getMessage();
@@ -175,8 +191,9 @@ public final class IngestApplier {
                     Optional.of(failedRow(tenant, envelope, hash, IngestErrorCode.PROJECTOR_ERROR, detail)));
         }
         // 프로젝터의 try 밖 — 여기서 나는 예외는 apply()의 바깥 catch가 APPLY_ERROR로 받는다(같은 트랜잭션이 통째로 롤백된다)
-        notifications.derive(tenant, envelope, projected);
-        store.saveCursor(envelope.seq(), Optional.of(envelope.eventId()), IngestState.RUNNING, Optional.empty(), clock.instant());
+        tracing.run("ingest.derive", () -> notifications.derive(tenant, envelope, projected));
+        tracing.run("ingest.cursor", () -> store.saveCursor(envelope.seq(), Optional.of(envelope.eventId()), IngestState.RUNNING, Optional.empty(),
+                clock.instant()));
         return new Result(Outcome.APPLIED, Optional.empty(), projected.drift());
     }
 

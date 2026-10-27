@@ -72,8 +72,11 @@ final class IngestRig {
                 new com.ga.portal.infra.persistence.SyncStatusRepository(gateway), com.ga.portal.app.PortalMeters.NONE, CLOCK);
     }
 
+    /** 스팬 포트(포털 Phase 7 — TracingLeakIT가 실제 OpenTelemetry SDK를 넣는다). */
+    com.ga.portal.domain.trace.Tracing tracing = com.ga.portal.domain.trace.Tracing.NONE;
+
     IngestApplier applier(Projector projector, com.ga.portal.projection.NotificationDeriver deriver) {
-        return new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), store, transactions, lock, projector, deriver, CLOCK);
+        return new IngestApplier(new EnvelopeValidator(ContractSchemas.get()), store, transactions, lock, projector, deriver, CLOCK, tracing);
     }
 
     /** 실제 뷰 프로젝터 + 운영 파생기로 도는 워커. */
