@@ -102,8 +102,10 @@ class TracingLeakIT {
         try (SdkTracerProvider provider = SdkTracerProvider.builder().addSpanProcessor(SimpleSpanProcessor.create(exporter)).build()) {
             MicrometerTracing tracing = new MicrometerTracing(new OtelTracer(provider.get("ga-agent-portal"), new OtelCurrentTraceContext(), event -> { }));
             List<SpanData> spans;
+            String tenant;
             Set<String> forbidden = new TreeSet<>(sentinels());
             try (ReconRig r = new ReconRig("RCN_TRACE", "a1", ReconRig.a1(), "{\"auto_rebuild_enabled\": true}").tracing(tracing).ingestAll()) {
+                tenant = r.tenant.value();
                 forbidden.addAll(streamValues(r.stream));
                 r.corruptLine("1");
                 RunRecord run = ((ReconRunner.Outcome.Done) r.run("202608", "202702")).run();
@@ -139,10 +141,10 @@ class TracingLeakIT {
                 remove("engine.simulation");
             }});
             assertThat(values).as("attribute values scanned").isGreaterThan(30);
-            assertThat(spans.stream().filter(s -> s.getName().equals("recon.run")).findFirst().orElseThrow().getAttributes().asMap().values()
-                    .stream().map(String::valueOf).toList()).as("tenant, CLI, 2 checked, 1 new drift").containsExactlyInAnyOrder(
-                    spans.getFirst().getAttributes().asMap().entrySet().stream().filter(e -> e.getKey().getKey().equals("tenant"))
-                            .map(e -> String.valueOf(e.getValue())).findFirst().orElseThrow(), "CLI", "2", "1");
+            Map<String, String> run = new TreeMap<>();
+            spans.stream().filter(s -> s.getName().equals("recon.run")).findFirst().orElseThrow().getAttributes()
+                    .forEach((k, v) -> run.put(k.getKey(), String.valueOf(v)));
+            assertThat(run).as("recon.run: tenant, trigger, counts").isEqualTo(Map.of("tenant", tenant, "trigger", "CLI", "checked", "2", "drift_new", "1"));
         }
     }
 }
