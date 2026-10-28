@@ -396,3 +396,59 @@ DE-24 문구 정정(Q30): "앞으로 포털 계약 개정은 작업 브랜치 �
 - `CLAUDE.md` "알림·문의 규약" 절, 의존 방향에 `inbox`, E2E 센티널 `inquiry` 키.
 - 문의 보존기간은 설계서에 없다 — 정하지 않았다(`docs/운영.md` §7 — 다음 Phase 질문). 알림 보존은 1년(운영 SQL).
 - 영문 번역(`docs/en/`)은 v1.6 그대로.
+
+## 2026-10-24 — Phase 6 수용 심사 (`docs/phase-06-수용심사.md`)
+
+판정: **수용, 조건 없음** — PR #20 병합(merge commit `b87db17`), `phase-6` = `f865034` 유지. F1~F13·P6-1~18 전부 수용. 새 RM·DE 없음(DE-25·DE-26·DD-18 그대로). 사용자 직접 계획 승인 세 번째 Phase — 사후 확인, 뒤집은 것 없음.
+
+- 습관(조건 아님): 다음 Phase부터 본문 센티널 단언은 `.describedAs` 없이 `contains` 결과만 단언한다 — 실패 메시지가 잡은 출력을 되풀이하지 않게(F13).
+- Phase 7 재료(심사 §3): Q1 `REPAIRED` 달의 확정·지급 알림은 **같은 키로 낸다** — 파생 지점은 재대사가 `REPAIRED`를 쓰는 트랜잭션(§6.5에 이벤트 아닌 둘째 파생 행), 재구축은 여전히 파생 0, 새 종류 없음. Q2 재구축이 처음 적용한 사실의 알림은 메우지 않는다 — §14.1 #12 "공백은 달 알림 범위에서만 메워진다". Q3 운영 알림 v1 = 지표 + CLI `status`(DRIFT 수·`APPLY_ERROR`·커서 정지·`REPAIRED` 실패·문의 적체 `inquiry_open_oldest_age_seconds{tenant}`·`inquiry_open_total{tenant}`), 이메일·웹훅 v2. Q4 지표 태그 지금 고정 — `notifications_derived_total{tenant, type}`, `inquiries_total{tenant, action}`(`CREATED`·`ANSWERED`·`CLOSED`), `recon_runs_total{tenant, result}`(`OK`·`DRIFT`·`REPAIRED`·`FAILED`). Q5 문의 보존 = 감사와 같은 기간(예시값 5년, `inquiry_retention_years`), 삭제 잡 없음. Q6 적용 트랜잭션 스팬 하나 + 프로젝터·파생·커서 자식 스팬, 속성에 값 0. 엔진은 `GET /internal/v1/agents/{agentId}/statements/{ym}`(계약 1.4.0) 사용만.
+- 실 엔진 E2E는 병합 뒤 `main`에서 사용자가 실행 → `RESULT.md`(판정 넷).
+
+## 2026-10-27 — Phase 7 계획 승인 (`docs/phase-07-계획승인.md`)
+
+승인: 계획 Q1~Q14 권장안 전부(Q1 = ⓑ′ — ESTIMATE 달은 DRIFT 없음, `clawbackOffset`·`adjustment`만 `MATCH`/`INCONCLUSIVE(ESTIMATE_DIFF)`), P-1~P-15 그대로. 돌이킬 수 없는 결정 셋 모두 예 — 엔진 샘플 PR(엔진 CI 통과 뒤 직접 병합, 포털 `UPSTREAM` = 병합 커밋), 새 의존성 `spring-boot-micrometer-tracing-opentelemetry`·`opentelemetry-sdk-testing`(Boot 4.1.1 BOM 판, 내보내기 0 — 재생성 diff는 추가만·전이 목록 표), V8 `recon_run`(값 열 0 — `CHECK` 시험). 조건 A: R5에서 `INCONCLUSIVE`로 끝난 달에 `data_status = DRIFT`를 다시 쓸 때 `recon_result` 행은 쓰지 않는다. 조건 B: `status` 출력에 `ym` 꼴 0(시험). Q9: 회차 잠금 연결과 풀 크기 관계를 `docs/운영.md` §8에.
+
+### 지시문 오류
+
+| # | 지시문 문구 | 무엇이 틀렸나 | 정한 것 |
+|---|---|---|---|
+| DE-27 | 질문 1 "E2 `estimate_cycle_01`의 분급 도래" | 분급 도래 스트림은 `estimate_cycle_05`(측정 — ESTIMATE 378,000 vs 포털 0) | 샘플에 `cycle_05` ESTIMATE 하나 추가(P-1) |
+| DE-28 | ② "여전히 DRIFT면 행은 그대로(미해결)" | 재구축은 `earnings_month`를 이벤트로 다시 만들어 BATCH DRIFT의 `data_status`를 지운다 — 행만 보고 표식을 못 봤다 | 재대사가 `MATCH`가 아닌 모든 미해결 달에 `data_status = DRIFT`를 다시 쓴다(P-6, 조건 A) |
+
+지시문 ⑤ 하네스 제어 경로 모양(P-10 — `/<동작>/<테넌트>/…`), ⓪ A-1·`cycle_01` 설계사가 둘 다 `A-1001`(P-2 — 엔진 상태별 샘플 묶음)도 같은 표에 둔다.
+
+### 설계서·계약 결함
+
+| # | 무엇 | 처리 |
+|---|---|---|
+| DD-19 | 포털 계약 `contracts/events/v1/payloads/StatementEstimated` 설명문 "gross = Σ 그 달 `CommissionCalculated` 라인"이 엔진 동작(도래 예정 미리보기 포함)과 다르다 | **이 Phase에서 고치지 않는다**(엔진 사본·`CHECKSUMS`가 묶여 있다) — 다음 이벤트 계약 개정(Phase 8 또는 E3) 때 "미리보기 포함" 표기 정정 + 엔진 사본 갱신 PR(선승인 패턴). 보고서 질문에 |
+
+## 2026-10-27 — Phase 7 구현에서 계획과 다르게 한 것 (보고서 §5)
+
+| # | 계획 | 구현 | 이유 |
+|---|---|---|---|
+| P7-1 | Q6 새 의존성 "`spring-boot-micrometer-tracing-opentelemetry`" | 그 모듈 + **`micrometer-tracing-bridge-otel`**(같은 BOM 판 1.7.1) | 승인한 모듈은 `OtelTracer`가 클래스패스에 있을 때만 켜지는 자동 구성뿐이다 — 계획이 "브리지"라 부른 것은 별도 아티팩트다(사실 정정). 빈 `GRADLE_USER_HOME` 재생성 diff는 추가만·제거 0(잠금 +18 — 보고서 전이 표) |
+| P7-2 | ③ R1 "미해결 DRIFT 달은 재구축 뒤 재대사에서 푼다" | 미해결 DRIFT 달이 **첫 판정에서** `MATCH`면 그 자리에서 `REPAIRED`(재구축 없이, 회차 결과 `OK`) | 엔진 쪽 정정 이벤트가 이미 포털을 고쳤으면 재구축할 것이 없다 — 그 달을 미해결로 남기면 다음 회차가 쓸데없이 재구축한다 |
+| P7-3 | Q5 "`REPAIRED`는 재대사 시각" · Q14 "시도 = DRIFT 행 뒤의 `rebuilt_at`" | 재대사의 DRIFT 행도 재대사 시각, "시도함"은 그 에피소드의 **첫** DRIFT 뒤의 `rebuilt_at` | 재대사가 같은 회차에서 새 DRIFT 행(값이 바뀐 경우)을 쓰면 "마지막 DRIFT 뒤 재구축"이 없어 다음 날 다시 재구축했을 것이다(§0 "미해결 DRIFT의 매일 재구축 금지") |
+| P7-4 | Q9 "테넌트 권고 잠금을 회차 내내" | 바깥 테넌트 트랜잭션이 `pg_try_advisory_xact_lock(hashtext('portal.recon'), hashtext(tenant))`를 회차 내내 쥐고, 저장·재구축은 `REQUIRES_NEW`(`SpringTenantTransactions.requiresNew`) | 세션 잠금은 직접 DB 접근 허용 목록(닫힌 FQN — `IssuerDirectoryReader` 하나)을 넓혀야 한다. 트랜잭션 잠금은 저장소 경로 그대로 — 대가는 회차당 연결 하나 더(`docs/운영.md` §8) |
+| P7-5 | (계획에 없음) | `spring.task.scheduling.pool.size: 2` | Spring 기본 스케줄러 스레드는 하나 — 대사 회차(최대 `recon_max_seconds` + 재구축) 동안 모든 테넌트의 인제스트 폴링이 멈춘다. 같은 틱은 `fixedDelay`라 자기와 겹치지 않는다(`ReconSchedulerIT`) |
+| P7-6 | ③ V8 `recon_run`의 `CHECK` | **V9**가 `ck_recon_run_outcome`을 `IS NOT DISTINCT FROM`으로 다시 썼다 | V8의 `(result <> 'REPAIRED' OR rebuild_outcome = 'SUCCEEDED')`는 `rebuild_outcome`이 NULL이면 NULL → `CHECK` 통과. `ReconRunSchemaIT` 거부 사례 24가 CI run 40490868281에서 잡았다 — 커밋된 V8은 고치지 않는다(새 V로만) |
+| P7-7 | ⑤ "기존 지표 14" | 기존 12 + 새 8 = **20** | 셈이 틀렸다 — `docs/지표.md` 표가 정본, `MetricsCatalogTest`가 20을 단언 |
+| P7-8 | ⑤ `MetricsCatalogTest` "레지스트리의 전 지표" | **원천 정적 스캔**(모든 모듈의 `counter("…"`·`Gauge.builder("…"`·`Timer.builder("…"` — 이름·태그 키가 글자 그대로여야 한다) ↔ 표 양방향. 런타임 쪽은 `IngestPollingIT`이 앱 조립의 레지스트리에 `ingest.`·`recon.`·`engine.` 지표가 없음을 본다 | 레지스트리는 실행된 경로의 지표만 담는다 — 한 번도 안 탄 경로의 태그 집합 위반을 못 본다. 인제스트 게이지의 변수 이름 등록을 글자 등록으로 바꿨다(스캐너가 읽게) |
+| P7-9 | ⑤ 트레이스 "ObservationRegistry 포트" | 스팬 포트 `portal-domain` `trace.Tracing`, 구현은 Micrometer Tracing `Tracer` 직접(Observation 아님). `ingest.derive`에 `notifications` 속성 없음 | Observation은 기본 지표 처리기가 `ingest.apply` 같은 타이머를 레지스트리에 올린다 — 닫힌 표 밖. 파생기는 넣은 수를 돌려주지 않는다(수는 `notifications_derived_total`이 커밋 뒤에 센다) |
+| P7-10 | (계획에 없음) | 통합 시험 소스셋 컴파일 경로에 `micrometer-tracing-bridge-otel` | `TracingLeakIT`가 실제 SDK 위의 `OtelTracer`를 만든다(앱은 `implementation`이라 시험 컴파일 경로에 없다). 잠금 diff는 기존 항목의 구성 이름 `integrationTestCompileClasspath` 여섯 줄뿐 — 새 아티팩트 0 |
+| P7-11 | ⑦ ⓔ "`status` 출력의 재구축 시각을 하네스가 수로" | 하네스 제어 `POST /count/<T>/rebuilds`(행위자 `recon:<T>`의 `INGEST_REBUILD_SUCCEEDED` 수 — 본문 = 숫자), 엔진 명세 스텁 제어 `POST /statement/<T>/down\|up` | `status`의 `last_rebuild`는 마지막 결과 하나라 "재구축 0회 더"를 셀 수 없다. ⓓ는 명세 스텁을 내려야 한다(시뮬레이션 스텁 제어와 따로) |
+| P7-12 | ⑧ C2 `ReconResultWriteIT` | 열 목록(`information_schema` — 차이 열 0) + DRIFT 행 값. 비교 안 한 필드 NULL은 `ReconRunnerTest`(확정 답에 환수 상계가 없을 때 — 엔진 샘플에 그런 답이 없다) | 샘플 밖 답은 스텁이 낼 수 없다(C1 — 샘플 밖 500) |
+| P7-13 | ⑧ C7 `ReconEngineIT` "404 둘·422·400" | 404 둘·422는 `HttpStatementClientTest`(실 HTTP·샘플), 동시 1·재시도 0·예산은 `ReconRunIT`. 400은 판정 표(`ReconRulesTest` — `ENGINE_REJECTED`)만 | 엔진 샘플에 400 답이 없다 |
+| P7-14 | (계획에 없음) | `TenantContextGuardTest`(닫힌 저장소·공개 메서드 목록)에 새 저장소 둘·메서드 다섯 | `7ed1b98`에서 빠뜨려 CI run 40495054323(`portal-infra:test`)이 잡았다 — `f4dc0d0` |
+| P7-15 | (계획에 없음 — 설계서 §7 v1.6 ETag) | ETag `cfg` 입력에 데이터 표식 둘(커서 `updated_at`, 마지막 `recon_run` 행) — 표식은 `SyncStatusRepository.lastRecon` 한 문장(문장 수 +1: `/me` 5·`/earnings/{ym}` 6·`/limits` 5·`/deferrals` 6). `CachingIT.aReconRunOrARebuildAtTheSameSeqChangesTheTag`, `MeQueriesTest.aReconRunOrARebuildAtTheSameSeqChangesTheEtag` | E2E ⓑ(run 40498434426·40499141094 — android·desktop)가 찾았다: 대사가 `data_status`를 DRIFT로 바꿔도 `seq`·설정이 같아 304가 "정상" 본문을 되살렸다(iOS 프로젝트는 두 회차 모두 통과 — 이유는 확인하지 않았다). 설정·커서 문장에 붙이면 같은 문장의 임계치 변환(`* 100`)이 `ReconArithmeticScanTest`에, `ReconRunRepository`로 읽으면 `ApiLayerRulesTest`(조회 경로 저장소)에 걸려 코드를 옮겼다. **설계 의미 변경 — 수용 심사에서 승인 요청** |
+| P7-16 | ⑧ C2 "`MultiplicationScanTest`·`SqlArithmeticScanTest` 무변경" | 두 스캔은 그대로 두고 **새 스캔** `ReconArithmeticScanTest`(허용 목록 없음): `com.ga.portal.recon..`·`JdbcReconStore`의 `LADD`·`LSUB`·`LMUL`·`LDIV`·`LREM`·`LNEG`와 `Math`·`StrictMath` 덧셈·뺄셈·부호·절댓값 호출 0, `recon_result`·`recon_run` 자바 SQL 문장의 `+ - * / %` 0 | 주입 S2 첫 모양(`portal - engine` 뺄셈)이 기존 두 스캔을 **통과했다** — 둘은 `*`·`/`·`%`만 본다. S2a(SQL 뺄셈)·S2b(`ReconRunner` `LSUB`)를 새 스캔이 잡았다 — `4c47bff` |
+| P7-17 | ⑧ C12 "평문 스캔(트레이스 exporter 출력 파일 포함)" | `TracingLeakIT`가 내보낸 스팬 전부를 단언 전에 `portal-app/build/trace-export/TracingLeakIT.spans.log`로 쓴다 — `scanPlaintextLeaks`의 기존 `build/**/*.log` 규칙이 읽고, 줄에 `trace dumps: N`을 보인다 | 보고서를 쓰다 찾았다 — 메모리 내보내기는 파일을 남기지 않아 스캔이 스팬을 본 적이 없다. 이 기계에서 센티널 한 줄을 넣은 덤프로 스캔 실패를 보고 지웠다. 첫 판(`9af9ee0`)은 시험 원천에 경로를 글자로 적어 `verifyTestInputs`가 "저장소 파일을 입력 선언 없이 읽는다"로 막았다(run 40502293298) — 덤프 디렉터리는 `integrationTest`의 **출력**으로 선언하고 시스템 속성 `ga.traceExport`로 넘긴다(규칙은 그대로) |
+
+### 결정 (설계서 v1.10)
+
+- 대사 흐름 → §3.4 3·§6.6(세 판정·사유·Q1 ⓑ′·뒤처짐·Q14·P-6·조건 A·P7-2·P7-3), `recon_result` 쓰기 규칙·V8·V9 → §5, 재대사 알림 → §6.5 표 한 행, 자동 재구축 행위자·의존 방향 → §6.7, 지표·트레이스·운영 알림 채널 → §10 + `docs/지표.md`(신설 — 닫힌 표), Phase 7 → §12, 시험 → §13, §14.1 #11(자동 재구축이 밤에 도는 이유)·#12(닫음 — 공백은 달 알림 범위에서만).
+- `CLAUDE.md` "대사·관측성 규약" 절. `docs/운영.md` §8(CLI `recon run`·`status`, 신호 → 할 일 표, 테넌트 설정, 연결·스레드 — Q9·P7-4·P7-5).
+- DD-19(`StatementEstimated` 설명문)는 고치지 않았다(승인 그대로 — 다음 이벤트 계약 개정 때).
+- 영문 번역(`docs/en/`)은 v1.6 그대로.

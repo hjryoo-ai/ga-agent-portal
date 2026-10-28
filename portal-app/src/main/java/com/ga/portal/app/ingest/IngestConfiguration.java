@@ -1,5 +1,6 @@
 package com.ga.portal.app.ingest;
 
+import com.ga.portal.domain.trace.Tracing;
 import com.ga.portal.infra.persistence.IngestCursorRepository;
 import com.ga.portal.infra.persistence.IngestEventRepository;
 import com.ga.portal.infra.persistence.IngestLockRepository;
@@ -18,6 +19,7 @@ import com.ga.portal.infra.persistence.EarningsMonthRepository;
 import com.ga.portal.infra.persistence.PolicyFlagRepository;
 import com.ga.portal.infra.persistence.PolicyLimitRepository;
 import com.ga.portal.infra.persistence.ReconResultRepository;
+import com.ga.portal.app.PortalMeters;
 import com.ga.portal.infra.persistence.NotificationRepository;
 import com.ga.portal.infra.persistence.SyncStatusRepository;
 import com.ga.portal.projection.NotificationDeriver;
@@ -86,8 +88,14 @@ public class IngestConfiguration {
 
     /** 알림 파생(포털 Phase 6 — 적용 트랜잭션 안, 프로젝터 다음). no-op 구현은 시험 픽스처에만 있다. */
     @Bean
-    NotificationDeriver notificationDeriver(NotificationRepository notifications, SyncStatusRepository settings, Clock clock) {
-        return new JdbcNotificationDeriver(notifications, settings, clock);
+    NotificationDeriver notificationDeriver(NotificationRepository notifications, SyncStatusRepository settings, PortalMeters meters, Clock clock) {
+        return new JdbcNotificationDeriver(notifications, settings, meters, clock);
+    }
+
+    /** 여러 경로가 같이 쓰는 지표(포털 Phase 7 — 파생 알림·문의·문의 적체, {@code docs/지표.md}). */
+    @Bean
+    PortalMeters portalMeters(ObjectProvider<MeterRegistry> registry) {
+        return new PortalMeters(java.util.Optional.ofNullable(registry.getIfAvailable()));
     }
 
     @Bean
@@ -97,7 +105,7 @@ public class IngestConfiguration {
 
     @Bean
     IngestApplier ingestApplier(EnvelopeValidator validator, IngestStore store, TenantTransactions transactions, IngestLock lock,
-                                Projector projector, NotificationDeriver notifications, Clock clock) {
-        return new IngestApplier(validator, store, transactions, lock, projector, notifications, clock);
+                                Projector projector, NotificationDeriver notifications, Clock clock, Tracing tracing) {
+        return new IngestApplier(validator, store, transactions, lock, projector, notifications, clock, tracing);
     }
 }

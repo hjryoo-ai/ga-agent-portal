@@ -129,6 +129,45 @@ class CachingIT extends ApiIntegrationTest {
         }
     }
 
+    /**
+     * 포털 Phase 7(E2E ⓑ가 찾음 — 보고서 F): 대사는 {@code seq}를 움직이지 않고 달의 {@code data_status}를 바꾼다, 재구축도 같은 {@code seq}로 뷰를 다시 쓴다. ETag가
+     * 그 표식(마지막 대사 회차·커서 갱신 시각)을 보지 않으면 옛 태그로 다시 물은 브라우저가 304를 받아 DRIFT 달을 "정상"으로 그대로 보인다.
+     */
+    @Test
+    void aReconRunOrARebuildAtTheSameSeqChangesTheTag() {
+        caughtUpAt(Instant.now());
+        String path = "/api/v1/me/earnings/202608";
+        HttpResponse<byte[]> before = asA2(path, null);
+        assertThat(new String(before.body())).contains("\"monthDataStatus\":\"OK\"");
+        DB.seed(T2.value(), c -> {
+            SeedData.exec(c, "UPDATE earnings_month SET data_status = 'DRIFT' WHERE tenant_id = ? AND agent_id = ? AND close_ym = '202608'", T2.value(), AGENT_A2);
+            SeedData.exec(c, """
+                    INSERT INTO recon_run (tenant_id, run_at, actor, trigger, checked, matched, drift_new, drift_unresolved, inconclusive, engine_calls, result)
+                    VALUES (?, now(), 'cli:caching-it', 'CLI', 1, 0, 1, 1, 0, 1, 'DRIFT')
+                    """, T2.value());
+        });
+        try {
+            HttpResponse<byte[]> drift = asA2(path, etag(before));
+            assertThat(drift.statusCode()).as("the old tag must not revalidate the old body").isEqualTo(200);
+            assertThat(new String(drift.body())).contains("\"monthDataStatus\":\"DRIFT\"");
+            assertThat(etag(drift)).isNotEqualTo(etag(before)).startsWith("W/\"40.O.");
+            assertThat(asA2(path, etag(drift)).statusCode()).as("nothing changed since").isEqualTo(304);
+
+            DB.seed(T2.value(), c -> {
+                SeedData.exec(c, "UPDATE earnings_month SET data_status = 'OK' WHERE tenant_id = ? AND agent_id = ? AND close_ym = '202608'", T2.value(), AGENT_A2);
+                SeedData.exec(c, "UPDATE ingest_cursor SET updated_at = updated_at + interval '1 minute' WHERE tenant_id = ?", T2.value());
+            });
+            HttpResponse<byte[]> rebuilt = asA2(path, etag(drift));
+            assertThat(rebuilt.statusCode()).as("a rebuild at the same seq changes the tag too").isEqualTo(200);
+            assertThat(new String(rebuilt.body())).contains("\"monthDataStatus\":\"OK\"");
+        } finally {
+            DB.seed(T2.value(), c -> {
+                SeedData.exec(c, "UPDATE earnings_month SET data_status = 'OK' WHERE tenant_id = ? AND agent_id = ? AND close_ym = '202608'", T2.value(), AGENT_A2);
+                SeedData.exec(c, "DELETE FROM recon_run WHERE tenant_id = ? AND actor = 'cli:caching-it'", T2.value());
+            });
+        }
+    }
+
     static void tenantCursorState(String state) {
         DB.seed(T2.value(), c -> SeedData.exec(c, "UPDATE ingest_cursor SET state = ? WHERE tenant_id = ?", state, T2.value()));
     }

@@ -55,6 +55,12 @@ spring-boot-starter-security-oauth2-resource-server = { module = "org.springfram
 nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt" }
 # 발급자 리더(IssuerDirectoryReader)의 전용 롤 연결 풀 — 요청마다 조회하므로 연결을 새로 열지 않는다
 hikaricp = { module = "com.zaxxer:HikariCP" }
+# 트레이스(포털 Phase 7 계획 Q6 — 승인 돌이킬 수 없는 결정 2): Micrometer Observation → OpenTelemetry 다리. 내보내기(OTLP)는 넣지 않는다(Phase 8).
+spring-boot-micrometer-tracing-opentelemetry = { module = "org.springframework.boot:spring-boot-micrometer-tracing-opentelemetry" }
+# 위 모듈은 자동 구성뿐이고 브리지(OtelTracer)를 싣지 않는다 — 자동 구성이 브리지 클래스를 조건으로 건다(계획 Q6의 "브리지"는 이 아티팩트, P7-1)
+micrometer-tracing-bridge-otel = { module = "io.micrometer:micrometer-tracing-bridge-otel" }
+# 시험 전용: 메모리 스팬 수집기(TracingLeakIT — 스팬 이름·속성에 값이 없음을 본다)
+opentelemetry-sdk-testing = { module = "io.opentelemetry:opentelemetry-sdk-testing" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

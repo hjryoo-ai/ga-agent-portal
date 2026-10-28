@@ -7,10 +7,15 @@ import com.ga.portal.infra.testing.SeedData;
 import com.ga.portal.ingest.testing.Samples;
 import com.ga.portal.ingest.testing.StubFeedServer;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.samplers.Sampler;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -72,6 +77,26 @@ class IngestPollingIT {
     @Autowired
     MeterRegistry meters;
 
+    @Autowired
+    InMemorySpanExporter spans;
+
+    @Autowired
+    SdkTracerProvider tracerProvider;
+
+    /** 포털 Phase 7 C8: 자동 구성된 추적기(브리지 → SDK)에 메모리 내보내기를 붙이고 전부 표본으로 뽑는다(운영 기본은 내보내기 없음 — Phase 8). */
+    @TestConfiguration(proxyBeanMethods = false)
+    static class Spans {
+        @Bean
+        InMemorySpanExporter inMemorySpanExporter() {
+            return InMemorySpanExporter.create();
+        }
+
+        @Bean
+        Sampler alwaysOn() {
+            return Sampler.alwaysOn();
+        }
+    }
+
     @Test
     void theSchedulerPullsTheFeedOfATenantFromItsEngineAndAppliesIt() throws InterruptedException {
         IngestRig rig = new IngestRig();
@@ -102,6 +127,33 @@ class IngestPollingIT {
                 .satisfies(g -> assertThat(g.value()).isZero());
         assertThat(meters.find("ingest_events_total").tag("tenant", T.value()).tag("result", "applied").counter())
                 .isNotNull().satisfies(c -> assertThat(c.count()).isEqualTo(11.0));
+        // 포털 Phase 7(docs/지표.md): notifications_derived_total = 커밋해 넣은 알림 행(종류별 합 = 테넌트의 알림 행 수)
+        java.util.List<String> rows = IngestRig.notificationRows(T);
+        assertThat(rows).isNotEmpty();
+        java.util.Map<String, Long> byType = rows.stream().collect(java.util.stream.Collectors.groupingBy(r -> r.split("\\|", -1)[2],
+                java.util.TreeMap::new, java.util.stream.Collectors.counting()));
+        java.util.Map<String, Long> counted = new java.util.TreeMap<>();
+        meters.find("notifications_derived_total").tag("tenant", T.value()).counters()
+                .forEach(c -> counted.put(c.getId().getTag("type"), (long) c.count()));
+        assertThat(counted).isEqualTo(byType);
+        // 포털 Phase 7 C8(docs/지표.md §4): 운영 조립의 스팬 — 이벤트마다 ingest.apply와 그 아래 project·derive·cursor, 피드 호출 engine.feed
+        assertThat(tracerProvider.forceFlush().join(10, java.util.concurrent.TimeUnit.SECONDS).isSuccess()).isTrue();
+        java.util.List<io.opentelemetry.sdk.trace.data.SpanData> finished = spans.getFinishedSpanItems();
+        java.util.Map<String, String> nameById = finished.stream().collect(java.util.stream.Collectors.toMap(
+                io.opentelemetry.sdk.trace.data.SpanData::getSpanId, io.opentelemetry.sdk.trace.data.SpanData::getName));
+        java.util.List<io.opentelemetry.sdk.trace.data.SpanData> applied = finished.stream()
+                .filter(sp -> sp.getName().equals("ingest.apply") && T.value().equals(sp.getAttributes().get(
+                        io.opentelemetry.api.common.AttributeKey.stringKey("tenant")))).toList();
+        assertThat(applied).as("one ingest.apply per event of this tenant").hasSizeGreaterThanOrEqualTo(11);
+        for (String child : java.util.List.of("ingest.project", "ingest.derive", "ingest.cursor")) {
+            assertThat(finished.stream().filter(sp -> sp.getName().equals(child)).map(sp -> nameById.get(sp.getParentSpanId())))
+                    .as(child).isNotEmpty().containsOnly("ingest.apply");
+        }
+        assertThat(finished).anyMatch(sp -> sp.getName().equals("engine.feed")
+                && "OK".equals(sp.getAttributes().get(io.opentelemetry.api.common.AttributeKey.stringKey("outcome"))));
+        assertThat(meters.getMeters()).as("spans are not Observations — no ingest.apply timer outside the catalog")
+                .noneMatch(m -> m.getId().getName().startsWith("ingest.") || m.getId().getName().startsWith("recon.")
+                        || m.getId().getName().startsWith("engine."));
     }
 
     private static long lastSeq(IngestRig rig) {

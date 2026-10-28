@@ -95,15 +95,16 @@ class TenantPredicateScanTest {
     @Test
     void scanCoversMigrationsAndRepositories() {
         assertThat(sqlFiles).extracting(p -> p.getFileName().toString()).containsExactly("V1__init.sql", "V2__rls.sql", "V3__ingest_payload_hash.sql", "V4__projection.sql",
-                "V5__query_api.sql", "V6__simulation_log.sql", "V7__inbox.sql");
-        assertThat(knownTables).hasSize(17).contains("tenant", "earnings_line", "ingest_cursor", "audit_access");
+                "V5__query_api.sql", "V6__simulation_log.sql", "V7__inbox.sql", "V8__recon_run.sql", "V9__recon_run_outcome.sql");
+        assertThat(knownTables).hasSize(18).contains("tenant", "earnings_line", "ingest_cursor", "audit_access", "recon_run");
         long javaSqlCount = javaFiles.stream().mapToLong(p -> SqlTenantScanner.sqlLiteralsInJava(read(p)).size()).sum();
         assertThat(javaSqlCount).as("repository SQL literals found (TenantRepository 1, IngestCursorRepository 3, IngestEventRepository 4, "
                 + "IngestLockRepository 1, AuditAccessRepository 2; Phase 2: AgentProfile 2, EarningsLine 3, EarningsMonth 2, PolicyLimit 5, "
                 + "DeferralItem 3, ClawbackItem 2, PolicyFlag 2, ReconResult 1, ViewReset 8 DELETE + 3 invariant queries; Phase 3: IngestCursor +2 caught_up_at, IssuerDirectoryReader 1, IdentityLink 1, "
                 + "AuditAccess +1 denial, AgentQuery 16, SyncStatus 1; Phase 5: AgentQuery +3 monthDetail·deferralPolicies·policies, "
-                + "SimulationLog 4, SimulationLock 1; Phase 6: Notification 4, Inquiry 7, InquiryOperator 4)")
-                .isEqualTo(11 + 20 + 11 + 2 + 3 + 17 + 3 + 4 + 1 + 4 + 7 + 4);
+                + "SimulationLog 4, SimulationLock 1; Phase 6: Notification 4, Inquiry 7, InquiryOperator 4; Phase 7: EarningsMonth +2 findByMonths·markDataStatus, "
+                + "ReconResult +1 driftAndRepaired, InquiryOperator +1 openSummary, ReconLock 1, ReconRun 7, SyncStatus +1 lastRecon)")
+                .isEqualTo(11 + 20 + 11 + 2 + 3 + 17 + 3 + 4 + 1 + 4 + 7 + 4 + 13);
     }
 
     @Test

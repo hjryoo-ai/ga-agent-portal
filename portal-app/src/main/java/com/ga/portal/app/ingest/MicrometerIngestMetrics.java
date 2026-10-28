@@ -49,27 +49,27 @@ final class MicrometerIngestMetrics implements IngestMetrics {
 
     @Override
     public void lag(TenantId tenant, long lagSeq, long lagSeconds) {
-        gauge("ingest_lag_seq", tenant, null).set(lagSeq);
-        gauge("ingest_lag_seconds", tenant, null).set(lagSeconds);
+        // 등록 문장마다 이름·태그 키가 글자 그대로, 사슬이 .register(로 끝난다 — 지표 목록 시험(MetricsCatalogTest)이 원천에서 읽는다(포털 Phase 7)
+        gauges.computeIfAbsent("ingest_lag_seq|" + tenant.value(), k -> {
+            AtomicLong value = new AtomicLong();
+            Gauge.builder("ingest_lag_seq", value, AtomicLong::get).tag("tenant", tenant.value()).register(registry);
+            return value;
+        }).set(lagSeq);
+        gauges.computeIfAbsent("ingest_lag_seconds|" + tenant.value(), k -> {
+            AtomicLong value = new AtomicLong();
+            Gauge.builder("ingest_lag_seconds", value, AtomicLong::get).tag("tenant", tenant.value()).register(registry);
+            return value;
+        }).set(lagSeconds);
     }
 
     @Override
     public void state(TenantId tenant, IngestState state) {
         for (IngestState s : IngestState.values()) {
-            gauge("ingest_state", tenant, s.name()).set(s == state ? 1 : 0);
+            gauges.computeIfAbsent("ingest_state|" + tenant.value() + "|" + s.name(), k -> {
+                AtomicLong value = new AtomicLong();
+                Gauge.builder("ingest_state", value, AtomicLong::get).tag("tenant", tenant.value()).tag("state", s.name()).register(registry);
+                return value;
+            }).set(s == state ? 1 : 0);
         }
-    }
-
-    private AtomicLong gauge(String name, TenantId tenant, String state) {
-        String key = name + "|" + tenant.value() + "|" + state;
-        return gauges.computeIfAbsent(key, k -> {
-            AtomicLong value = new AtomicLong();
-            Gauge.Builder<AtomicLong> b = Gauge.builder(name, value, AtomicLong::get).tag("tenant", tenant.value());
-            if (state != null) {
-                b = b.tag("state", state);
-            }
-            b.register(registry);
-            return value;
-        });
     }
 }

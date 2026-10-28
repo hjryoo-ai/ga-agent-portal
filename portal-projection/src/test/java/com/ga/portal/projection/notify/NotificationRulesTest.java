@@ -224,6 +224,18 @@ class NotificationRulesTest {
                 .isInstanceOf(IllegalStateException.class);
     }
 
+    /** Phase 7(Phase 6 수용 Q1): 재대사 {@code REPAIRED}의 후보는 이벤트가 낸 것과 같은 키·params·링크다 — {@code ON CONFLICT}로 한 번만. */
+    @Test
+    void aRepairedMonthUsesTheSameKeysAsTheClosingEvents() {
+        List<Candidate> confirmed = NotificationRules.monthRepaired("A-1", "202609", MonthStatus.CONFIRMED);
+        List<Candidate> paid = NotificationRules.monthRepaired("A-1", "202609", MonthStatus.PAID);
+        assertThat(confirmed).containsExactlyElementsOf(run(env("StatementConfirmed", 40), new Change.MonthClosed(month(DataStatus.OK))));
+        assertThat(paid).containsExactly(confirmed.getFirst(), run(env("PayoutCompleted", 41), new Change.MonthClosed(month(DataStatus.OK))).getFirst());
+        assertThat(NotificationRules.monthRepaired("A-1", "202609", MonthStatus.PROVISIONAL)).isEmpty();
+        assertThat(NotificationRules.monthRepaired("A-1", "202609", MonthStatus.ESTIMATED)).isEmpty();
+        SEEN.addAll(paid);
+    }
+
     @Test
     void anAnsweredInquiryIsOneInfoNotificationLinkedToTheInquiry() {
         Candidate c = NotificationRules.inquiryAnswered("A-1", "00000000-0000-4000-8000-0000000000c1");

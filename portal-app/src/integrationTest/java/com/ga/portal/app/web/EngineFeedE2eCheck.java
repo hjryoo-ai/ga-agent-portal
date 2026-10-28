@@ -31,7 +31,9 @@ import java.util.Set;
  * 200이고 계약({@code portal-api.openapi.yaml})을 통과하며 증권번호 원문이 없다 ③ (포털 Phase 5 ⑨) 시뮬레이션 한 쌍 — 신계약(엔진 샘플 S1의 요청)과
  * 해약 영향(S5 — 그 설계사의 원장 {@code policyKey}): 실 엔진의 답이 엔진 계약 사본 스키마를 통과해야 포털이 200을 내고, 포털 응답이 계약을 통과하며,
  * {@code simulation_log}에 그 둘이 {@code SUCCEEDED}로 남는다 ④ (포털 Phase 6 ⑨) GA01의 {@code notification} 행 수 &gt; 0 — 알림은 피드 적용
- * 트랜잭션에서 자연히 생긴다(종류별 수만 적는다 — 키·매개변수는 읽지 않는다). 결과를 RESULT.md에 날짜·커밋·해시와 함께 쓴다(토큰·subject·비밀 없음).
+ * 트랜잭션에서 자연히 생긴다(종류별 수만 적는다 — 키·매개변수는 읽지 않는다) ⑤ (포털 Phase 7 계획 ⑦) {@code run.sh}가 부른 실 CLI
+ * {@code recon run --tenant=GA01 --ym=202608,202702}의 종료 코드 0, 마지막 CLI 회차 행 = 검사 2·일치 2·새 DRIFT 0·미해결 0·판정 불가 0·{@code OK}(202608
+ * CONFIRMED 셋 비교, 202702 ESTIMATE 둘 비교), {@code recon_result} 0행. 결과를 RESULT.md에 날짜·커밋·해시와 함께 쓴다(토큰·subject·비밀 없음).
  *
  * <p>인자: {@code <stateDir> <jdbcUrl> <portalBaseUrl> <resultFile> <engineCommit> <portalCommit>}. DB는 {@code portal_app}(로컬 기본 자격 증명 —
  * {@code docker/postgres/init-roles.sql})으로 테넌트를 설정해 읽는다.
@@ -116,6 +118,12 @@ public final class EngineFeedE2eCheck {
         boolean notificationsOk = notificationRows > 0;
         ok &= notificationsOk;
 
+        // ⑤ 대사(포털 Phase 7) — 실 CLI의 종료 코드(run.sh가 상태 디렉터리에 쓴다), 회차 행의 수, 결과 행 수
+        String reconExit = Files.readString(state.resolve("recon.exit"), StandardCharsets.UTF_8).strip();
+        List<String> recon = recon(jdbcUrl);
+        boolean reconOk = reconExit.equals("0") && recon.equals(List.of("CLI 2 2 0 0 0 OK", "recon_result 0"));
+        ok &= reconOk;
+
         report.add("# 실 엔진 E2E 결과 (e2e/engine-feed)");
         report.add("");
         report.add("- 일시(UTC): " + OffsetDateTime.now(ZoneOffset.UTC));
@@ -145,6 +153,11 @@ public final class EngineFeedE2eCheck {
         notifications.forEach((type, n) -> byType.append(byType.isEmpty() ? "" : " · ").append(type).append(' ').append(n));
         report.add("- `notification`(GA01) 행 수 " + notificationRows + (byType.isEmpty() ? "" : " (" + byType + ")") + " — "
                 + (notificationsOk ? "OK" : "기대 1행 이상"));
+        report.add("");
+        report.add("## 대사(포털 Phase 7 — `recon run --tenant=GA01 --ym=202608,202702`)");
+        report.add("");
+        report.add("- 종료 코드 " + reconExit + ", 마지막 CLI 회차(검사·일치·새 DRIFT·미해결·판정 불가·결과) `" + String.join("` · `", recon) + "` — "
+                + (reconOk ? "OK" : "기대 종료 0, CLI 2 2 0 0 0 OK, recon_result 0"));
         Files.write(result, report, StandardCharsets.UTF_8);
         System.out.println("[e2e] " + (ok ? "PASS" : "FAIL") + " — " + result);
         if (!ok) {
@@ -221,6 +234,36 @@ public final class EngineFeedE2eCheck {
                     while (rs.next()) {
                         out.put(rs.getString(1), rs.getInt(2));
                     }
+                }
+            }
+            c.rollback();
+        }
+        return out;
+    }
+
+    /** GA01의 마지막 CLI 회차(수와 결과만)와 {@code recon_result} 행 수. */
+    static List<String> recon(String jdbcUrl) throws Exception {
+        List<String> out = new ArrayList<>();
+        try (Connection c = DriverManager.getConnection(jdbcUrl, "portal_app", "app_local_only")) {
+            c.setAutoCommit(false);
+            try (PreparedStatement ps = c.prepareStatement("SELECT set_config('app.tenant_id', ?, true)")) {
+                ps.setString(1, TENANT);
+                ps.execute();
+            }
+            try (PreparedStatement ps = c.prepareStatement("""
+                    SELECT concat_ws(' ', trigger, checked, matched, drift_new, drift_unresolved, inconclusive, result) FROM recon_run
+                     WHERE tenant_id = ? AND trigger = 'CLI' ORDER BY run_at DESC LIMIT 1
+                    """)) {
+                ps.setString(1, TENANT);
+                try (ResultSet rs = ps.executeQuery()) {
+                    out.add(rs.next() ? rs.getString(1) : "no CLI run");
+                }
+            }
+            try (PreparedStatement ps = c.prepareStatement("SELECT count(*) FROM recon_result WHERE tenant_id = ?")) {
+                ps.setString(1, TENANT);
+                try (ResultSet rs = ps.executeQuery()) {
+                    rs.next();
+                    out.add("recon_result " + rs.getInt(1));
                 }
             }
             c.rollback();

@@ -136,16 +136,17 @@ class ArchitectureRulesTest {
                 .check(classes);
     }
 
-    // (b) Spring·DB 무의존: portal-domain·portal-projection·portal-query(Phase 3 계획 F7), 그리고 그것들이 기대는 platform-core(의존성 그래프로 확인).
+    // (b) Spring·DB 무의존: portal-domain·portal-projection·portal-query(Phase 3 계획 F7)·portal-sim·portal-inbox·portal-recon(Phase 7), 그리고 그것들이 기대는 platform-core(의존성 그래프로 확인).
     //     이 모듈들이 의존할 수 있는 플랫폼 모듈은 platform-core뿐이다.
     @Test
     void springAndDbFreeModules() {
-        ArchRules.springFreeModules(List.of(P + "domain..", P + "projection..", P + "query..", P + "sim..", P + "inbox..", "com.ga.platform.core.."), List.of())
+        ArchRules.springFreeModules(List.of(P + "domain..", P + "projection..", P + "query..", P + "sim..", P + "inbox..", P + "recon..",
+                        "com.ga.platform.core.."), List.of())
                 .check(classes);
-        noClasses().that().resideInAnyPackage(P + "domain..", P + "projection..", P + "query..", P + "sim..", P + "inbox..")
+        noClasses().that().resideInAnyPackage(P + "domain..", P + "projection..", P + "query..", P + "sim..", P + "inbox..", P + "recon..")
                 .should().dependOnClassesThat().resideInAnyPackage("org.flywaydb..", "com.ga.platform.spring..", "com.ga.platform.canonical..")
                 .allowEmptyShould(true)
-                .as("portal-domain·portal-projection·portal-query·portal-sim·portal-inbox depend only on platform-core (no Flyway, platform-spring, platform-canonical)")
+                .as("portal-domain·portal-projection·portal-query·portal-sim·portal-inbox·portal-recon depend only on platform-core (no Flyway, platform-spring, platform-canonical)")
                 .check(classes);
     }
 
@@ -242,6 +243,26 @@ class ArchitectureRulesTest {
         noClasses().that().haveFullyQualifiedName(rebuilder)
                 .should().transitivelyDependOnClassesThat(derivation)
                 .as("the rebuilder never derives notifications, not even transitively")
+                .check(classes);
+    }
+
+    /**
+     * 포털 Phase 7(C6, 계획 ⑧): 알림 파생 규칙({@code projection.notify})을 부르는 곳은 닫힌 목록 — 운영 파생기(이벤트), 운영 CLI 답변(문의), 대사 회차
+     * (재대사 {@code REPAIRED} — Phase 6 수용 Q1). 재구축기에서 대사로 가는 의존도 0(대사가 재구축을 부르지, 거꾸로가 아니다 — 레이어 규칙과 같은 뜻을 이름으로).
+     */
+    @Test
+    void theDerivationRulesHaveAClosedSetOfCallers() {
+        Set<String> callers = classes.stream()
+                .filter(c -> !c.getPackageName().startsWith("com.ga.portal.projection.notify"))
+                .filter(c -> c.getDirectDependenciesFromSelf().stream().anyMatch(d -> d.getTargetClass().getPackageName().equals("com.ga.portal.projection.notify")
+                        && d.getTargetClass().getSimpleName().startsWith("NotificationRules")))
+                .map(c -> c.getName().replaceFirst("\\$.*$", ""))
+                .collect(Collectors.toCollection(java.util.TreeSet::new));
+        assertThat(callers).containsExactly("com.ga.portal.app.cli.InquiryCommands", "com.ga.portal.app.ingest.JdbcNotificationDeriver",
+                "com.ga.portal.recon.ReconRunner");
+        noClasses().that().haveFullyQualifiedName("com.ga.portal.ingest.apply.Rebuilder")
+                .should().transitivelyDependOnClassesThat().resideInAPackage("com.ga.portal.recon..")
+                .as("the rebuilder never reaches the reconciler")
                 .check(classes);
     }
 

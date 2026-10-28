@@ -1,6 +1,8 @@
 package com.ga.portal.app.ingest;
 
 import com.ga.platform.spring.jdbc.TenantDirectoryReader;
+import com.ga.portal.app.trace.TracedFeedClient;
+import com.ga.portal.domain.trace.Tracing;
 import com.ga.portal.infra.persistence.TenantRepository;
 import com.ga.portal.ingest.apply.IngestApplier;
 import com.ga.portal.ingest.apply.IngestMetrics;
@@ -32,12 +34,13 @@ import java.time.Clock;
 public class IngestPollingConfiguration {
 
     @Bean
-    FeedClient feedClient(IngestProperties props, TenantTransactions transactions, TenantRepository tenants, ServiceTokenSource tokens) {
-        return httpFeed(props, transactions, tenants, tokens);
+    FeedClient feedClient(IngestProperties props, TenantTransactions transactions, TenantRepository tenants, ServiceTokenSource tokens,
+                          Tracing tracing) {
+        return new TracedFeedClient(httpFeed(props, transactions, tenants, tokens), tracing);
     }
 
     /** 폴링과 재구축(CLI)이 같은 피드 조립을 쓴다. */
-    static FeedClient httpFeed(IngestProperties props, TenantTransactions transactions, TenantRepository tenants, ServiceTokenSource tokens) {
+    public static FeedClient httpFeed(IngestProperties props, TenantTransactions transactions, TenantRepository tenants, ServiceTokenSource tokens) {
         return new HttpFeedClient(HttpClient.newBuilder().connectTimeout(props.httpTimeout()).build(),
                 tenant -> URI.create(transactions.inTransaction(tenant, tenants::current).orElseThrow().engineBaseUrl()),
                 tokens, props.httpTimeout());

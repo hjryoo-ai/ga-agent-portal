@@ -98,7 +98,7 @@ subprojects {
 // Spring·DB 무의존 모듈(지시문 §1): 컴파일·런타임 클래스패스에 org.springframework 그룹이 없어야 한다.
 // (java.sql / javax.sql 은 JDK 모듈이라 클래스패스로 막을 수 없으므로 ArchUnit이 막는다.)
 // ---------------------------------------------------------------------------------------------
-val springFreeModules = listOf("portal-domain", "portal-projection", "portal-ingest", "portal-query", "portal-sim", "portal-inbox")   // portal-query: Phase 3 계획 F7, portal-sim: Phase 5, portal-inbox: Phase 6
+val springFreeModules = listOf("portal-domain", "portal-projection", "portal-ingest", "portal-query", "portal-sim", "portal-inbox", "portal-recon")   // portal-query: Phase 3 계획 F7, portal-sim: Phase 5, portal-inbox: Phase 6, portal-recon: Phase 7
 
 // Boot BOM(spring-boot-dependencies)은 버전 제약만 담은 POM이라 클래스가 없다 — 검사에서 제외한다.
 val constraintOnlyPlatforms = setOf("org.springframework.boot:spring-boot-dependencies")
@@ -405,7 +405,9 @@ val scanPlaintextLeaks = tasks.register("scanPlaintextLeaks") {
         if (hits.isNotEmpty()) {
             throw GradleException("평문 센티널이 시험 출력에 나타났다(값은 앞 1자만 표시):\n" + hits.joinToString("\n"))
         }
-        logger.lifecycle("scanPlaintextLeaks: ${files.size} files, ${forbidden.size} forbidden strings, 0 hits")
+        // 트레이스(포털 Phase 7 C12): TracingLeakIT가 내보낸 스팬을 build/trace-export/*.log로 쓴다 — 위 .log 규칙이 읽는다, 수만 따로 보인다
+        val traceDumps = files.count { it.path.contains("${File.separator}trace-export${File.separator}") }
+        logger.lifecycle("scanPlaintextLeaks: ${files.size} files (trace dumps: $traceDumps), ${forbidden.size} forbidden strings, 0 hits")
     }
 }
 subprojects {

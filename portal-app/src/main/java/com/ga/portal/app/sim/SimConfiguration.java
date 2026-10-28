@@ -1,5 +1,7 @@
 package com.ga.portal.app.sim;
 
+import com.ga.portal.app.trace.TracedSimulationClient;
+import com.ga.portal.domain.trace.Tracing;
 import com.ga.portal.domain.view.SyncSnapshot;
 import com.ga.portal.infra.persistence.AgentQueryRepository;
 import com.ga.portal.infra.persistence.SimulationLockRepository;
@@ -44,7 +46,8 @@ public class SimConfiguration {
     SimulationUseCases simulationUseCases(SimulationLogRepository logs, SimulationLockRepository locks, TenantRepository tenants,
                                           AgentQueryRepository agents, PolicyKeys policyKeys, SyncStatusRepository sync, ServiceTokenSource tokens,
                                           PlatformTransactionManager transactionManager, ObjectProvider<MeterRegistry> registry, Clock clock,
-                                          SimProperties props, @Value("${portal.query.default-sync-delay-seconds}") long defaultSyncDelaySeconds) {
+                                          SimProperties props, @Value("${portal.query.default-sync-delay-seconds}") long defaultSyncDelaySeconds,
+                                          Tracing tracing) {
         TransactionTemplate write = new TransactionTemplate(transactionManager);
         TransactionTemplate read = new TransactionTemplate(transactionManager);
         read.setReadOnly(true);
@@ -67,7 +70,7 @@ public class SimConfiguration {
         };
         HttpClient http = HttpClient.newBuilder().connectTimeout(props.connectTimeout()).build();
         return new SimulationUseCases(new JdbcSimulationLogStore(logs, locks, tenants), transactions, policies,
-                new HttpEngineSimulationClient(http, props.readTimeout()), credentials, facts, new MicrometerSimMetrics(Optional.ofNullable(registry.getIfAvailable())),
+                new TracedSimulationClient(new HttpEngineSimulationClient(http, props.readTimeout()), tracing), credentials, facts, new MicrometerSimMetrics(Optional.ofNullable(registry.getIfAvailable())),
                 clock, UUID::randomUUID, props.defaultRatePerMinute());
     }
 }

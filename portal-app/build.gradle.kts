@@ -20,6 +20,9 @@ dependencies {
     implementation(libs.platform.spring)
     implementation(libs.spring.boot.starter.webmvc)
     implementation(libs.spring.boot.starter.actuator)
+    // 트레이스(Phase 7 Q6): Observation → OpenTelemetry. 내보내기 없음 — 스팬은 프로세스 안에서만(Phase 8에서 OTLP)
+    implementation(libs.spring.boot.micrometer.tracing.opentelemetry)
+    implementation(libs.micrometer.tracing.bridge.otel)
     implementation(libs.spring.boot.starter.jdbc)
     implementation(libs.spring.boot.starter.flyway)
     // 조회 API(Phase 3): /api/** 리소스 서버 — 발급자별 디코더, 같은 바이트 거부(계획 ②·③)
@@ -58,6 +61,8 @@ testing {
                         "portal-infra", "portal-app", "portal-demo").forEach { m ->
                         inputs.dir(rootProject.layout.projectDirectory.dir("$m/src/main")).withPathSensitivity(PathSensitivity.RELATIVE)
                     }
+                    // MetricsCatalogTest(포털 Phase 7 C8)가 지표 목록 정본을 읽는다
+                    inputs.file(rootProject.layout.projectDirectory.file("docs/지표.md")).withPathSensitivity(PathSensitivity.RELATIVE)
                 }
             }
         }
@@ -68,7 +73,9 @@ testing {
                 implementation(testFixtures(project(":portal-ingest")))
                 implementation(testFixtures(project(":portal-projection")))
                 implementation(testFixtures(project(":portal-sim")))
+                implementation(testFixtures(project(":portal-recon")))
                 implementation(project(":portal-sim"))
+                implementation(project(":portal-recon"))
                 implementation(project(":portal-inbox"))
                 implementation(project(":portal-ingest"))
                 implementation(project(":portal-infra"))
@@ -78,6 +85,9 @@ testing {
                 implementation(platform(libs.spring.boot.bom))
                 implementation(libs.spring.boot.starter.test)
                 implementation(libs.spring.boot.starter.actuator)
+                implementation(libs.opentelemetry.sdk.testing)
+                // TracingLeakIT(포털 Phase 7 C8): 실제 SDK 위의 브리지 추적기를 직접 만든다(앱은 implementation이라 시험 컴파일 경로에 없다)
+                implementation(libs.micrometer.tracing.bridge.otel)
                 // 시험 발급기(TestIssuer): RSA 키·JWKS·서명(계획 ⑦ — Keycloak 컨테이너는 Phase 8)
                 implementation(libs.nimbus.jose.jwt)
                 implementation(libs.spring.boot.starter.security.oauth2.resource.server)
@@ -107,6 +117,14 @@ testing {
                     // 화면 E2E 하네스(WebE2eHarness — 같은 소스셋)가 읽는 포털 손 스트림
                     inputs.dir(rootProject.layout.projectDirectory.dir("web/e2e/streams")).withPathSensitivity(PathSensitivity.RELATIVE)
                     inputs.dir(rootProject.layout.projectDirectory.dir("contracts/shared/ga-commission-engine")).withPathSensitivity(PathSensitivity.RELATIVE)
+                    // TracingLeakIT(포털 Phase 7 C9): 스팬 표(docs/지표.md §4)
+                    inputs.file(rootProject.layout.projectDirectory.file("docs/지표.md")).withPathSensitivity(PathSensitivity.RELATIVE)
+                    // TracingLeakIT(포털 Phase 7 C12 — P7-17): 내보낸 스팬 덤프는 이 태스크의 출력 — scanPlaintextLeaks가 build/**/*.log로 읽는다
+                    val traceExport = layout.buildDirectory.dir("trace-export")
+                    outputs.dir(traceExport)
+                    systemProperty("ga.traceExport", traceExport.get().asFile.absolutePath)
+                    // 대사 스케줄러(포털 Phase 7 P-11): 앱 문맥을 띄우는 시험에서 1분 틱이 회차를 쓰지 않게 끈다 — 회차는 시험이 직접 부른다
+                    environment("PORTAL_RECON_SCHEDULER_ENABLED", "false")
                 }
             }
         }

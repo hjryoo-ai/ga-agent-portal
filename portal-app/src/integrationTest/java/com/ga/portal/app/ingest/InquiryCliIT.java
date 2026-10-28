@@ -196,7 +196,7 @@ class InquiryCliIT {
         };
         AuditAccessRepository audit = new AuditAccessRepository(rig.gateway);
         InquiryCommands commands = new InquiryCommands(rig.transactions, new InquiryOperatorRepository(rig.gateway), failing, audit, rig.links,
-                IngestRig.CLOCK);
+                com.ga.portal.app.PortalMeters.NONE, IngestRig.CLOCK);
         assertThatThrownBy(() -> commands.answer(t, OPEN_1, "롤백될 답변", "cli:" + OS_USER)).isInstanceOf(IllegalStateException.class);
         assertThat(state(t, OPEN_1, null)).isEqualTo("OPEN|-|true|false");
         assertThat(IngestRig.notificationRows(t)).isEmpty();

@@ -67,4 +67,14 @@ public class InquiryOperatorRepository extends ViewRepository {
                  WHERE tenant_id = :tenantId AND inquiry_id = :id AND status IN ('OPEN', 'ANSWERED')
                 """, params("id", id));
     }
+
+    /** 열린 문의의 수와 가장 오래된 접수 시각(포털 Phase 7 — 운영 {@code status}·지표 {@code inquiry_open_*}). 본문·설계사는 읽지 않는다. */
+    public record OpenSummary(long count, Optional<Instant> oldest) {
+    }
+
+    public OpenSummary openSummary() {
+        return queryAtMostOne("""
+                SELECT count(*) AS n, min(created_at) AS oldest FROM inquiry WHERE tenant_id = :tenantId AND status = 'OPEN'
+                """, Map.of(), (rs, n) -> new OpenSummary(rs.getLong("n"), optInstant(rs, "oldest"))).orElse(new OpenSummary(0, Optional.empty()));
+    }
 }

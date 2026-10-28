@@ -37,6 +37,7 @@ import com.ga.portal.query.port.ReadTransaction;
 import com.ga.portal.domain.view.SyncSnapshot;
 import com.ga.portal.domain.rule.LimitStage;
 import com.ga.portal.domain.rule.PolicyMask;
+import com.ga.portal.query.port.ReconMarkStore;
 import com.ga.portal.query.port.SyncStatusStore;
 import com.ga.portal.query.rule.Etags;
 import com.ga.portal.query.rule.ForecastScenario;
@@ -79,15 +80,17 @@ public final class MeQueries {
 
     private final AgentQueryStore store;
     private final SyncStatusStore sync;
+    private final ReconMarkStore reconMarks;
     private final PolicyKeys policyKeys;
     private final ReadTransaction transaction;
     private final Clock clock;
     private final long defaultSyncDelaySeconds;
 
-    public MeQueries(AgentQueryStore store, SyncStatusStore sync, PolicyKeys policyKeys, ReadTransaction transaction, Clock clock,
-                     long defaultSyncDelaySeconds) {
+    public MeQueries(AgentQueryStore store, SyncStatusStore sync, ReconMarkStore reconMarks, PolicyKeys policyKeys, ReadTransaction transaction,
+                     Clock clock, long defaultSyncDelaySeconds) {
         this.store = Objects.requireNonNull(store, "store");
         this.sync = Objects.requireNonNull(sync, "sync");
+        this.reconMarks = Objects.requireNonNull(reconMarks, "reconMarks");
         this.policyKeys = Objects.requireNonNull(policyKeys, "policyKeys");
         this.transaction = Objects.requireNonNull(transaction, "transaction");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -298,11 +301,13 @@ public final class MeQueries {
     /** 요청 하나의 동기화 문맥: 설정·커서 한 문장 → 상태·asOf·ETag 재료. */
     private final class Context {
         final SyncSnapshot snapshot;
+        final Optional<String> reconMark;
         final long delaySeconds;
         final SyncStatus status;
 
-        Context(SyncSnapshot snapshot) {
+        Context(SyncSnapshot snapshot, Optional<String> reconMark) {
             this.snapshot = snapshot;
+            this.reconMark = reconMark;
             this.delaySeconds = snapshot.configuredDelaySeconds().orElse(defaultSyncDelaySeconds);
             this.status = SyncStatusRule.evaluate(snapshot.cursor().map(SyncSnapshot.Cursor::state),
                     snapshot.cursor().flatMap(SyncSnapshot.Cursor::caughtUpAt), delaySeconds, clock.instant());
@@ -316,7 +321,10 @@ public final class MeQueries {
             return snapshot.cursor().map(SyncSnapshot.Cursor::lastSeq).orElse(0L);
         }
 
-        /** {@code cfg} 입력 = 그 요청이 읽은 설정 + 지연 초(모든 요청이 읽는다 — 계획 ⑤ 표). */
+        /**
+         * {@code cfg} 입력 = 그 요청이 읽은 설정 + 지연 초(모든 요청이 읽는다 — 계획 ⑤ 표) + 데이터 표식(포털 Phase 7): 커서 갱신 시각(재구축이 같은 {@code seq}로
+         * 뷰를 다시 쓴다)과 마지막 대사 회차(대사가 같은 {@code seq}로 달의 {@code data_status}를 바꾼다 — {@link ReconMarkStore}). 없으면 그 표식이 바뀐 뒤에도 304가 옛 본문을 되살린다.
+         */
         String etag(String... configRead) {
             return Etags.of(seq(), status, config(configRead));
         }
@@ -328,12 +336,14 @@ public final class MeQueries {
         private List<String> config(String... configRead) {
             List<String> all = new ArrayList<>(List.of(configRead));
             all.add(Long.toString(delaySeconds));
+            all.add(snapshot.cursor().map(c -> c.updatedAt().toString()).orElse("-"));
+            all.add(reconMark.orElse("-"));
             return all;
         }
     }
 
     private Context context() {
-        return new Context(sync.snapshot());
+        return new Context(sync.snapshot(), reconMarks.last());
     }
 
     private static String[] thresholds(SyncSnapshot s) {

@@ -1,6 +1,7 @@
 package com.ga.portal.app.cli;
 
 import com.ga.portal.app.ingest.IngestCommands;
+import com.ga.portal.app.recon.ReconCommands;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -22,8 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class CliRunnerTest {
 
-    private final CliRunner runner = new CliRunner(null, null, new PrintStream(OutputStream.nullOutputStream()), "ops-kim");
-    private final CliRunner noUser = new CliRunner(null, null, new PrintStream(OutputStream.nullOutputStream()), "");
+    private final CliRunner runner = new CliRunner(null, null, null, new PrintStream(OutputStream.nullOutputStream()), "ops-kim");
+    private final CliRunner noUser = new CliRunner(null, null, null, new PrintStream(OutputStream.nullOutputStream()), "");
 
     static Map<String, String> opts(String... kv) {
         java.util.LinkedHashMap<String, String> m = new java.util.LinkedHashMap<>();
@@ -47,6 +48,45 @@ class CliRunnerTest {
         assertThat(runner.execute(List.of("inquiry", "close"), opts("tenant", "GA01", "id", "not-a-uuid")).lines()).contains("invalid or missing --id");
         assertThat(runner.execute(List.of("inquiry", "answer"), opts("tenant", "GA01", "id", "00000000-0000-4000-8000-000000000001")).lines())
                 .contains("invalid or missing --answer-file");
+    }
+
+    /** 포털 Phase 7: {@code recon run}(최대 6개 달, 형식·중복)과 한 단어 {@code status}({@code --tenant}·{@code --all} 정확히 하나)의 사용법 오류. */
+    @Test
+    void reconAndStatusUsageErrorsExitWith64() {
+        assertThat(runner.execute(List.of("recon", "start"), opts("tenant", "GA01")).exitCode()).isEqualTo(64);
+        assertThat(runner.execute(List.of("recon", "run"), opts()).lines()).contains("invalid or missing --tenant");
+        for (String ym : List.of("202613", "2026-08", "202608,202608", "202608,", "", "202601,202602,202603,202604,202605,202606,202607", "20260８")) {
+            assertThat(runner.execute(List.of("recon", "run"), opts("tenant", "GA01", "ym", ym)).lines()).as(ym).contains("invalid or missing --ym");
+        }
+        assertThat(runner.execute(List.of("recon", "run"), opts("tenant", "GA01", "agent", "A-1")).lines()).contains("unknown option --agent");
+        assertThat(runner.execute(List.of("status"), opts()).lines()).contains("invalid or missing --tenant or --all");
+        assertThat(runner.execute(List.of("status"), opts("tenant", "GA01", "all", "")).exitCode()).as("both").isEqualTo(64);
+        assertThat(runner.execute(List.of("status"), opts("all", "yes")).exitCode()).as("--all takes no value").isEqualTo(64);
+        assertThat(runner.execute(List.of("status"), opts("tenant", "GA01", "ym", "202608")).lines()).contains("unknown option --ym");
+        assertThat(runner.execute(List.of("status", "now"), opts("all", "")).exitCode()).isEqualTo(64);
+        assertThat(ReconCommands.months(java.util.Optional.of("202601,202602,202603,202604,202605,202606"))).hasSize(6);
+        assertThat(ReconCommands.months(java.util.Optional.empty())).as("no --ym: the window").isEmpty();
+    }
+
+    /**
+     * 승인 조건 B: {@code status} 줄에 달({@code ym})이 나오지 않는다 — 미해결 달은 나이(일)로만, 시각은 초까지(마이크로초 여섯 자리도 없다). 시각의 소수부를
+     * 달 같은 값({@code .202608})으로, 미해결의 시작을 2026-08로 골라도 여섯 자리 숫자 0.
+     */
+    @Test
+    void theStatusLineCarriesNoMonth() {
+        java.time.Instant now = java.time.Instant.parse("2026-10-28T04:05:06.202608Z");
+        ReconCommands.StatusFacts facts = new ReconCommands.StatusFacts(
+                java.util.Optional.of(new com.ga.portal.domain.CursorRecord(11, java.util.Optional.of("e-11"), com.ga.portal.domain.IngestState.RUNNING,
+                        now, java.util.Optional.empty())),
+                java.util.Optional.of(now.minusSeconds(12)), 1, java.util.Optional.of(java.time.Instant.parse("2026-08-01T00:00:00.202608Z")),
+                java.util.Optional.of(new com.ga.portal.infra.persistence.ReconRunRepository.Run(now, "recon:GA01", com.ga.portal.domain.ReconTrigger.SCHEDULE,
+                        2, 1, 1, 1, 0, 3, com.ga.portal.domain.ReconRunResult.DRIFT, java.util.Optional.of(now),
+                        java.util.Optional.of(com.ga.portal.domain.RebuildOutcome.SUCCEEDED))),
+                java.util.Optional.empty(), new com.ga.portal.infra.persistence.InquiryOperatorRepository.OpenSummary(2, java.util.Optional.of(now.minusSeconds(7_200))));
+        String line = ReconCommands.statusLine(com.ga.platform.core.tenant.TenantId.of("GA01"), facts, java.util.OptionalLong.of(13), now);
+        assertThat(java.util.regex.Pattern.compile("\\d{6}").matcher(line).find()).isFalse();
+        assertThat(line).startsWith("GA01 cursor=RUNNING last_seq=11 lag_seq=2 caught_up_at=")
+                .contains(" drift_unresolved=1 drift_oldest_days=88 last_run=2026-10-28T04:05:06Z/DRIFT last_rebuild=- inquiries_open=2 inquiry_oldest_hours=2");
     }
 
     @Test
@@ -98,7 +138,7 @@ class CliRunnerTest {
     void aValidOsUserIsRequired() {
         assertThat(noUser.execute(List.of("ingest", "status"), opts()).exitCode()).isEqualTo(2);
         assertThat(noUser.execute(List.of("inquiry", "list"), opts("tenant", "GA01")).exitCode()).isEqualTo(2);
-        assertThat(new CliRunner(null, null, new PrintStream(OutputStream.nullOutputStream()), "o p")
+        assertThat(new CliRunner(null, null, null, new PrintStream(OutputStream.nullOutputStream()), "o p")
                 .execute(List.of("ingest", "status"), opts()).exitCode()).isEqualTo(2);
         assertThat(IngestCommands.actorSubject("ops-kim")).contains("cli:ops-kim");
         assertThat(IngestCommands.actorSubject("x".repeat(65))).isEmpty();

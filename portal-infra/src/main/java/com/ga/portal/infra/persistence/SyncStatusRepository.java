@@ -35,4 +35,15 @@ public class SyncStatusRepository extends ViewRepository {
                         instant(rs, "updated_at"), IngestState.valueOf(rs.getString("state")), optInstant(rs, "caught_up_at")))))
                 .orElseThrow(() -> new IllegalStateException("no tenant row for the bound tenant"));
     }
+
+    /**
+     * 마지막 대사 회차의 표식(포털 Phase 7 — 조회 ETag의 재료): 시각·결과·미해결 수·재구축 결과를 이은 문자열, 회차가 없으면 비어 있다. 설정·커서 문장과 따로 —
+     * 그 문장의 임계치 변환(% → bp)과 대사 표를 한 문장에 섞지 않는다({@code ReconArithmeticScanTest}).
+     */
+    public Optional<String> lastRecon() {
+        return queryAtMostOne("""
+                SELECT concat_ws('|', run_at, result, drift_unresolved, coalesce(rebuild_outcome, 'NONE')) AS mark
+                  FROM recon_run WHERE tenant_id = :tenantId ORDER BY run_at DESC LIMIT 1
+                """, Map.of(), (rs, n) -> rs.getString("mark"));
+    }
 }

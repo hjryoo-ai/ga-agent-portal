@@ -13,7 +13,10 @@ import com.ga.portal.domain.MonthStatus;
 import com.ga.portal.domain.NetBasis;
 import com.ga.portal.domain.NotificationType;
 import com.ga.portal.domain.ReceivableStatus;
+import com.ga.portal.domain.RebuildOutcome;
+import com.ga.portal.domain.ReconRunResult;
 import com.ga.portal.domain.ReconSource;
+import com.ga.portal.domain.ReconTrigger;
 import com.ga.portal.domain.Role;
 import com.ga.portal.domain.Severity;
 import com.ga.portal.domain.SimulationKind;
@@ -43,19 +46,19 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 계획 승인 Q9: 닫힌 값 컬럼의 {@code CHECK (… IN …)} 목록이 그 값의 정본과 같다 — 두 정본이 어긋나지 않게(C10과 같은 방식).
  * 마이그레이션은 V1부터 마지막 V까지 전부 읽는다(V4가 닫힌 값 7개를 더했다 — Phase 2 계획 ⑧).
  * <ul>
- *   <li>Java 열거가 있는 컬럼 17개(V5 {@code identity_link.role}·{@code status}, V6 {@code simulation_log.kind}, Phase 6의 넷 — V1
+ *   <li>Java 열거가 있는 컬럼 20개(V5 {@code identity_link.role}·{@code status}, V6 {@code simulation_log.kind}, V8 {@code recon_run}의 셋, Phase 6의 넷 — V1
  *       {@code notification.severity}·{@code inquiry.status}, V7 {@code notification.type}·{@code inquiry.category}): 열거 값 집합 = CHECK 목록({@code ingest_event.status}의 {@code SKIPPED}·{@code earnings_month.data_status}의
  *       {@code REBUILDING}은 열거에 남아 있으나 쓰지 않는다 — Phase 1 승인 Q2, Phase 2 승인 Q9).</li>
  *   <li>열거가 없는 컬럼 7개: CHECK 목록이 정본이고 설계서 §5 DDL 주석({@code -- A/B/C})과 대조.</li>
- *   <li>CHECK가 걸린 컬럼 집합 = 승인된 24개(Phase 0의 12 + V4의 7 + V5의 2 + V6의 1 — {@code simulation_log.kind} + V7의 2 —
- *       {@code notification.type}·{@code inquiry.category}) = 설계서 §5에서 닫힌 목록 주석이 달린 컬럼 집합({@code /...}로 끝나는
+ *   <li>CHECK가 걸린 컬럼 집합 = 승인된 27개(Phase 0의 12 + V4의 7 + V5의 2 + V6의 1 — {@code simulation_log.kind} + V7의 2 —
+ *       {@code notification.type}·{@code inquiry.category} + V8의 3 — {@code recon_run.trigger}·{@code result}·{@code rebuild_outcome}) = 설계서 §5에서 닫힌 목록 주석이 달린 컬럼 집합({@code /...}로 끝나는
  *       열린 목록은 제외 — 예: {@code comm_type}·{@code role}).</li>
  * </ul>
  */
 class StatusEnumDdlTest {
 
     private static final Pattern CHECK_IN = Pattern.compile(
-            "CONSTRAINT ck_([a-z_]+?)_(status_reason|data_status|net_basis|status|state|kind|flag_type|severity|reason|source|role|type|category) CHECK \\(\\2 IN \\(([^)]*)\\)\\)");
+            "CONSTRAINT ck_([a-z_]+?)_(status_reason|data_status|net_basis|status|state|kind|flag_type|severity|reason|source|role|type|category|trigger|result|rebuild_outcome) CHECK \\(\\2 IN \\(([^)]*)\\)\\)");
 
     private static final Map<String, Class<? extends Enum<?>>> ENUMS = Map.ofEntries(
             Map.entry("earnings_month.status", MonthStatus.class),
@@ -75,7 +78,11 @@ class StatusEnumDdlTest {
             Map.entry("notification.severity", Severity.class),
             Map.entry("inquiry.status", InquiryStatus.class),
             Map.entry("notification.type", NotificationType.class),
-            Map.entry("inquiry.category", InquiryCategory.class));
+            Map.entry("inquiry.category", InquiryCategory.class),
+            // V8(Phase 7 계획 P-7)
+            Map.entry("recon_run.trigger", ReconTrigger.class),
+            Map.entry("recon_run.result", ReconRunResult.class),
+            Map.entry("recon_run.rebuild_outcome", RebuildOutcome.class));
 
     private static final Set<String> APPROVED_COLUMNS = Set.of(
             "earnings_month.status", "earnings_month.data_status", "deferral_item.status", "ingest_cursor.state",
@@ -89,11 +96,13 @@ class StatusEnumDdlTest {
             // V6(Phase 5 계획 Q21)
             "simulation_log.kind",
             // V7(Phase 6 계획 ⑤)
-            "notification.type", "inquiry.category");
+            "notification.type", "inquiry.category",
+            // V8(Phase 7 계획 P-7)
+            "recon_run.trigger", "recon_run.result", "recon_run.rebuild_outcome");
 
     @Test
-    void checkedColumnsAreExactlyTheApprovedTwentyFour() {
-        assertThat(APPROVED_COLUMNS).hasSize(24);
+    void checkedColumnsAreExactlyTheApprovedTwentySeven() {
+        assertThat(APPROVED_COLUMNS).hasSize(27);
         assertThat(ddlChecks().keySet()).containsExactlyInAnyOrderElementsOf(APPROVED_COLUMNS);
     }
 
