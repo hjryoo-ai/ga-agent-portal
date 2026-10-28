@@ -29,5 +29,8 @@ tasks.withType<Test>().configureEach {
     inputs.dir(rootProject.layout.projectDirectory.dir("portal-ingest/src/test/resources/streams")).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(rootProject.layout.projectDirectory.dir("portal-projection/src/test/resources/golden-streams")).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(rootProject.layout.projectDirectory.dir("portal-projection/src/test/resources/golden-views")).withPathSensitivity(PathSensitivity.RELATIVE)
+    // DemoComposeFilesTest(포털 Phase 8 ②·③): compose·렐름·등록 SQL·비밀 생성기·이미지 빌드 파일, README의 데모 비밀번호 줄
+    inputs.dir(rootProject.layout.projectDirectory.dir("docker")).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(rootProject.layout.projectDirectory.file("README.md")).withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("ga.repoRoot", rootDir.absolutePath)
 }

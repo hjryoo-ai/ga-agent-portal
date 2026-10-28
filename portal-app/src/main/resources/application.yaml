@@ -30,7 +30,7 @@ management:
         include: health
   health:
     # 트랜잭션 밖 DB 접근 금지(불변 규약 2) — DB 헬스 지표는 테넌트 없이 커넥션을 쓰므로 끈다.
-    # 포털 Phase 8에서 전용 롤(portal_health)로 복원한다(설계서 §9 롤 표).
+    # 전용 롤(portal_health)과 함께 켤 일은 v2다(포털 Phase 8 계획 Q5 — 설계서 §9 롤 표).
     db:
       enabled: false
 

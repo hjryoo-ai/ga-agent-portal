@@ -30,7 +30,7 @@ CREATE ROLE portal_directory LOGIN PASSWORD :'directory_password'
 CREATE ROLE portal_issuer LOGIN PASSWORD :'issuer_password'
     NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
 
--- (예약) portal_health — DB 헬스 지표 전용 롤. 포털 Phase 8에서 만든다(Phase 0은 DB 헬스 비활성, 설계서 §9).
+-- (v2) portal_health — DB 헬스 지표 전용 롤. 포털 Phase 8 계획 Q5에서 만들지 않기로 했다(DB 헬스 비활성 그대로, 설계서 §9 v1.11).
 
 ALTER DATABASE portal OWNER TO portal_migrator;
 REVOKE ALL ON DATABASE portal FROM PUBLIC;

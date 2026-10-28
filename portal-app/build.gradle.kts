@@ -1,7 +1,7 @@
 import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 
-// Spring Boot 조립(설계서 §3.3). Phase 0: 진입점 + /actuator/health(DB 헬스 비활성 — 포털 Phase 8에서 전용 롤로 복원).
+// Spring Boot 조립(설계서 §3.3). Phase 0: 진입점 + /actuator/health(DB 헬스 비활성 — 전용 롤과 함께 v2, 포털 Phase 8 계획 Q5).
 // integrationTest: Testcontainers PostgreSQL로 부팅 스모크(Flyway는 portal_migrator, 데이터소스는 portal_app).
 // archTest: 전 모듈 아키텍처 규칙(ArchUnit) + SQL 테넌트 조건 스캔(5단계).
 plugins {
@@ -20,9 +20,12 @@ dependencies {
     implementation(libs.platform.spring)
     implementation(libs.spring.boot.starter.webmvc)
     implementation(libs.spring.boot.starter.actuator)
-    // 트레이스(Phase 7 Q6): Observation → OpenTelemetry. 내보내기 없음 — 스팬은 프로세스 안에서만(Phase 8에서 OTLP)
+    // 트레이스(Phase 7 Q6): Observation → OpenTelemetry. 포털 Phase 8: OTLP 내보내기는 끝점 속성이 있을 때만(compose) — 시험·CI 프로파일에는 0(OtlpExportOffIT)
     implementation(libs.spring.boot.micrometer.tracing.opentelemetry)
     implementation(libs.micrometer.tracing.bridge.otel)
+    implementation(libs.opentelemetry.exporter.otlp)
+    // 지표 긁기 끝점(포털 Phase 8 Q5): /actuator/prometheus는 관리 포트에서만(management.server.port — compose 안 네트워크)
+    implementation(libs.micrometer.registry.prometheus)
     implementation(libs.spring.boot.starter.jdbc)
     implementation(libs.spring.boot.starter.flyway)
     // 조회 API(Phase 3): /api/** 리소스 서버 — 발급자별 디코더, 같은 바이트 거부(계획 ②·③)

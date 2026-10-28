@@ -1,0 +1,10 @@
+# 이미지 빌드 문맥(docker/portal.Dockerfile): 산출물·캐시·저장소 메타데이터는 넣지 않는다 — 빌드는 소스에서 다시 만든다.
+.git
+.gradle
+**/build
+**/node_modules
+web/.gradle
+web/test-results
+web/playwright-report
+**/.DS_Store
+docker/compose.yaml

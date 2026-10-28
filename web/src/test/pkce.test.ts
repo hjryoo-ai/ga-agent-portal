@@ -223,7 +223,7 @@ describe('login, rotation and logout', () => {
     expect(currentToken()).toBe(jwt(1));
     expect(tokenSource()).toBe('pkce');
     expect(b.channels[0]?.closed).toBe(true);
-    expect(b.timers.at(-1)?.ms).toBe(270_000);
+    expect(b.timers.at(-1)?.ms).toBe(240_000);
   });
 
   it('rotationReplacesTheRefreshToken', async () => {

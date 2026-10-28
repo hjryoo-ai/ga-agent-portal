@@ -4,7 +4,7 @@
 //  ② 디스커버리: {issuer}/.well-known/openid-configuration — issuer가 정확히 같고 인가·토큰·종료 끝점이 발급자 출처 안에 있어야 한다(CSP connect-src도 그 출처뿐).
 //  ③ 로그인: 사용자 클릭 → 팝업(모바일은 새 탭)을 먼저 열고(차단 회피) 인가 주소로 보낸다. 팝업은 /auth/callback에서 주소를 지우고 code·state를
 //     이름이 pkce:<state>인 채널로 넘기고 닫힌다(main.tsx → finishCallback). 본 창은 자기 state의 채널에서 state가 같은 메시지 하나만 받고 채널을 닫는다(조건 B).
-//  ④ 교환·갱신: 토큰 끝점에 form POST(쿠키 없음). 만료 30초 전에 refresh 토큰으로 갱신하고 새 refresh 토큰으로 바꾼다(회전 — 옛 것은 다시 쓰지 않는다).
+//  ④ 교환·갱신: 토큰 끝점에 form POST(쿠키 없음). 만료 60초 전에 refresh 토큰으로 갱신하고 새 refresh 토큰으로 바꾼다(회전 — 옛 것은 다시 쓰지 않는다).
 //     갱신이 실패하거나 API가 401이면 토큰·refresh를 버리고 로그인 화면으로(다시 로그인).
 //  ⑤ 로그아웃: 메모리를 먼저 비우고, 종료 끝점에 refresh 토큰으로 POST(실패해도 화면은 이미 로그아웃이다).
 // 네트워크 예외 파일(eslint.config.js — 이 파일만 fetch를 쓴다, 대상은 발급자 출처뿐).
@@ -43,7 +43,7 @@ const RANDOM_SHAPE = /^[A-Za-z0-9_-]{43}$/;
 const CODE_SHAPE = /^[\x21-\x7e]{1,2048}$/;
 const JWT_SHAPE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 const ATTEMPT_MS = 300_000;
-const REFRESH_LEAD_S = 30;
+const REFRESH_LEAD_S = 60;
 const REFRESH_MIN_S = 5;
 
 /** 시험이 바꿔 끼우는 브라우저 기능(기본값은 실제 전역). */
