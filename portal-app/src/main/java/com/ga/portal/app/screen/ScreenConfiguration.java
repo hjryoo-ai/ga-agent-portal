@@ -58,7 +58,7 @@ public class ScreenConfiguration implements WebMvcConfigurer {
      * 포털 Phase 8: {@code /auth/callback}은 PKCE 팝업이 돌아오는 화면 경로(같은 문서) — 인증 없는 경로 목록이 아니라 여기다(조건 A).
      */
     public static final List<String> SCREEN_PATHS = List.of("/", "/statements", "/statements/*", "/lines/*", "/limits", "/limits/*", "/deferrals",
-            "/simulations", "/notifications", "/inquiries", "/inquiries/new", "/inquiries/*", "/auth/callback");
+            "/simulations", "/notifications", "/inquiries", "/inquiries/new", "/inquiries/*");
     static final String ASSETS = "/assets/*";
     private static final MediaType HTML = MediaType.parseMediaType("text/html;charset=UTF-8");
 
