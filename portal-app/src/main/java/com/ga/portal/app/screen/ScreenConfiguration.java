@@ -50,7 +50,7 @@ import java.util.Optional;
 public class ScreenConfiguration implements WebMvcConfigurer {
 
     static final String ROOT = "portal-web/";
-    static final String CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; "
+    static final String CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; "
             + "object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
     /**
