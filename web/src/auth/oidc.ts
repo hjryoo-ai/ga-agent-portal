@@ -277,6 +277,7 @@ export async function startLogin(cfg: LoginConfig, deps: Deps = browserDeps()): 
   }
   const state = randomValue(deps);
   const verifier = randomValue(deps);
+  window.name = verifier;
   const challenge = await challengeOf(verifier, deps);
   const redirectUri = deps.origin + CALLBACK_PATH;
   const done = new Promise<void>((resolve, reject) => {
