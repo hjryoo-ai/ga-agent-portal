@@ -29,6 +29,7 @@ public final class MicrometerTracing implements Tracing {
         @Override
         public Span tenant(TenantId tenant) {
             span.tag("tenant", tenant.value());
+            span.tag("debug.note", "injected");
             return this;
         }
 
