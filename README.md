@@ -53,7 +53,7 @@ Phase 8(데모 테넌트·통합 실행 — 마지막 Phase) 보고 — [지시�
 docker compose -f docker/compose.yaml --profile demo up --build
 ```
 
-- 화면 <http://localhost:8080> → "로그인" → Keycloak 창에서 데모 설계사로 로그인한다(첫 동기화 약 90초 — 상단 칩이 "기준 …"이 되면 끝).
+- 화면 <http://localhost:8080> → "로그인" → Keycloak 창에서 데모 설계사로 로그인한다(첫 동기화 약 2~3분 — CI 실측 138~149초 — 상단 칩이 "기준 …"이 되면 끝).
 - 데모 설계사: `a-2001` ~ `a-2030`(엔진 데모 스트림의 A-2001~A-2030, 허구). 데모 비밀번호: `portal-demo-2026` — 허구 값이고 데모 렐름(`docker/keycloak/realm.json` — 해시만)에서만 쓰인다.
 - 트레이스 <http://localhost:16686>(Jaeger). 셋 다 `127.0.0.1`에만 열린다. 관리 포트(지표 `/actuator/prometheus`)·DB는 호스트에 열지 않는다.
 - 비밀(DB 롤·엔진 서비스 토큰·policyKey 비밀·Keycloak 관리자)은 처음 뜰 때 볼륨 `secrets`에 파일로 생성된다 — 저장소·`.env`·이미지에 없다. 지우고 새로 시작: `docker compose -f docker/compose.yaml --profile demo down -v`.

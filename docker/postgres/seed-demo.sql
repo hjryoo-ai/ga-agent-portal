@@ -6,7 +6,7 @@
 --   socat 중계), 대상 portal-demo, 웹 출처 http://localhost:8080 → 공개 클라이언트 portal-web(GET /auth/config).
 --   설계사 30명(A-2001~A-2030, subject = 렐름 사용자 id), 조직 경로는 포털 사실(인가용 — 다섯 명씩 T1~T6, B1·B2).
 --   운영자 cli:portal(포털 이미지의 OS 사용자 — docker compose exec portal … --spring.profiles.active=cli).
---   params: 기본 셋(§14.0) + 폴링 5초(docs/운영.md §5 범위 5~30) — 포털 인제스트 쪽 한 쪽 1,000건(compose 명령 인자)과 함께 첫 동기화 약 90초.
+--   params: 기본 셋(§14.0) + 폴링 5초(docs/운영.md §5 범위 5~30) — 포털 인제스트 쪽 한 쪽 1,000건(compose 명령 인자)과 함께 첫 동기화 약 2~3분 — CI 실측 138~149초.
 -- =============================================================================================
 BEGIN;
 SELECT set_config('app.tenant_id', 'DEMO', true);
