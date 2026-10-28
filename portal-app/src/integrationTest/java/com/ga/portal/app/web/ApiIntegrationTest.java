@@ -144,6 +144,7 @@ abstract class ApiIntegrationTest {
     @DynamicPropertySource
     static void datasource(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", DB::jdbcUrl);
+        registry.add("management.opentelemetry.tracing.export.otlp.endpoint", () -> "http://127.0.0.1:9/v1/traces");
         registry.add("spring.flyway.url", DB::jdbcUrl);
         registry.add("portal.api.issuer-username", () -> PostgresHarness.ISSUER);
         registry.add("portal.api.issuer-password", () -> PostgresHarness.ISSUER_PASSWORD);
