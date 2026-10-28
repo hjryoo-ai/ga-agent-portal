@@ -83,6 +83,8 @@ test('로그인 → 다섯 화면 데이터 → 알림함·문의 → 로그아�
 
   // ④ 분급 타임라인
   await go(page, '/deferrals');
+  // 데모 스트림의 첫 분급 도래는 2028-01(체결 2027-01 + 12개월) — 이번 달부터 12개월(기본)에는 없을 수 있어 24개월을 고른다(README 데모 절)
+  await page.getByTestId('period-24').click();
   await expect(page.getByTestId('timeline-month').first()).toBeVisible();
   screens['timeline'] = { months: await page.getByTestId('timeline-month').count(), items: await page.getByTestId('timeline-item').count() };
   await check(page, 'timeline');
@@ -154,7 +156,7 @@ test('콜백 문서는 code·state를 그리지 않고 주소에서 바로 지�
 
 test('운영: recon run(MATCH — OK)·status·운영자 재구축 전후 다섯 화면 응답 동일', async () => {
   const token = await directGrant(AGENT);
-  const paths = ['/api/v1/me', '/api/v1/me/earnings?from=202603&to=202802', '/api/v1/me/earnings/202608', '/api/v1/me/limits', '/api/v1/me/deferrals'];
+  const paths = ['/api/v1/me', '/api/v1/me/earnings?from=202603&to=202802', '/api/v1/me/earnings/202608', '/api/v1/me/limits', '/api/v1/me/deferrals?from=202801&to=202812'];
   const before = await Promise.all(paths.map((p) => api(p, token)));
   for (const r of before) expect(r.status).toBe(200);
 
@@ -180,14 +182,39 @@ test('운영: recon run(MATCH — OK)·status·운영자 재구축 전후 다섯
   );
 });
 
-interface JaegerSpan {
-  operationName: string;
-  tags: { key: string; value: unknown }[];
-  processID: string;
+/** Jaeger 2.x 질의 API v3(OTLP JSON — `/api/v3/traces`). 내부 API `/api/traces`는 2.22에 없다(첫 CI: 404). 스트리밍 응답은 줄마다 JSON 하나. */
+interface OtlpAttribute {
+  key: string;
+  value: Record<string, unknown>;
 }
-interface JaegerTrace {
-  spans: JaegerSpan[];
-  processes: Record<string, { serviceName: string; tags: { key: string; value: unknown }[] }>;
+interface OtlpSpan {
+  name: string;
+  attributes?: OtlpAttribute[];
+}
+interface ResourceSpans {
+  resource?: { attributes?: OtlpAttribute[] };
+  scopeSpans?: { spans?: OtlpSpan[] }[];
+}
+
+async function jaegerSpans(): Promise<ResourceSpans[]> {
+  const now = Date.now();
+  const q = new URLSearchParams({
+    'query.service_name': 'ga-agent-portal',
+    'query.start_time_min': new Date(now - 2 * 3600_000).toISOString(),
+    'query.start_time_max': new Date(now + 60_000).toISOString(),
+    'query.search_depth': '1500',
+  });
+  const r = await fetch(`${JAEGER}/api/v3/traces?${q.toString()}`);
+  if (!r.ok) throw new Error(`jaeger answered ${String(r.status)} (${r.headers.get('content-type') ?? '-'})`);
+  const text = await r.text();
+  return text
+    .split('\n')
+    .filter((l) => l.trim() !== '')
+    .flatMap((l) => {
+      const v = JSON.parse(l) as { result?: { resourceSpans?: ResourceSpans[] }; resourceSpans?: ResourceSpans[]; error?: unknown };
+      if (v.error !== undefined) throw new Error('jaeger answered an error object');
+      return v.result?.resourceSpans ?? v.resourceSpans ?? [];
+    });
 }
 
 /** docs/지표.md §4 — 앱 스팬 표, 프레임워크 스팬 표, 수집 경로가 더하는 키(닫힌 두 목록). */
@@ -208,37 +235,37 @@ function catalog() {
 test('Jaeger: 스팬 이름·키가 닫힌 표 안, 값에 누출 0(P-21)', async () => {
   const { app, http, span, process } = catalog();
   expect(app.size).toBeGreaterThanOrEqual(11);
-  let traces: JaegerTrace[] = [];
+  let traces: ResourceSpans[] = [];
+  const spansOf = (rs: ResourceSpans) => (rs.scopeSpans ?? []).flatMap((ss) => ss.spans ?? []);
   await expect(async () => {
-    const r = await fetch(`${JAEGER}/api/traces?service=ga-agent-portal&limit=1500&lookback=2h`);
-    traces = ((await r.json()) as { data: JaegerTrace[] }).data;
-    const names = new Set(traces.flatMap((t) => t.spans.map((s) => s.operationName)));
+    traces = await jaegerSpans();
+    const names = new Set(traces.flatMap((rs) => spansOf(rs).map((s) => s.name)));
     expect(names.has('ingest.apply') && names.has('recon.run') && [...names].some((n) => n.startsWith('http '))).toBe(true);
   }).toPass({ timeout: 60_000 });
   const problems: string[] = [];
   const seen = { spans: 0, names: new Set<string>(), keys: new Set<string>(), processKeys: new Set<string>() };
-  for (const t of traces) {
-    for (const s of t.spans) {
+  for (const rs of traces) {
+    for (const s of spansOf(rs)) {
       seen.spans++;
-      seen.names.add(s.operationName);
-      const own = app.get(s.operationName) ?? (/^http [a-z]+ /.test(s.operationName) ? http : null);
-      if (own === null) problems.push(`span outside the table: ${s.operationName}`);
-      for (const tag of s.tags) {
-        seen.keys.add(tag.key);
-        if (!(own?.has(tag.key) ?? false) && !span.has(tag.key)) problems.push(`${s.operationName}: key ${tag.key}`);
-        const v = String(tag.value);
-        if (leaks(v).length > 0 || /A-20[0-9]{2}/.test(v)) problems.push(`${s.operationName}: value of ${tag.key} leaks`);
+      seen.names.add(s.name);
+      const own = app.get(s.name) ?? (/^http [a-z]+ /.test(s.name) ? http : null);
+      if (own === null) problems.push(`span outside the table: ${s.name}`);
+      for (const a of s.attributes ?? []) {
+        seen.keys.add(a.key);
+        if (!(own?.has(a.key) ?? false) && !span.has(a.key)) problems.push(`${s.name}: key ${a.key}`);
+        const v = JSON.stringify(a.value);
+        if (leaks(v).length > 0 || /A-20[0-9]{2}/.test(v)) problems.push(`${s.name}: value of ${a.key} leaks`);
       }
     }
-    for (const p of Object.values(t.processes)) for (const tag of p.tags) {
-      seen.processKeys.add(tag.key);
-      if (!process.has(tag.key)) problems.push(`process key ${tag.key}`);
+    for (const a of rs.resource?.attributes ?? []) {
+      seen.processKeys.add(a.key);
+      if (!process.has(a.key)) problems.push(`resource key ${a.key}`);
     }
   }
   mkdirSync(out, { recursive: true });
   writeFileSync(
     resolve(out, 'jaeger.json'),
-    JSON.stringify({ traces: traces.length, spans: seen.spans, names: [...seen.names].sort(), keys: [...seen.keys].sort(), processKeys: [...seen.processKeys].sort() }, null, 2),
+    JSON.stringify({ resourceSpans: traces.length, spans: seen.spans, names: [...seen.names].sort(), keys: [...seen.keys].sort(), processKeys: [...seen.processKeys].sort() }, null, 2),
   );
   expect([...new Set(problems)]).toEqual([]);
   expect(policyNumbers()).toHaveLength(432);
