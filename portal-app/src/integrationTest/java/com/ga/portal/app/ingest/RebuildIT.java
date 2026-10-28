@@ -330,8 +330,13 @@ class RebuildIT {
 
     /** 대사가 남긴 행 하나(BATCH — 출처 seq 0, 금액은 시험값). */
     private static ReconRow batch(String status, String ym, String at) {
+        return batch(status, ym, at, 0);
+    }
+
+    /** 기본 키가 (시각, 출처, 순번)이라 같은 시각의 BATCH 두 행은 순번으로만 갈린다(상태는 키가 아니다). */
+    private static ReconRow batch(String status, String ym, String at, long seq) {
         return new ReconRow("A-1001", ym, Instant.parse(at), 1_800_000, 0, 0, Optional.of(1_700_000L), Optional.of(0L), Optional.of(0L),
-                Optional.empty(), status, ReconSource.BATCH, 0);
+                Optional.empty(), status, ReconSource.BATCH, seq);
     }
 
     private void reconcile(TenantId t, ReconRow... rows) {
@@ -373,7 +378,8 @@ class RebuildIT {
     void aRepairedMonthStaysOkAfterARebuild() {
         TenantId t = ingested("RB_F11R", a1());
         reconcile(t, batch("DRIFT", "202608", "2026-10-18T19:00:00Z"), batch("REPAIRED", "202608", "2026-10-19T19:00:00Z"),
-                batch("DRIFT", "202702", "2026-10-18T19:00:00Z"), batch("REPAIRED", "202702", "2026-10-18T19:00:00Z"));
+                batch("DRIFT", "202702", "2026-10-18T19:00:00Z"), batch("REPAIRED", "202702", "2026-10-18T19:00:00Z", 1));
+        assertThat(ViewRig.views(t).get("recon_result")).as("all four rows stored (CI run 40686776209: seq 0 twice was skipped)").hasSize(4);
 
         assertThat(commands(t, ViewRig.feed(t, a1())).rebuild(t, ACTOR).exitCode()).isZero();
 

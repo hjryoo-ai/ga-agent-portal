@@ -22,7 +22,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * F11(포털 Phase 8 ①, 계획 P-6): 재구축 끝 불변식의 SQL({@link ViewResetRepository#restoreDriftMarks()})은 재구축기가 대사에 닿을 수 없어
  * (ArchUnit — "the rebuilder never reaches the reconciler") 대사의 순수 함수 {@link Episodes#unresolved}를 부르지 못한다. 둘이 같은 답인지
  * 격자로 묶는다: (설계사, 달)마다 DRIFT·REPAIRED 행을 시각 셋 중에서 0~3개(259가지 — 같은 시각·같은 상태의 반복, 출처 BATCH·EVENT 섞음),
- * 모든 달이 OK인 상태에서 복원한 뒤 DRIFT가 된 달의 집합 = {@code Episodes}의 미해결 집합.
+ * 모든 달이 OK인 상태에서 복원한 뒤 DRIFT가 된 달의 집합 = {@code Episodes}의 미해결 집합. 기본 키가 (시각, 출처, {@code source_seq})라 상태가 달라도
+ * 같은 시각·같은 출처의 두 행은 {@code source_seq}로만 갈린다 — 행마다 그 순번을 준다(CI run 40686776209가 순번 0 고정의 충돌을 잡았다).
  */
 class DriftMarkAgreementIT {
 
@@ -69,8 +70,7 @@ class DriftMarkAgreementIT {
                             INSERT INTO recon_result (tenant_id, agent_id, close_ym, run_at, portal_gross, portal_offset, portal_adjustment,
                                                       engine_gross, engine_offset, engine_adjustment, status, source, source_seq)
                             VALUES (?, ?, '202608', ?::timestamptz, 1, 0, 0, 2, 0, 0, ?, ?, ?)
-                            """, t.value(), agent, "2026-10-1" + token[1] + " 19:00:00+00", token[0], j % 2 == 0 ? "BATCH" : "EVENT",
-                            j % 2 == 0 ? 0 : j);
+                            """, t.value(), agent, "2026-10-1" + token[1] + " 19:00:00+00", token[0], j % 2 == 0 ? "BATCH" : "EVENT", j);
                 }
             }
         });
