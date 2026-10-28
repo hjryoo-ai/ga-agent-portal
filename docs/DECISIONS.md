@@ -466,3 +466,20 @@ DE-24 문구 정정(Q30): "앞으로 포털 계약 개정은 작업 브랜치 �
 - E2E ⓑ에서 iOS만 통과한 이유는 그대로 둔다 — Phase 8 데모 E2E에서 WebKit `no-cache` 처리 차이인지 한 줄로 확인.
 - Phase 8 재료(심사 §3): Q1 compose의 대사는 앱 안 스케줄러 그대로(cron 컨테이너 없음), 데모 스크립트는 `recon run --ym`을 한 번 불러 판정을 보인다. Q2 OTLP 넣는다 — compose에 Jaeger(또는 Tempo) + `opentelemetry-exporter-otlp`(Boot BOM), 내보내기는 속성으로만 켜고 시험 프로파일은 꺼진 채, 새 의존성은 검증 메타데이터 승인 대상, compose E2E가 수집기 API에서 스팬 하나를 읽어 속성 키 ⊆ 표 확인. Q3 위 F11. Q4 DD-19는 **Phase 8 0단계** — 이벤트 계약 `StatementEstimated` 설명문 표기 1.4.1("도래 예정 미리보기 포함, basisSeq는 하한") + 엔진 사본 갱신 PR(선승인 패턴). Q5 ETag 문장 그대로 — k6(§13) 홈 콜 p95가 문제면 그때. Q6 `run.sh`를 compose 안에서(판정 ⑤ 포함), §14.1 #14 닫기(Keycloak PKCE), README 포트폴리오 관점, 데모 생성기 부록 B.
 - 실 엔진 E2E는 병합 뒤 `main`에서 사용자가 실행 → `RESULT.md`(판정 다섯 — Phase 3·5·6·7 몫).
+
+## 2026-10-28 — Phase 8 계획 승인 (`docs/phase-08-계획승인.md`)
+
+승인: 계획 Q1~Q14 권장안 전부, P-1~P-24 그대로. 돌이킬 수 없는 결정 일곱 전부 예 — 엔진 데모 PR(약 9 MB, 두 저장소 — 엔진 CI 뒤 직접 병합), 이벤트 계약 표기 1.4.1(포털 `main` 표기 PR → 엔진 사본 PR), 새 의존성 둘(`opentelemetry-exporter-otlp`·`micrometer-registry-prometheus` — 검증 메타데이터 추가만·제거 0·전이 목록 표), 요청별 CSP(`connect-src`만), V10(`tenant.web_origin`·`oidc_client_id`), 인증 없는 `GET /auth/config`, 웹 린트 닫힌 예외 `src/auth/oidc.ts`. 작은 조건 A(`/auth/config` — 출처 정확 일치, 두 필드, 열거 불가 시험, `/auth/callback`은 `PublicPathsTest` 밖)·B(콜백은 `code`·`state`를 그리지 않고 즉시 주소에서 지움, 본 창은 일치하는 `state` 메시지 하나만 받고 채널을 닫음 — Vitest 둘 + 주입 S16). Q5 관리 포트 호스트 공개 0을 compose E2E가 본다. Q11 명세 샘플은 `index.json` 하나로 묶는다. 이번 승인이 돌이킬 수 없는 결정의 "예"를 적었다(사용자 확인 대신).
+
+### 지시문 오류
+
+| # | 지시문 문구 | 무엇이 틀렸나 | 정한 것 |
+|---|---|---|---|
+| DE-30 | ③ "`state`·`code_verifier`는 메모리" · ⓪ "명세 두 달" · ⑤ "p95 목표 §10" · ⑥ "운영자 재구축 뒤 표식 유지로 대체" | 전체 페이지 리다이렉트에서는 메모리가 사라진다(P-9). 두 달만이면 야간 스케줄러가 매일 `INCONCLUSIVE`(Q11). §10의 p95는 투영 지연이다(P-2). compose 안에는 미해결 DRIFT가 없어 보일 것이 없다(Q4) | 팝업 + `BroadcastChannel`, 전 달 명세 샘플, §13 예시값, F11 증거는 `RebuildIT`·하네스 E2E ⓔ′ |
+
+### 설계서 결함
+
+| # | 무엇 | 처리 |
+|---|---|---|
+| DD-21 | §13 응답 시간 목표 없음(P-2) · 부록 B 체결일 2025-07(룰 효력 2026-01 — P-3) · 부록 B CUT·HELD가 엔진 표준 룰로 불가(P-4) · §6.7·§14.1 #11 설정 키 이름 `portal.ingest.rebuild.max-events`(실제 `rebuild-max-events` — P-18) · 부록 B "포털 생성기"(지시문 §0이 뒤집음 — 엔진이 만든다) | v1.11에서 고친다: §13 예시값(콜 p95 ≤ 300 ms, 홈 다섯 묶음 ≤ 800 ms, 30명), 부록 B 체결일 2026-01~2027-06·엔진 데모 시험 픽스처, 키 이름 |
+
