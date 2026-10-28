@@ -32,7 +32,7 @@ put() { # put <소유 uid> <파일> <값>
 mkdir -p "$D/postgres" "$D/portal/config" "$D/portal/engine-tokens" "$D/demo" "$D/keycloak"
 chmod 0755 "$D"
 
-superuser=$(rand); migrator=$(rand); app=$(rand); directory=$(rand); issuer=$(rand); token=$(rand); admin=$(rand)
+superuser=$(rand); migrator=$(rand); app=$(rand); directory=$(rand); issuer=$(rand); token=${DEMO_ENGINE_TOKEN:-$(rand)}; admin=$(rand)
 
 put 999 "$D/postgres/superuser" "$superuser"
 put 999 "$D/postgres/migrator" "$migrator"
