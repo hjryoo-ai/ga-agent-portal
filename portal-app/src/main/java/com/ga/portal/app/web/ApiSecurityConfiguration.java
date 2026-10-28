@@ -27,6 +27,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.function.RouterFunction;
+import org.springframework.web.servlet.function.ServerResponse;
 
 import java.time.Clock;
 import java.util.List;
@@ -40,7 +42,8 @@ import java.util.function.Function;
  *   <li>{@code /api/**} 체인 하나: 무상태(세션·CSRF·요청 캐시·익명·폼·기본 인증 없음), 베어러 헤더 하나 → {@link IssuerTenantResolver}(검사 2~8) →
  *       {@link TenantBindingFilter}. 거부는 전부 {@link ApiAuthenticationEntryPoint}의 같은 401. 캐시 헤더는 {@code private, no-cache}
  *       (Spring 기본의 {@code no-store}를 끈다 — 304가 의미를 갖게, 지시문 D-8).</li>
- *   <li>나머지 경로: 헬스만 열고 그 밖은 {@code denyAll} — 같은 404 바이트.</li>
+ *   <li>나머지 경로: 인증 없는 경로 닫힌 목록({@link #PUBLIC_PATHS} — 헬스 셋 + 포털 Phase 8 {@code /auth/config}, {@code docs/authz-matrix.md}
+ *       "인증 없는 경로" 블록과 {@code PublicPathsTest}가 양방향 대조)만 {@code GET}으로 열고 그 밖은 {@code denyAll} — 같은 404 바이트.</li>
  *   <li>예외 장벽(보안 체인보다 앞) — 필터 단계 예외는 500 고정 바이트.</li>
  * </ul>
  */
@@ -52,6 +55,10 @@ public class ApiSecurityConfiguration implements WebMvcConfigurer {
     /** 서블릿 필터 순서: 예외 장벽은 보안 체인({@code -100})보다 앞. */
     static final int BARRIER_ORDER = Ordered.HIGHEST_PRECEDENCE + 10;
 
+    /** 인증 없는 경로(GET만) — 닫힌 목록. 화면 경로({@code ScreenConfiguration.SCREEN_PATHS}, {@code /auth/callback} 포함)는 화면 체인의 것이라 여기 없다. */
+    public static final List<String> PUBLIC_PATHS = List.of("/actuator/health", "/actuator/health/readiness", "/actuator/health/liveness",
+            AuthConfigHandler.PATH);
+
     private final ObjectProvider<CallerArgumentResolver> callerResolver;
 
     ApiSecurityConfiguration(ObjectProvider<CallerArgumentResolver> callerResolver) {
@@ -61,6 +68,17 @@ public class ApiSecurityConfiguration implements WebMvcConfigurer {
     @Bean
     IssuerDirectoryReader issuerDirectoryReader(ApiProperties props, @Value("${spring.datasource.url}") String jdbcUrl) {
         return new IssuerDirectoryReader(jdbcUrl, props.issuerUsername(), props.issuerPassword(), props.issuerPoolSize());
+    }
+
+    /** 요청 출처 → 로그인 설정(60초 캐시) — {@code /auth/config}와 화면 CSP가 함께 쓴다(포털 Phase 8). */
+    @Bean
+    LoginConfigs loginConfigs(IssuerDirectoryReader issuers, Clock clock) {
+        return new LoginConfigs(issuers::byWebOrigin, clock);
+    }
+
+    @Bean
+    RouterFunction<ServerResponse> authConfigRoute(LoginConfigs logins) {
+        return AuthConfigHandler.routes(logins);
     }
 
     @Bean
@@ -146,8 +164,7 @@ public class ApiSecurityConfiguration implements WebMvcConfigurer {
                 .formLogin(f -> f.disable())
                 .httpBasic(b -> b.disable())
                 .logout(l -> l.disable())
-                .authorizeHttpRequests(a -> a.requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/readiness",
-                                "/actuator/health/liveness").permitAll()
+                .authorizeHttpRequests(a -> a.requestMatchers(HttpMethod.GET, PUBLIC_PATHS.toArray(String[]::new)).permitAll()
                         .anyRequest().denyAll())
                 .exceptionHandling(e -> e.authenticationEntryPoint(unrouted).accessDeniedHandler(unrouted));
         return http.build();

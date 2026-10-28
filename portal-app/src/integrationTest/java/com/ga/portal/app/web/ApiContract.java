@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code no-store} — 1.1.0), 304 = 본문 없음, 400·401·404·422·429·502·503 =
  * {@code Problem}({@code application/problem+json}). 포털 Phase 6(1.2.0): 알림·문의 GET은 본문 ETag({@code W/"<16진 16자>"}), 읽음 {@code PATCH} 200·문의
  * {@code POST} 201은 ETag 없음·{@code no-store}. 같은 경로에 메서드가 둘이라({@code /inquiries}) 경로는 메서드와 함께 고른다. 엔드포인트 × 상태별 검증 수를 센다(보고서 표).
+ * 포털 Phase 8(1.3.0): 인증 없는 {@code GET /auth/config} — 200은 ETag 없음·{@code no-cache}, 스키마 {@code AuthConfig}(추가 속성 금지 — 주입 S9).
  */
 final class ApiContract {
 
@@ -55,7 +56,8 @@ final class ApiContract {
             new Route("PATCH /api/v1/me/notifications/{id}/read", "^/api/v1/me/notifications/[^/]+/read$", "Notification"),
             new Route("GET /api/v1/me/inquiries", "^/api/v1/me/inquiries$", "InquiriesResponse"),
             new Route("POST /api/v1/me/inquiries", "^/api/v1/me/inquiries$", "InquiryCreated"),
-            new Route("GET /api/v1/me/inquiries/{id}", "^/api/v1/me/inquiries/[^/]+$", "Inquiry"));
+            new Route("GET /api/v1/me/inquiries/{id}", "^/api/v1/me/inquiries/[^/]+$", "Inquiry"),
+            new Route("GET /auth/config", "^/auth/config$", "AuthConfig"));
 
     record Route(String endpoint, String regex, String schema) {
         boolean matches(String method, String path) {
@@ -65,6 +67,11 @@ final class ApiContract {
         /** 알림·문의 GET — 본문 ETag. */
         boolean bodyEtag() {
             return endpoint.startsWith("GET /api/v1/me/notifications") || endpoint.startsWith("GET /api/v1/me/inquiries");
+        }
+
+        /** 인증 없는 연산(1.3.0) — ETag 없음, {@code no-cache}. */
+        boolean isPublic() {
+            return endpoint.equals("GET /auth/config");
         }
 
         int success() {
@@ -126,7 +133,10 @@ final class ApiContract {
         } else {
             assertThat(status).as(path).isEqualTo(route.get().success());
             assertThat(r.headers().firstValue("content-type")).as("%s content type", path).contains("application/json");
-            if (!route.get().endpoint().startsWith("GET ")) {
+            if (route.get().isPublic()) {
+                assertThat(r.headers().firstValue("etag")).as("%s etag", path).isEmpty();
+                assertThat(r.headers().allValues("cache-control")).as("%s cache-control", path).containsExactly("no-cache");
+            } else if (!route.get().endpoint().startsWith("GET ")) {
                 // 시뮬레이션(1.1.0)·읽음·문의 접수(1.2.0): ETag 없음, 저장하지 않는다
                 assertThat(r.headers().firstValue("etag")).as("%s etag", path).isEmpty();
                 assertThat(r.headers().allValues("cache-control")).as("%s cache-control", path).containsExactly("no-store");

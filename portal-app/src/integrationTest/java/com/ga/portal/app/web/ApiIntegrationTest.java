@@ -62,9 +62,18 @@ abstract class ApiIntegrationTest {
     static final String SUB_A1 = "sub-ph3-a1001-Zq87";
     static final String AGENT_A1 = "A-1001";
 
+    // 포털 Phase 8(V10, 조건 A): 화면 로그인 출처 — T1·T2에 하나씩, 셋째는 미등록. 시험 클라이언트의 Host(127.0.0.1:포트)는 어느 것도 아니다(하네스·다른 IT의 화면 CSP 그대로).
+    static final String WEB_1 = "http://" + T1.value().toLowerCase(Locale.ROOT).replace('_', '-') + ".invalid:8080";
+    static final String WEB_2 = "http://" + T2.value().toLowerCase(Locale.ROOT).replace('_', '-') + ".invalid:8080";
+    static final String WEB_STRANGER = "http://ph8-stranger.invalid:8080";
+    static final String CLIENT_1 = "portal-web-ph8-1";
+    static final String CLIENT_2 = "portal-web-ph8-2";
+
     static {
         seedTenant(T1, ISSUER_1.issuer(), AUD_1);
         seedTenant(T2, ISSUER_2.issuer(), AUD_2);
+        webLogin(T1, WEB_1, CLIENT_1);
+        webLogin(T2, WEB_2, CLIENT_2);
         link(T1, SUB_A, AGENT_A, "AGENT", "ACTIVE");
         link(T1, SUB_B, AGENT_B, "AGENT", "ACTIVE");
         link(T1, SUB_M, AGENT_M, "MANAGER", "ACTIVE");
@@ -157,6 +166,10 @@ abstract class ApiIntegrationTest {
                 INSERT INTO tenant (tenant_id, name, engine_base_url, status, payout_day_rule, params, oidc_issuer, oidc_audience)
                 VALUES (?, ?, 'http://127.0.0.1:1', 'ACTIVE', 'NEXT_MONTH_D10', '{}'::jsonb, ?, ?)
                 """, t.value(), "시험 GA " + t.value(), issuer, audience));
+    }
+
+    static void webLogin(TenantId t, String origin, String clientId) {
+        DB.seed(t.value(), c -> SeedData.exec(c, "UPDATE tenant SET web_origin = ?, oidc_client_id = ? WHERE tenant_id = ?", origin, clientId, t.value()));
     }
 
     static void link(TenantId t, String subject, String agentId, String role, String status) {

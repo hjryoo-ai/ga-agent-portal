@@ -487,3 +487,15 @@ DE-24 문구 정정(Q30): "앞으로 포털 계약 개정은 작업 브랜치 �
 
 포털 Phase 8 계획 승인(돌이킬 수 없는 결정 2)의 ⓐ: `contracts/events/v1/payloads/StatementEstimated.v1.schema.json`의 `gross` 설명문에서 "포털 earnings_month.gross와 같은 정의"를 지우고 "잠정 명세는 그 달 도래 예정 분급의 미리보기를 더할 수 있다 — 같다는 보장이 없다, basisSeq는 하한"을 적었다. 제약 무변경 — `EventSchemaTest.descriptionOnlyChangesSince140`(스키마 15개에서 문자열 `description`을 뺀 키 정렬 트리의 SHA-256이 1.4.0 = `2ccfc44`의 값 `f26fd753…c1926`과 같다), `v141EstimatedGrossDocumentsThePreview`. `contracts/CHECKSUMS` 갱신. `main` 기반 PR — `CLAUDE.md`의 공유 계약 표기 변경 예외로 자체 CI 뒤 병합하고, 엔진 사본 PR(ⓑ)의 `UPSTREAM`이 그 병합 커밋을 가리킨다. 설계서 v1.10.1.
 
+## 2026-10-28 — Phase 8 구현에서 계획과 다르게 한 것 (보고서 §5)
+
+단계마다 더한다(보고서 §5가 이 표를 옮긴다).
+
+| # | 계획 | 구현 | 이유 |
+|---|---|---|---|
+| P8-1 | P-3·DD-21 "체결일 2026-01~2027-06", P-4 HELD 케이스 | 엔진 데모 창 **2026-03~2028-02**(마감 202603~202801, 잠정 202802), 기본 계약 체결일 2026-03~2027-06. HELD는 커브 계약 `DEMO-S05`(2027-01-15)의 202801 이후 미유지 판정 주입 | `DEFER_AFTER_FY`는 분급 일정을 만들지 않고(엔진 계약 설명), 커브 분급은 12개월 뒤에 도래한다 — 2026-01 시작으로는 창 안에서 HELD가 생기지 않았다(엔진 `9963809`, 설계서 부록 B v1.11) |
+| P8-2 | ④ S4 "`DemoServerTest.outOfSampleIs500`" | `DemoServerTest.statementsAnswerOnlyTheSampleRequests`·`simulationsAnswerOnlyTheSampleRequestsWhateverTheKeyOrder`(S4는 둘째가 잡았다 — 로컬 주입) | 명세·시뮬레이션 두 경로를 한 시험에 섞지 않았다 — 이름만 다르다 |
+| P8-3 | Q2 "허용 목록 항목은 그대로 하나" | 직접 DB 접근 허용 목록(닫힌 FQN — `ArchitectureRulesTest.PORTAL_DB_ALLOWLIST`)은 그대로 `IssuerDirectoryReader` 하나. **문장 허용 목록**(`TenantPredicateScanTest.ALLOWLIST` — (파일, 문장) 쌍)은 같은 파일의 둘째 문장 `byWebOrigin` +1(사유 기재), 자바 SQL 문장 수 +1 | `web_origin` 조회도 테넌트 바인딩 전의 `tenant` 조회라 `tenant_id` 술어가 없다 — 문장 단위 목록은 문장마다 항목이다. 계획 문장의 "항목"은 클래스 목록이었다 |
+| P8-4 | 지시문 ③ "ID/액세스/refresh 전부 메모리" | 액세스·refresh만 메모리, **ID 토큰은 받아도 보관하지 않는다** | 화면이 ID 토큰을 쓰는 곳이 없다(로그아웃은 refresh 토큰으로 종료 끝점에 POST). 보관하지 않는 것이 더 좁다 — PKCE 저장 위치 표에 "없음" |
+| P8-5 | (계획에 없음) | `PortalApiCompatibilityTest`에 1.2.0 사본(`main` `80880b8`의 바이트 — SHA-256 고정, `contracts/CHECKSUMS`의 그 판 줄과 같다)을 더해 1.0.0~1.2.0 → 1.3.0 추가뿐을 대조. `PortalApiContractTest`에 인증 없는 연산 닫힌 표(`GET /auth/config` — `security: []`, 200·404만, `no-cache`) | 1.2.0 → 1.3.0이 추가뿐이라는 것을 직전 판과도 대조해야 한다. 경로 대조 시험(`pathsAreTheAuthorizationMatrix…`)은 공개 연산을 건너뛰고 새 시험이 그 연산을 본다 |
+| P8-6 | ① F11 시험 `DriftMarkAgreementIT`(격자 259)·`RebuildIT.aRepairedMonthStaysOkAfterARebuild` | 격자 행마다 `source_seq` = 행 순번, 같은 시각의 BATCH 짝은 순번 0·1. `RebuildIT`는 넣은 행 수(4)를 먼저 단언 | `recon_result` 기본 키는 (시각, 출처, `source_seq`) — 상태가 키가 아니라 같은 시각·같은 출처·순번 0의 두 행이 충돌(격자 — 23505)하거나 `insertIfAbsent`가 둘째를 조용히 건너뛰었다(`RebuildIT` — DRIFT만 남음). CI run 40686776209가 잡았다(시험 자료의 결함 — 복원 문장은 그대로) |

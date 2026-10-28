@@ -21,7 +21,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 화면 서빙(포털 Phase 4 계획 ⑧, C8·C12): 같은 출처의 화면 경로·자원, 헤더 집합 전수, 화면 경로 목록 ↔ {@code web/src/routes.ts} 양방향,
- * 경로 밖·다른 메서드는 나머지 체인의 같은 404, API 응답 헤더는 Phase 3 그대로(CSP 없음).
+ * 경로 밖·다른 메서드는 나머지 체인의 같은 404, API 응답 헤더는 Phase 3 그대로(CSP 없음). 포털 Phase 8(C8, 돌이킬 수 없는 결정 4): 요청 출처에 로그인
+ * 설정이 등록된 테넌트가 있으면 {@code connect-src}만 {@code 'self' <발급자 출처>}이고 나머지 아홉 지시어는 같다. 등록 없는 출처는 지금 열 지시어 그대로.
+ * {@code /auth/callback}(PKCE 팝업 복귀)은 화면 경로다.
  */
 class WebScreensIT extends ApiIntegrationTest {
 
@@ -56,7 +58,8 @@ class WebScreensIT extends ApiIntegrationTest {
     @Test
     void everyScreenPathServesTheSameDocumentWithTheScreenHeaders() throws IOException {
         byte[] index = indexHtml();
-        for (String path : List.of("/", "/statements", "/statements/202608", "/lines/1", "/limits", "/limits/1")) {
+        for (String path : List.of("/", "/statements", "/statements/202608", "/lines/1", "/limits", "/limits/1", "/auth/callback",
+                "/auth/callback?code=c0de&state=5tate")) {
             HttpResponse<byte[]> r = fetch(request(path).GET());
             assertThat(r.statusCode()).as(path).isEqualTo(200);
             assertThat(r.body()).as(path).isEqualTo(index);
@@ -64,6 +67,32 @@ class WebScreensIT extends ApiIntegrationTest {
             assertThat(r.headers().allValues("Cache-Control")).as(path).containsExactly("no-store");
             assertScreenHeaders(r);
         }
+    }
+
+    @Test
+    void aRegisteredOriginAddsOnlyItsIssuerOriginToConnectSrc() throws IOException {
+        Map<String, String> expected = new LinkedHashMap<>(CSP);
+        expected.put("connect-src", "'self' " + originOf(ISSUER_1.issuer()));
+        String html = new String(indexHtml(), StandardCharsets.UTF_8);
+        Matcher m = Pattern.compile("src=\"(/assets/[^\"]+\\.js)\"").matcher(html);
+        assertThat(m.find()).isTrue();
+        for (String path : List.of("/", "/auth/callback", m.group(1))) {
+            HttpResponse<byte[]> registered = fetch(request(path).header("Origin", WEB_1).GET());
+            assertThat(registered.statusCode()).as(path).isEqualTo(200);
+            assertThat(directives(registered.headers().firstValue("Content-Security-Policy").orElseThrow())).as(path).isEqualTo(expected);
+            assertThat(registered.headers().allValues("Content-Security-Policy")).as(path).hasSize(1);
+            HttpResponse<byte[]> stranger = fetch(request(path).header("Origin", WEB_STRANGER).GET());
+            assertScreenHeaders(stranger);
+        }
+        HttpResponse<byte[]> two = fetch(request("/").header("Origin", WEB_2).GET());
+        assertThat(directives(two.headers().firstValue("Content-Security-Policy").orElseThrow()).get("connect-src"))
+                .isEqualTo("'self' " + originOf(ISSUER_2.issuer()));
+    }
+
+    /** 시험 발급기 URL(포트가 늘 있다)의 출처. */
+    static String originOf(String url) {
+        java.net.URI u = java.net.URI.create(url);
+        return u.getScheme() + "://" + u.getHost() + ":" + u.getPort();
     }
 
     @Test

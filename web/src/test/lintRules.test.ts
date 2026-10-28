@@ -5,6 +5,7 @@ import { ESLint } from 'eslint';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import config, { NETWORK_EXCEPTIONS } from '../../eslint.config.js';
 import { MONEY_EXEMPT } from '../../eslint/plugin.js';
 
 const web = resolve(import.meta.dirname, '../..');
@@ -85,4 +86,30 @@ describe('network and storage', () => {
   it('openapi-fetch is imported only in src/api/client.ts', () => {
     expect(rules('clientImport.ts')).toContain('no-restricted-imports');
   });
+
+  // 포털 Phase 8(계획 P-11·돌이킬 수 없는 결정 7): 네트워크 예외는 닫힌 두 파일 — 규칙을 좁히지 않고 코드를 한 곳에 모은다
+  it('the network exceptions are exactly two files and each exists', () => {
+    expect(NETWORK_EXCEPTIONS).toEqual(['src/api/client.ts', 'src/auth/oidc.ts']);
+    for (const f of NETWORK_EXCEPTIONS) expect(existsSync(join(web, f)), f).toBe(true);
+    const overriding = config
+      .filter((block) => block.files !== undefined && block.rules !== undefined)
+      .filter((block) => ['no-restricted-globals', 'no-restricted-properties', 'no-restricted-imports'].some((r) => r in (block.rules ?? {})))
+      .flatMap((block) => (block.files ?? []).flat())
+      .filter((f): f is string => typeof f === 'string' && !f.includes('*'));
+    expect(overriding.sort()).toEqual([...NETWORK_EXCEPTIONS].sort());
+  });
+
+  it('only src/auth/oidc.ts may call fetch, and storage stays forbidden there', async () => {
+    const eslint = new ESLint({ cwd: web });
+    const names = async (file: string) => {
+      const c = (await eslint.calculateConfigForFile(join(web, file))) as { rules: Record<string, unknown[]> };
+      return (c.rules['no-restricted-globals'] ?? []).slice(1).map((g) => (g as { name: string }).name);
+    };
+    const oidc = await names('src/auth/oidc.ts');
+    expect(oidc).not.toContain('fetch');
+    expect(oidc).toEqual(expect.arrayContaining(['localStorage', 'sessionStorage', 'indexedDB', 'caches', 'cookieStore', 'XMLHttpRequest']));
+    for (const other of ['src/api/client.ts', 'src/api/queries.ts', 'src/boot/token.ts', 'src/ui/States.tsx']) {
+      expect(await names(other), other).toContain('fetch');
+    }
+  }, 60_000);
 });

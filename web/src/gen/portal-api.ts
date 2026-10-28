@@ -242,6 +242,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 화면 로그인 설정(1.3.0) — 인증 없음, 요청 출처에 등록된 테넌트의 발급자·클라이언트 id */
+        get: operations["getAuthConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -249,6 +266,11 @@ export interface components {
         AsOf: {
             at?: components["schemas"]["Instant"];
             seq: components["schemas"]["Seq"];
+        };
+        /** @description 1.3.0 — 화면이 OIDC 디스커버리({issuer}/.well-known/openid-configuration)와 인가 요청에 쓰는 두 값. 비밀이 아니다 */
+        AuthConfig: {
+            clientId: string;
+            issuer: string;
         };
         /**
          * @description 동기화 상태 — 커서가 RUNNING이 아니거나 머리에 닿은 지 sync_delay_seconds를 넘으면 SYNC_DELAYED
@@ -897,6 +919,8 @@ export interface components {
         CacheControl: "private, no-cache";
         /** @description 약한 ETag W/"<seq>.<sync>.<cfg>"(라인 목록은 뒤에 .<page>.<size>.<filter>) — 피드 위치·동기화 상태·응답에 쓰인 테넌트 설정이 바뀌면 바뀐다 */
         ETag: string;
+        /** @description 로그인 설정은 저장해도 되지만 쓸 때마다 다시 확인한다(1.3.0) */
+        NoCache: "no-cache";
         /** @description 시뮬레이션 결과는 저장하지 않는다(1.1.0). 알림 읽음·문의 접수 응답도(1.2.0) */
         NoStore: "no-store";
     };
@@ -1357,6 +1381,28 @@ export interface operations {
             429: components["responses"]["RateLimited"];
             502: components["responses"]["EngineContract"];
             503: components["responses"]["EngineUnavailable"];
+        };
+    };
+    getAuthConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 발급자·공개 클라이언트 id(둘뿐 — audience·테넌트는 싣지 않는다) */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["NoCache"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthConfig"];
+                };
+            };
+            404: components["responses"]["NotFound"];
         };
     };
 }

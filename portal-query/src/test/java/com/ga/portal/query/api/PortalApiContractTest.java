@@ -155,6 +155,34 @@ class PortalApiContractTest {
             ApiAuthorization.INQUIRY_CREATE, List.of("201", "400", "401", "404", "429"),
             ApiAuthorization.NOTIFICATION_READ, List.of("200", "401", "404"));
 
+    /**
+     * 인증 없는 연산(1.3.0, 포털 Phase 8 계획 Q2 — 닫힌 표): {@code security: []}, 응답은 200(스키마 참조·{@code no-cache}·ETag 없음)과 404뿐. 권한 표 밖이다
+     * ({@code docs/authz-matrix.md} "인증 없는 경로" 블록 — {@code PublicPathsTest}). 다른 연산은 전부 문서 기본값(Bearer)을 물려받는다.
+     */
+    static final Set<String> PUBLIC_OPERATIONS = Set.of("GET /auth/config");
+
+    @Test
+    void publicOperationsAreTheClosedTableAndCarryNoSecurity() {
+        Set<String> found = new TreeSet<>();
+        api.path("paths").properties().forEach(e -> e.getValue().properties().forEach(op -> {
+            String key = op.getKey().toUpperCase(java.util.Locale.ROOT) + " " + e.getKey();
+            JsonNode security = op.getValue().path("security");
+            if (security.isMissingNode()) {
+                return;
+            }
+            assertThat(security.isArray() && security.isEmpty()).as("%s: an override is only ever the empty list", key).isTrue();
+            found.add(key);
+            JsonNode responses = op.getValue().path("responses");
+            assertThat(responses.propertyNames()).as(key).containsExactlyInAnyOrder("200", "404");
+            assertThat(responses.path("200").path("content").path("application/json").path("schema").has("$ref")).as(key).isTrue();
+            assertThat(responses.path("200").path("headers").has("ETag")).as(key).isFalse();
+            assertThat(responses.path("200").path("headers").path("Cache-Control").path("$ref").asString()).as(key)
+                    .isEqualTo("#/components/headers/NoCache");
+        }));
+        assertThat(found).isEqualTo(PUBLIC_OPERATIONS);
+        assertThat(api.path("security").toString()).isEqualTo("[{\"bearer\":[]}]");
+    }
+
     @Test
     void pathsAreTheAuthorizationMatrixAndEachHas401And404() {
         Set<String> operations = new TreeSet<>();
@@ -162,6 +190,9 @@ class PortalApiContractTest {
             String method = op.getKey();
             assertThat(method).as(e.getKey()).isIn("get", "post", "patch");
             String key = method.toUpperCase(java.util.Locale.ROOT) + " " + e.getKey();
+            if (PUBLIC_OPERATIONS.contains(key)) {
+                return; // 권한 표 밖 — publicOperationsAreTheClosedTableAndCarryNoSecurity
+            }
             operations.add(key);
             JsonNode responses = op.getValue().path("responses");
             assertThat(responses.has("401") && responses.has("404")).as(key).isTrue();
