@@ -452,3 +452,8 @@ DE-24 문구 정정(Q30): "앞으로 포털 계약 개정은 작업 브랜치 �
 - `CLAUDE.md` "대사·관측성 규약" 절. `docs/운영.md` §8(CLI `recon run`·`status`, 신호 → 할 일 표, 테넌트 설정, 연결·스레드 — Q9·P7-4·P7-5).
 - DD-19(`StatementEstimated` 설명문)는 고치지 않았다(승인 그대로 — 다음 이벤트 계약 개정 때).
 - 영문 번역(`docs/en/`)은 v1.6 그대로.
+
+## 2026-10-28 — 포털 계약 v1.4.1 (표기만 — DD-19 닫음)
+
+포털 Phase 8 계획 승인(돌이킬 수 없는 결정 2)의 ⓐ: `contracts/events/v1/payloads/StatementEstimated.v1.schema.json`의 `gross` 설명문에서 "포털 earnings_month.gross와 같은 정의"를 지우고 "잠정 명세는 그 달 도래 예정 분급의 미리보기를 더할 수 있다 — 같다는 보장이 없다, basisSeq는 하한"을 적었다. 제약 무변경 — `EventSchemaTest.descriptionOnlyChangesSince140`(스키마 15개에서 문자열 `description`을 뺀 키 정렬 트리의 SHA-256이 1.4.0 = `2ccfc44`의 값 `f26fd753…c1926`과 같다), `v141EstimatedGrossDocumentsThePreview`. `contracts/CHECKSUMS` 갱신. `main` 기반 PR — `CLAUDE.md`의 공유 계약 표기 변경 예외로 자체 CI 뒤 병합하고, 엔진 사본 PR(ⓑ)의 `UPSTREAM`이 그 병합 커밋을 가리킨다. 설계서 v1.10.1.
+
