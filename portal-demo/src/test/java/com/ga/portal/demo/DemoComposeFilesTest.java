@@ -119,6 +119,24 @@ class DemoComposeFilesTest {
         });
     }
 
+    /** README의 데모 비밀번호(계획 Q7 — 평문은 README 한 곳)가 렐름의 해시와 맞는다 — 설계사 30명 전원(Keycloak pbkdf2-sha256과 같은 계산). */
+    @Test
+    void theReadmePasswordMatchesEveryRealmHash() throws Exception {
+        Matcher m = Pattern.compile("데모 비밀번호: `([^`]+)`").matcher(Files.readString(ROOT.resolve("README.md")));
+        assertThat(m.find()).as("README demo password line").isTrue();
+        char[] password = m.group(1).toCharArray();
+        javax.crypto.SecretKeyFactory pbkdf2 = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        for (JsonNode u : realm.path("users")) {
+            JsonNode c = u.path("credentials").get(0);
+            JsonNode secret = DemoData.JSON.readTree(c.path("secretData").asString());
+            int iterations = DemoData.JSON.readTree(c.path("credentialData").asString()).path("hashIterations").asInt();
+            byte[] salt = java.util.Base64.getDecoder().decode(secret.path("salt").asString());
+            byte[] expected = java.util.Base64.getDecoder().decode(secret.path("value").asString());
+            byte[] actual = pbkdf2.generateSecret(new javax.crypto.spec.PBEKeySpec(password, salt, iterations, 256)).getEncoded();
+            assertThat(actual).as(u.path("username").asString()).isEqualTo(expected);
+        }
+    }
+
     @Test
     void composePinsImagesBindsLoopbackAndKeepsSecretsOutOfTheEnvironment() throws IOException {
         List<String> images = new ArrayList<>(matches(compose, "(?m)^\\s*image: (?!ga-portal-demo/)(\\S+)"));
@@ -129,6 +147,10 @@ class DemoComposeFilesTest {
         assertThat(compose).doesNotContain(":9090\"").doesNotContain("9090:");
         assertThat(matches(compose, "(?m)^\\s+([A-Z_]*(?:PASSWORD|SECRET|TOKEN)[A-Z_]*):")).allSatisfy(k ->
                 assertThat(k).as("secret-looking variable %s must point at a file", k).matches(".*_FILE|PORTAL_ENGINE_TOKEN_DIR|PORTAL_POLICY_KEY_SECRET_FILE"));
+        String services = compose.substring(compose.indexOf("\nservices:\n"), compose.indexOf("\nvolumes:\n"));
+        List<String> names = new ArrayList<>(matches(services, "(?m)^  ([a-z][a-z-]*):$"));
+        assertThat(names).containsExactlyInAnyOrder("secrets", "postgres", "keycloak", "demo", "jaeger", "portal", "idp-relay", "seed");
+        assertThat(services.split("\n    profiles: \\[demo]\n", -1)).as("every service is in the demo profile (C5)").hasSize(names.size() + 1);
         assertThat(ROOT.resolve(".env")).doesNotExist();
         assertThat(DOCKER.resolve(".env")).doesNotExist();
         String generator = Files.readString(DOCKER.resolve("secrets/generate.sh"));

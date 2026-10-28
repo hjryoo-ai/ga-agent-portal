@@ -24,7 +24,7 @@ tasks.named<PnpmInstallTask>("pnpmInstall") {
 val contract = rootProject.layout.projectDirectory.file("contracts/api/v1/portal-api.openapi.yaml")
 val webSources = fileTree("src") { exclude("__lint__/**") }
 val webConfig = files("package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.json", "vite.config.ts", "eslint.config.js", "contracts-client.lock.json",
-    "playwright.config.ts")
+    "playwright.config.ts", "playwright.compose.config.ts", "eslint.config.d.ts")
 
 fun PnpmTask.webInputs() {
     dependsOn(tasks.named("pnpmInstall"))
@@ -33,6 +33,7 @@ fun PnpmTask.webInputs() {
     inputs.dir("scripts").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir("eslint").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir("e2e").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir("e2e-compose").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(contract).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
@@ -144,6 +145,19 @@ tasks.register<PnpmTask>("e2e") {
     environment.put("PORTAL_E2E_JAVA", launcher.map { it.executablePath.asFile.absolutePath })
     environment.put("PORTAL_E2E_HARNESS_CP", project(":portal-app").layout.buildDirectory.file("web-e2e/harness.classpath").map { it.asFile.absolutePath })
     args.set(listOf("run", "e2e"))
+    outputs.upToDateWhen { false }
+}
+
+// compose E2E(포털 Phase 8 지시문 ⑥ — CI 잡 compose-e2e): docker/compose.yaml(프로파일 demo)을 띄워 Playwright 프로젝트 하나(데스크톱 Chromium)로 본다.
+// 이미지는 앞 단계(docker compose build)가 만든다. 내리기·비밀 스캔은 CI 단계가 한다(볼륨의 비밀 파일이 필요하다). check에 넣지 않는다.
+tasks.register<PnpmTask>("composeE2e") {
+    group = "verification"
+    description = "Runs the compose E2E (login over PKCE, five screens, operations, Jaeger keys) against docker/compose.yaml --profile demo."
+    webInputs()
+    dependsOn(clientCheck, e2eInstall)
+    inputs.dir("e2e-compose").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file("playwright.compose.config.ts").withPathSensitivity(PathSensitivity.RELATIVE)
+    args.set(listOf("run", "e2e:compose"))
     outputs.upToDateWhen { false }
 }
 

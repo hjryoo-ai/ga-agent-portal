@@ -1,5 +1,6 @@
 # =============================================================================================
-# 데모 실행(포털 Phase 8 지시문 ②~④, 설계서 §3.2 v1.11) — `docker compose -f docker/compose.yaml up --build`
+# 데모 실행(포털 Phase 8 지시문 ②~④·C5, 설계서 §3.2 v1.11) — `docker compose -f docker/compose.yaml --profile demo up --build`
+#   서비스는 전부 프로파일 `demo`다(엔진 + Oracle을 띄우는 `engine` 프로파일은 v2 — 계획 Q6, 지금은 e2e/engine-feed/run.sh).
 #   화면 http://localhost:8080 · 로그인(Keycloak) http://localhost:8180 · 트레이스(Jaeger) http://localhost:16686 — 셋 다 127.0.0.1에만 묶는다.
 #   관리 포트(9090 — /actuator/prometheus·헬스)는 compose 네트워크 안에서만(호스트 공개 0, 계획 Q5). DB도 공개하지 않는다.
 # 데모 전용 제품 코드는 없다: 포털 이미지는 운영 설정 그대로이고 여기의 값(환경·인자·등록 SQL)만 다르다.
@@ -13,6 +14,7 @@ x-postgres-image: &postgres-image postgres@sha256:74935e72241653ca55e0414067e6d8
 
 services:
   secrets:
+    profiles: [demo]
     image: busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e  # 1.38.0
     command: ["sh", "/portal/generate.sh"]
     volumes:
@@ -21,6 +23,7 @@ services:
     restart: "no"
 
   postgres:
+    profiles: [demo]
     image: *postgres-image
     depends_on:
       secrets: { condition: service_completed_successfully }
@@ -40,6 +43,7 @@ services:
       retries: 60
 
   keycloak:
+    profiles: [demo]
     image: quay.io/keycloak/keycloak@sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b  # 26.8.1
     depends_on:
       secrets: { condition: service_completed_successfully }
@@ -63,6 +67,7 @@ services:
       retries: 100
 
   demo:
+    profiles: [demo]
     build: { context: .., dockerfile: docker/portal.Dockerfile, target: demo }
     image: ga-portal-demo/demo:local
     depends_on:
@@ -77,11 +82,13 @@ services:
       retries: 60
 
   jaeger:
+    profiles: [demo]
     image: jaegertracing/jaeger@sha256:836b967b5abcf1f7758066aa6b348619267a2f1459f72d472840570f9bd88a17  # 2.22.0 (OTLP 4318 수신, 메모리 저장)
     ports:
       - "127.0.0.1:16686:16686"
 
   portal:
+    profiles: [demo]
     build: { context: .., dockerfile: docker/portal.Dockerfile, target: portal }
     image: ga-portal-demo/portal:local
     depends_on:
@@ -114,6 +121,7 @@ services:
 
   # 포털 컨테이너 안의 localhost:8180 → keycloak:8080(계획 P-14): 브라우저가 쓰는 발급자 주소를 포털도 그대로 쓴다(디스커버리·JWKS)
   idp-relay:
+    profiles: [demo]
     image: alpine/socat@sha256:603174b77eebaba25ba8f8ebb15e1234d6600409554e95d6fb203fd106150287  # 1.8.1.3
     network_mode: "service:portal"
     depends_on:
@@ -123,6 +131,7 @@ services:
 
   # 데모 테넌트·설계사 30명·운영자 등록(docs/운영.md §1~§3의 SQL) — 포털이 뜬 뒤(Flyway 끝) 한 번
   seed:
+    profiles: [demo]
     image: *postgres-image
     user: "999:999"
     depends_on:

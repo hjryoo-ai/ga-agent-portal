@@ -33,7 +33,9 @@
   "include": [
     "src",
     "e2e",
+    "e2e-compose",
     "vite.config.ts",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "playwright.compose.config.ts"
   ]
 }

@@ -43,6 +43,20 @@ Phase 7(대사·DRIFT 자동 복구·관측성) 수용(2026-10-28, 조건 없음
 
 어느 쪽이든 받은 파일의 SHA-256이 `gradle/verification-metadata.xml`과 다르면 빌드가 실패한다.
 
+## 데모 (Phase 8 — `docker compose`)
+
+필요한 것: Docker뿐(자격 증명 없음 — 이미지 빌드가 공개 `ga-disclosure` 태그 `platform-v0.2.0` 소스에서 플랫폼을 만든다).
+
+```bash
+docker compose -f docker/compose.yaml --profile demo up --build
+```
+
+- 화면 <http://localhost:8080> → "로그인" → Keycloak 창에서 데모 설계사로 로그인한다(첫 동기화 약 90초 — 상단 칩이 "기준 …"이 되면 끝).
+- 데모 설계사: `a-2001` ~ `a-2030`(엔진 데모 스트림의 A-2001~A-2030, 허구). 데모 비밀번호: `portal-demo-2026` — 허구 값이고 데모 렐름(`docker/keycloak/realm.json` — 해시만)에서만 쓰인다.
+- 트레이스 <http://localhost:16686>(Jaeger). 셋 다 `127.0.0.1`에만 열린다. 관리 포트(지표 `/actuator/prometheus`)·DB는 호스트에 열지 않는다.
+- 비밀(DB 롤·엔진 서비스 토큰·policyKey 비밀·Keycloak 관리자)은 처음 뜰 때 볼륨 `secrets`에 파일로 생성된다 — 저장소·`.env`·이미지에 없다. 지우고 새로 시작: `docker compose -f docker/compose.yaml --profile demo down -v`.
+- 구성·운영 명령은 설계서 §3.2(v1.11)·`docs/운영.md`.
+
 ## 인제스트 운영 (Phase 1)
 
 엔진 피드를 테넌트별로 읽는 폴링은 `PORTAL_INGEST_ENABLED=true`일 때만 돈다. 테넌트 목록은 전용 롤 `portal_directory`(`PORTAL_DIRECTORY_USER`·`PORTAL_DIRECTORY_PASSWORD`), 서비스 토큰은 테넌트별 파일 `$PORTAL_ENGINE_TOKEN_DIR/<TENANT_ID>`(소유자만 읽게 — 값은 저장소·로그에 쓰지 않는다). 멈춘 테넌트를 다루는 운영 명령:

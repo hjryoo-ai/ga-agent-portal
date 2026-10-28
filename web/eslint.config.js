@@ -39,13 +39,13 @@ export default tseslint.config(
     },
   },
   {
-    files: ['eslint.config.js', 'eslint/**/*.js', 'scripts/**/*.mjs', 'e2e/**/*.mjs'],
+    files: ['eslint.config.js', 'eslint/**/*.js', 'scripts/**/*.mjs', 'e2e/**/*.mjs', 'e2e-compose/**/*.mjs'],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: { globals: globals.node },
   },
   {
     // E2E(Node 쪽 Playwright 시험): 브라우저 금지 규칙 밖 — 하네스 제어·토큰 파일은 Node에서 읽는다. 금액 규칙은 화면 코드(src)의 것이다.
-    files: ['e2e/**/*.ts', 'playwright.config.ts'],
+    files: ['e2e/**/*.ts', 'e2e-compose/**/*.ts', 'playwright.config.ts', 'playwright.compose.config.ts'],
     languageOptions: { globals: globals.node },
   },
   {
