@@ -483,3 +483,7 @@ DE-24 문구 정정(Q30): "앞으로 포털 계약 개정은 작업 브랜치 �
 |---|---|---|
 | DD-21 | §13 응답 시간 목표 없음(P-2) · 부록 B 체결일 2025-07(룰 효력 2026-01 — P-3) · 부록 B CUT·HELD가 엔진 표준 룰로 불가(P-4) · §6.7·§14.1 #11 설정 키 이름 `portal.ingest.rebuild.max-events`(실제 `rebuild-max-events` — P-18) · 부록 B "포털 생성기"(지시문 §0이 뒤집음 — 엔진이 만든다) | v1.11에서 고친다: §13 예시값(콜 p95 ≤ 300 ms, 홈 다섯 묶음 ≤ 800 ms, 30명), 부록 B 체결일 2026-01~2027-06·엔진 데모 시험 픽스처, 키 이름 |
 
+## 2026-10-28 — 포털 계약 v1.4.1 (표기만 — DD-19 닫음)
+
+포털 Phase 8 계획 승인(돌이킬 수 없는 결정 2)의 ⓐ: `contracts/events/v1/payloads/StatementEstimated.v1.schema.json`의 `gross` 설명문에서 "포털 earnings_month.gross와 같은 정의"를 지우고 "잠정 명세는 그 달 도래 예정 분급의 미리보기를 더할 수 있다 — 같다는 보장이 없다, basisSeq는 하한"을 적었다. 제약 무변경 — `EventSchemaTest.descriptionOnlyChangesSince140`(스키마 15개에서 문자열 `description`을 뺀 키 정렬 트리의 SHA-256이 1.4.0 = `2ccfc44`의 값 `f26fd753…c1926`과 같다), `v141EstimatedGrossDocumentsThePreview`. `contracts/CHECKSUMS` 갱신. `main` 기반 PR — `CLAUDE.md`의 공유 계약 표기 변경 예외로 자체 CI 뒤 병합하고, 엔진 사본 PR(ⓑ)의 `UPSTREAM`이 그 병합 커밋을 가리킨다. 설계서 v1.10.1.
+
