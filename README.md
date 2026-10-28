@@ -22,7 +22,7 @@ Phase 5(분급 타임라인·시뮬레이션) 수용(2026-10-23, 조건 B1 → `
 
 Phase 6(알림 파생·이의제기) 수용(2026-10-24, 조건 없음) — [지시문](docs/phase-06-지시문.md)·[계획](docs/phase-06-계획.md)·[승인](docs/phase-06-계획승인.md)·[보고서](docs/phase-06-보고서.md)·[수용 심사](docs/phase-06-수용심사.md). 태그 `phase-6`.
 
-Phase 7(대사·DRIFT 자동 복구·관측성) 구현 완료, 수용 심사 대기 — [지시문](docs/phase-07-지시문.md)·[계획](docs/phase-07-계획.md)·[승인](docs/phase-07-계획승인.md)·[보고서](docs/phase-07-보고서.md). 태그 `phase-7`. 지표·로그·스팬의 닫힌 표 [`docs/지표.md`](docs/지표.md).
+Phase 7(대사·DRIFT 자동 복구·관측성) 수용(2026-10-28, 조건 없음) — [지시문](docs/phase-07-지시문.md)·[계획](docs/phase-07-계획.md)·[승인](docs/phase-07-계획승인.md)·[보고서](docs/phase-07-보고서.md)·[수용 심사](docs/phase-07-수용심사.md). 태그 `phase-7`. 지표·로그·스팬의 닫힌 표 [`docs/지표.md`](docs/지표.md).
 
 정본 설계서 [`docs/설계서.md`](docs/설계서.md)(v1.10), 결정 기록 [`docs/DECISIONS.md`](docs/DECISIONS.md).
 

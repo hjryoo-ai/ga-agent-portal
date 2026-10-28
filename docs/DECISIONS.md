@@ -452,3 +452,17 @@ DE-24 문구 정정(Q30): "앞으로 포털 계약 개정은 작업 브랜치 �
 - `CLAUDE.md` "대사·관측성 규약" 절. `docs/운영.md` §8(CLI `recon run`·`status`, 신호 → 할 일 표, 테넌트 설정, 연결·스레드 — Q9·P7-4·P7-5).
 - DD-19(`StatementEstimated` 설명문)는 고치지 않았다(승인 그대로 — 다음 이벤트 계약 개정 때).
 - 영문 번역(`docs/en/`)은 v1.6 그대로.
+
+## 2026-10-28 — Phase 7 수용 심사 (`docs/phase-07-수용심사.md`)
+
+판정: **수용, 조건 없음** — PR #28 병합(merge commit `2ccfc44`), `phase-7` = `56181af` 유지. **P7-15 승인**(ETag 재료 = `seq`·동기화·설정 + 커서 `updated_at` + 마지막 `recon_run` — 설계서 §7 v1.10 문장 그대로, 콜마다 +1 문장 수용). P7-1~17·F1~F12 전부 수용. 사용자 직접 계획 승인 네 번째 Phase — 사후 확인, 뒤집은 것 없음.
+
+| # | 무엇 | 처리 |
+|---|---|---|
+| DD-20 | 설계서 §7 ETag `seq.sync.cfg`(v1.6)·Phase 3 승인 Q4 — 데이터가 `seq` 없이 바뀌는 경로(대사·재구축)를 보지 못했다 | v1.10 §7(P7-15, F5) — 승인 |
+| DE-29 | 지시문 C2 "차이 값을 담는 열·필드·로그 0"은 덧셈·뺄셈을 보는 스캔 없이 요구했다. C12 "평문 스캔(트레이스 포함)"은 메모리 내보내기에서 성립하지 않았다 | `ReconArithmeticScanTest`(P7-16, F4), 스팬 덤프(P7-17, F6) |
+
+- F11(운영자 `ingest rebuild`가 BATCH DRIFT 표식을 지운다)은 **Phase 8 1단계**: `Rebuilder` txB 끝의 불변식 하나 — "미해결 DRIFT 행(`recon_result` 마지막 행이 DRIFT)이 있는 (설계사, 달)은 `data_status = DRIFT`". 재구축은 대사 표를 읽기만 한다(파생 아님 — ArchUnit 규칙 그대로). §6.7 "지우지 않는 것"의 짝으로 "되살리는 것". 그때까지는 `docs/운영.md` §8 절차.
+- E2E ⓑ에서 iOS만 통과한 이유는 그대로 둔다 — Phase 8 데모 E2E에서 WebKit `no-cache` 처리 차이인지 한 줄로 확인.
+- Phase 8 재료(심사 §3): Q1 compose의 대사는 앱 안 스케줄러 그대로(cron 컨테이너 없음), 데모 스크립트는 `recon run --ym`을 한 번 불러 판정을 보인다. Q2 OTLP 넣는다 — compose에 Jaeger(또는 Tempo) + `opentelemetry-exporter-otlp`(Boot BOM), 내보내기는 속성으로만 켜고 시험 프로파일은 꺼진 채, 새 의존성은 검증 메타데이터 승인 대상, compose E2E가 수집기 API에서 스팬 하나를 읽어 속성 키 ⊆ 표 확인. Q3 위 F11. Q4 DD-19는 **Phase 8 0단계** — 이벤트 계약 `StatementEstimated` 설명문 표기 1.4.1("도래 예정 미리보기 포함, basisSeq는 하한") + 엔진 사본 갱신 PR(선승인 패턴). Q5 ETag 문장 그대로 — k6(§13) 홈 콜 p95가 문제면 그때. Q6 `run.sh`를 compose 안에서(판정 ⑤ 포함), §14.1 #14 닫기(Keycloak PKCE), README 포트폴리오 관점, 데모 생성기 부록 B.
+- 실 엔진 E2E는 병합 뒤 `main`에서 사용자가 실행 → `RESULT.md`(판정 다섯 — Phase 3·5·6·7 몫).
