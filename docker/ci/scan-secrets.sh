@@ -20,7 +20,7 @@ docker run --rm -v "$VOLUME:/s:ro" "$BUSYBOX" sh -c 'find /s -type f ! -name .ge
 files=$(wc -l < "$work/modes")
 bad=$(awk '$1 != "600"' "$work/modes" | wc -l)
 echo "files: $files, not 0600: $bad"
-[ "$files" -ge 15 ] || { echo 'FAIL: fewer secret files than generated'; failed=1; }
+[ "$files" -eq 14 ] || { echo 'FAIL: not the 14 files generate.sh writes'; failed=1; }
 [ "$bad" -eq 0 ] || { echo 'FAIL: a secret file is not 0600'; failed=1; }
 
 docker run --rm -v "$VOLUME:/s:ro" "$BUSYBOX" sh -c '
@@ -51,7 +51,10 @@ done
 scan 'compose E2E artifacts' web/build/compose-e2e
 
 echo '③ management port 9090:'
-if "${C[@]}" port portal 9090 > /dev/null 2>&1; then echo 'FAIL: 9090 is published'; failed=1; else echo '   not published'; fi
+# `docker compose port`는 공개되지 않은 포트에도 0으로 끝난다(":0") — 컨테이너의 실제 공개 목록을 본다: 8080 하나뿐이어야 한다.
+published=$(docker inspect -f '{{range $p, $b := .NetworkSettings.Ports}}{{if $b}}{{$p}} {{end}}{{end}}' "$("${C[@]}" ps -q portal)")
+echo "   portal publishes: ${published:-nothing}"
+[ "$published" = '8080/tcp ' ] || { echo 'FAIL: the portal publishes something other than 8080'; failed=1; }
 if curl -s --max-time 3 -o /dev/null http://127.0.0.1:9090/; then echo 'FAIL: 127.0.0.1:9090 answers'; failed=1; else echo '   127.0.0.1:9090 refuses'; fi
 
 echo 'images (service, image, id):'

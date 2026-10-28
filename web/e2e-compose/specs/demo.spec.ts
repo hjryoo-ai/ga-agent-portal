@@ -2,7 +2,7 @@
 // 시뮬레이션) 데이터 → 알림함·문의 접수 → 대사 `recon run`·`status`(compose exec) → 운영자 `ingest rebuild` 전후 응답 동일 → Jaeger 스팬 키 → 로그아웃.
 // 데모 스트림에는 엔진이 낼 수 없는 불일치가 없다 — 대사는 MATCH(OK)뿐이고 DRIFT 감지·복구·표식 유지의 증거는 하네스 E2E ⓐ~ⓔ′다(계획 Q4).
 // 화면 상태 표(보고서 — 스냅샷이 아니라 화면이 보인 문구·행 수)는 build/compose-e2e/screens.json.
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
@@ -23,8 +23,6 @@ import {
   watch,
 } from '../support';
 
-test.describe.configure({ mode: 'serial' });
-
 const AGENT = 'a-2001';
 interface Sample {
   name: string;
@@ -38,6 +36,18 @@ const sample = (name: string): Sample => {
   return s;
 };
 const screens: Record<string, Record<string, string | number>> = {};
+
+/**
+ * 화면 안 이동(라우터 — 문서를 다시 읽지 않는다). PKCE 토큰은 메모리에만 있어 `page.goto`(문서 새로 읽기)는 세션을 버린다 — 설계대로다(저장소 0).
+ * 그래서 로그인 뒤 이동은 사용자의 링크 이동처럼 history 항목을 더하고 라우터에 알린다.
+ */
+async function go(page: Page, path: string): Promise<void> {
+  await page.evaluate((p) => {
+    history.pushState(null, '', p);
+    dispatchEvent(new PopStateEvent('popstate'));
+  }, path);
+  await expect(page).toHaveURL(BASE + path);
+}
 
 test('로그인 → 다섯 화면 데이터 → 알림함·문의 → 로그아웃(IdP 세션도 끝)', async ({ page, context }) => {
   const w = await watch(context, page);
@@ -57,7 +67,7 @@ test('로그인 → 다섯 화면 데이터 → 알림함·문의 → 로그아�
   await check(page, 'home');
 
   // ② 월별 명세(확정 달)
-  await page.goto(`${BASE}/statements/202608`);
+  await go(page, '/statements/202608');
   await expect(page.getByTestId('lines').getByTestId('line').first()).toBeVisible();
   screens['statement 202608'] = {
     lines: await page.getByTestId('lines').getByTestId('line').count(),
@@ -66,20 +76,20 @@ test('로그인 → 다섯 화면 데이터 → 알림함·문의 → 로그아�
   await check(page, 'statement');
 
   // ③ 한도
-  await page.goto(`${BASE}/limits`);
+  await go(page, '/limits');
   await expect(page.getByTestId('ledger-card').first()).toBeVisible();
   screens['limits'] = { cards: await page.getByTestId('ledger-card').count() };
   await check(page, 'limits');
 
   // ④ 분급 타임라인
-  await page.goto(`${BASE}/deferrals`);
+  await go(page, '/deferrals');
   await expect(page.getByTestId('timeline-month').first()).toBeVisible();
   screens['timeline'] = { months: await page.getByTestId('timeline-month').count(), items: await page.getByTestId('timeline-item').count() };
   await check(page, 'timeline');
 
   // ⑤ 시뮬레이션 — 엔진 데모 샘플 요청 그대로 입력(P-24: 화면에 미리 채우는 코드 없음 — README 표의 값)
   const nc = sample('A-2001-new-contract');
-  await page.goto(`${BASE}/simulations`);
+  await go(page, '/simulations');
   const form = page.getByTestId('form-new');
   await form.getByTestId('field-productKey').locator('input').fill(String(nc.request['productKey']));
   await form.getByTestId('field-monthlyPremium').locator('input').fill(String(nc.request['monthlyPremium']));
@@ -99,13 +109,13 @@ test('로그인 → 다섯 화면 데이터 → 알림함·문의 → 로그아�
   await check(page, 'simulation');
 
   // 알림함
-  await page.goto(`${BASE}/notifications`);
+  await go(page, '/notifications');
   await expect(page.getByTestId('notifications').locator('[data-testid="notification"]').first()).toBeVisible();
   screens['notifications'] = { items: await page.getByTestId('notifications').locator('[data-testid="notification"]').count() };
   await check(page, 'notifications');
 
   // 문의 접수(기타 — 라인 없이)
-  await page.goto(`${BASE}/inquiries/new`);
+  await go(page, '/inquiries/new');
   await page.getByTestId('inquiry-message').fill('데모 문의 — 지난달 명세의 정정 항목을 확인 부탁드립니다');
   const created = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/v1/me/inquiries' && r.request().method() === 'POST');
   await page.getByTestId('inquiry-submit').click();
