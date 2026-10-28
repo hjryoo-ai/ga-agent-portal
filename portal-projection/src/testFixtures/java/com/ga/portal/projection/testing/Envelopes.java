@@ -32,6 +32,11 @@ public final class Envelopes {
         return repoRoot().resolve("contracts/events/v1/samples/a1/a1_portal_150000_e2.jsonl");
     }
 
+    /** 데모 테넌트 스트림(포털 Phase 8 ⓪ — 엔진 {@code DemoContractTest}가 낸 사본, 머리 줄 없음). */
+    public static Path demo() {
+        return repoRoot().resolve("contracts/shared/ga-commission-engine/samples/demo/demo_ga.jsonl");
+    }
+
     /** {@code portal-projection} 시험 자원의 골든 스트림. */
     public static Path stream(String name) {
         return repoRoot().resolve("portal-projection/src/test/resources/golden-streams").resolve(name);

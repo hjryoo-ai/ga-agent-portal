@@ -1,0 +1,4 @@
+{"agent_id":"A-2001","cleared_at":null,"flag_type":"CANCELLED","occurred_on":"2026-05-01","policy_no":"DEMO-0001","reason":"CANCEL"}
+{"agent_id":"A-2001","cleared_at":null,"flag_type":"CANCELLED","occurred_on":"2026-09-04","policy_no":"DEMO-0014","reason":"CANCEL"}
+{"agent_id":"A-2009","cleared_at":null,"flag_type":"CANCELLED","occurred_on":"2026-09-24","policy_no":"DEMO-0118","reason":"CANCEL"}
+{"agent_id":"A-2009","cleared_at":null,"flag_type":"REDUCED","occurred_on":"2027-05-28","policy_no":"DEMO-0126","reason":"REDUCE"}

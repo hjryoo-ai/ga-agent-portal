@@ -1,4 +1,4 @@
-hjryoo-ai/ga-commission-engine@38cdcee2f2e05824f7df3c8d4535ca0cc5c3dd41:commission-system/contracts
+hjryoo-ai/ga-commission-engine@9963809eafd307795f420e02551dc516b5e9027d:commission-system/contracts
 samples/simulations/event-cancel-6.request.json
 samples/simulations/event-cancel-6.response.json
 samples/simulations/event-cancel-7.request.json
@@ -45,3 +45,7 @@ samples/statements/estimate-cycle-01/index.json
 samples/statements/estimate-cycle-05/202801-estimate.request.json
 samples/statements/estimate-cycle-05/202801-estimate.response.json
 samples/statements/estimate-cycle-05/index.json
+samples/demo/cases.json
+samples/demo/demo_ga.jsonl
+samples/demo/simulations.json
+samples/demo/statements.json
