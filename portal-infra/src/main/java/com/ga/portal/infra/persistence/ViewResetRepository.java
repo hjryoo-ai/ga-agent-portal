@@ -31,6 +31,22 @@ public class ViewResetRepository extends ViewRepository {
     }
 
     /**
+     * 재구축 끝 불변식(설계서 §6.7 v1.11, F11): 미해결 DRIFT 행 — 그 행 이후(같은 시각 포함)에 같은 (설계사, 달)의 {@code REPAIRED} 행이 없다,
+     * 대사 {@code Episodes}와 같은 규칙 — 이 있는 달의 데이터 상태를 {@code DRIFT}로. 대사 표는 읽기만 한다. 바꾼 행 수.
+     */
+    public int restoreDriftMarks() {
+        return update("""
+                UPDATE earnings_month m SET data_status = 'DRIFT'
+                 WHERE m.tenant_id = :tenantId AND m.data_status <> 'DRIFT'
+                   AND EXISTS (SELECT 1 FROM recon_result d
+                                WHERE d.tenant_id = :tenantId AND d.agent_id = m.agent_id AND d.close_ym = m.close_ym AND d.status = 'DRIFT'
+                                  AND NOT EXISTS (SELECT 1 FROM recon_result r
+                                                   WHERE r.tenant_id = :tenantId AND r.agent_id = d.agent_id AND r.close_ym = d.close_ym
+                                                     AND r.status = 'REPAIRED' AND r.run_at >= d.run_at))
+                """, Map.of());
+    }
+
+    /**
      * 위반 키(값 없음): ⓐ 월 합계 세 열 = 그 달 라인의 Σ(설계서 §5 집계 정의) — 라인이 있는데 월 행이 없는 것도 ⓑ 원장 누적 = Σ 전기
      * ⓒ 전기 연쇄 — 각 전기의 {@code accum_after − 직전 accum_after = amount}(개설 누적 0, 재산정은 누적을 바꾸지 않는다 — DD-8).
      */
