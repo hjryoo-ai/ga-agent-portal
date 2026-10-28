@@ -18,6 +18,7 @@ import tools.jackson.dataformat.yaml.YAMLMapper;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -46,6 +47,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>v1.2(Phase 2 지시문 §0): 피드 400(M1), 분급 사유·채권 상태 닫힌 열거와 채권 금액 0 이상(M2·M3), 샘플 손질(M4),
  *       샘플 디렉터리 a1/·contract-only/·standalone/(M5).</li>
  *   <li>v1.3(Phase 2 승인 §3): a1/ = 엔진 E2 ⓪a의 A-1 스트림 바이트 그대로, 동기 API R1~R8.</li>
+ *   <li>v1.4.1(포털 Phase 8 ⓪a, DD-19): 표기만 — StatementEstimated.gross의 미리보기 문장, 설명문을 뺀 트리는 1.4.0과 같다.</li>
  * </ul>
  * 스키마 IRI는 저장소 파일로만 풀린다(원격 조회 없음): {@code https://ga.example/portal/contracts/} → {@code contracts/},
  * {@code https://ga.example/contracts/}(ga-disclosure의 IRI) → {@code contracts/shared/ga-disclosure/}.
@@ -550,6 +552,65 @@ class EventSchemaTest {
             assertThat(props.path("gross").path("description").asString()).as(type).contains("commType ∉ {CLAWBACK, ADJUSTMENT}").contains("전 상태 합산");
             assertThat(props.path("clawbackOffset").path("description").asString()).as(type).contains("commType = CLAWBACK").contains("≤ 0");
             assertThat(props.path("adjustment").path("description").asString()).as(type).contains("AdjustmentPosted");
+        }
+    }
+
+    /**
+     * v1.4.1(DD-19, 포털 Phase 8 ⓪a) — 표기만 바뀌었다: 이벤트 스키마 15개 전부에서 문자열 {@code description}을 뺀 트리(키 정렬)가
+     * 1.4.0과 같다. 다이제스트는 1.4.0(`main` = `2ccfc44`)에서 잰 값이다 — 제약을 바꾸는 개정은 이 값을 바꿔야 하고, 그것은 표기 변경이 아니다.
+     */
+    @Test
+    void descriptionOnlyChangesSince140() throws IOException {
+        List<Path> files;
+        try (Stream<Path> walk = Files.walk(CONTRACTS.resolve("events/v1"))) {
+            files = walk.filter(p -> p.toString().endsWith(".schema.json")).sorted().toList();
+        }
+        assertThat(files).hasSize(15);
+        StringBuilder all = new StringBuilder();
+        for (Path p : files) {
+            all.append(CONTRACTS.relativize(p).toString().replace('\\', '/')).append('\n')
+                    .append(JSON.writeValueAsString(withoutDescriptions(read(p)))).append('\n');
+        }
+        assertThat(sha256(all.toString())).isEqualTo("f26fd753e779e4086da52e1fc54416b5f1271f9787ef08a8df99e5518c6c1926");
+    }
+
+    private static JsonNode withoutDescriptions(JsonNode node) {
+        if (node.isObject()) {
+            TreeMap<String, JsonNode> fields = new TreeMap<>();
+            for (Map.Entry<String, JsonNode> e : node.properties()) {
+                if (!(e.getKey().equals("description") && e.getValue().isString())) {
+                    fields.put(e.getKey(), withoutDescriptions(e.getValue()));
+                }
+            }
+            ObjectNode sorted = JsonNodeFactory.instance.objectNode();
+            fields.forEach(sorted::set);
+            return sorted;
+        }
+        if (node.isArray()) {
+            ArrayNode copy = JsonNodeFactory.instance.arrayNode();
+            node.forEach(v -> copy.add(withoutDescriptions(v)));
+            return copy;
+        }
+        return node;
+    }
+
+    private static String sha256(String text) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** v1.4.1(DD-19): 잠정 명세의 gross는 그 달 도래 예정 분급의 미리보기를 더할 수 있다 — 포털 Σ와 같다는 보장이 없고, basisSeq는 하한이다. */
+    @Test
+    void v141EstimatedGrossDocumentsThePreview() {
+        String gross = payloadSchema("StatementEstimated").path("properties").path("gross").path("description").asString();
+        assertThat(gross).contains("도래 예정 분급").contains("미리보기").contains("같다는 보장이 없다").contains("basisSeq는 하한")
+                .doesNotContain("포털 earnings_month.gross와 같은 정의");
+        for (String type : List.of("StatementConfirmed", "PayoutCompleted")) {
+            assertThat(payloadSchema(type).path("properties").path("gross").path("description").asString()).as(type)
+                    .doesNotContain("미리보기");
         }
     }
 
