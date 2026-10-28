@@ -42,7 +42,7 @@ public class ViewResetRepository extends ViewRepository {
                                 WHERE d.tenant_id = :tenantId AND d.agent_id = m.agent_id AND d.close_ym = m.close_ym AND d.status = 'DRIFT'
                                   AND NOT EXISTS (SELECT 1 FROM recon_result r
                                                    WHERE r.tenant_id = :tenantId AND r.agent_id = d.agent_id AND r.close_ym = d.close_ym
-                                                     AND r.status = 'REPAIRED' AND r.run_at >= d.run_at))
+                                                     AND r.status = 'REPAIRED' AND r.run_at >= (SELECT min(o.run_at) FROM recon_result o WHERE o.tenant_id = :tenantId AND o.agent_id = d.agent_id AND o.close_ym = d.close_ym AND o.status = 'DRIFT')))
                 """, Map.of());
     }
 
