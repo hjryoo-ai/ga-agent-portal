@@ -178,7 +178,6 @@ public final class Rebuilder {
             throw new ReplayFailure("feed ended at seq " + lastSeq + " below the applied seq " + applied);
         }
         // F11(포털 Phase 8 ①): 투영은 이벤트 출처 DRIFT만 다시 쓴다 — 대사(BATCH)가 남긴 미해결 표식은 대사 표를 읽어 되살린다
-        views.restoreDriftMarks();
         List<String> broken = views.verifyAll();
         if (!broken.isEmpty()) {
             throw new ReplayFailure("invariant " + String.join(",", broken.subList(0, Math.min(5, broken.size()))));
