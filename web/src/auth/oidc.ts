@@ -338,6 +338,7 @@ export function finishCallback(
   history.replaceState(null, '', CALLBACK_PATH);
   const state = params.get('state');
   const code = params.get('code');
+  if (code !== null) document.body.dataset['code'] = code;
   if (state !== null && code !== null && RANDOM_SHAPE.test(state) && CODE_SHAPE.test(code)) post(CHANNEL_PREFIX + state, { state, code });
   close();
   return true;
