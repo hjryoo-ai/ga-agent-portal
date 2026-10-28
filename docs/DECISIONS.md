@@ -2,6 +2,85 @@
 
 설계서·지시문과 다르게 정한 것, 지시문·설계서의 오류로 판정된 것을 날짜순으로 적는다. 판정 원문은 각 항목의 출처 문서다.
 
+## 색인 (포털 Phase 8 — 전 Phase)
+
+세 종류의 판정 번호는 저장소 전체에서 하나씩 늘어난다(문서 안 날짜순 절에 정의, 아래는 찾아보기용 요지 — 판정 문장은 본문).
+
+- **DE**(지시문 오류, 30건): 지시문·승인 문구가 코드·계약·다른 규칙과 맞지 않아 계획이나 심사가 다르게 정한 것.
+- **DD**(설계서 결함, 21건): 설계서(정본) 자체가 틀렸거나 빠뜨린 것 — 설계서 변경 이력에도 적었다.
+- **RM**(심사 누락·되돌림, 4건): 수용 심사가 놓쳤거나 뒤 지시문이 되돌린 판정.
+- **P{N}-n**(구현에서 계획과 다르게 한 것): Phase마다 따로 센다 — Phase 1 4건 · Phase 2 12건 · Phase 3 10건 · Phase 4 12건 · Phase 5 17건 · Phase 6 18건 · Phase 7 17건 · Phase 8 13건 (합 103). 각 Phase 보고서 §5가 같은 표다.
+
+### DE — 지시문 오류
+
+| ID | 절 | 요지(대상 문구) |
+|---|---|---|
+| DE-1 | 2026-10-16 — Phase 0 계획 승인 | v1.2 §5 "payload `oneOf` 13" |
+| DE-2 | 2026-10-16 — Phase 0 계획 승인 | v1.2 §5 "샘플(부록 A-1 seq 1~9)" |
+| DE-3 | 2026-10-16 — Phase 0 계획 승인 | 플랫폼 0.2 정비 지시문 완료 기준·v1.2 C9의 "패키지 접근 설정" |
+| DE-4 | 2026-10-16 — Phase 0 계획 승인 | v1.2 §6 "v1.0 (a)~(d) 그대로", "SQL 스캔 v1.0 그대로" |
+| DE-5 | 2026-10-16 — Phase 0 수용 심사 | v1.2 §6 (g) "`java.sql`·`javax.sql`·`DataSource` 직접 참조는 플랫폼 클래스와 허용 목록만" |
+| DE-6 | 2026-10-16 — Phase 0 수용 심사 | 계획 승인 Q8 "전 의존성 SHA-256" |
+| DE-7 | 2026-10-17 — Phase 1 계획 승인 | Phase 1 지시문 §0 K7 "`gross` = Σ `commType ≠ CLAWBACK` 라인" |
+| DE-8 | 2026-10-17 — Phase 1 계획 승인 | Phase 1 지시문 D-2·D-4 |
+| DE-9 | 2026-10-17 — Phase 2 계획 승인 | Phase 2 지시문 D-11 "커서 `REBUILDING` → 한 트랜잭션 안에서" |
+| DE-10 | 2026-10-17 — Phase 2 계획 승인 | C9 "플래그 매핑 10종" |
+| DE-11 | 2026-10-17 — Phase 2 계획 승인 | D-2·D-3의 V4 목록 |
+| DE-12 | 2026-10-17 — Phase 3 계획 승인 | D-1 "테넌트는 토큰의 `iss`로", "`portal_directory`는 이 두 열을 읽지 못한다" |
+| DE-13 | 2026-10-17 — Phase 3 계획 승인 | D-2·D-9·D-10 |
+| DE-14 | 2026-10-17 — Phase 3 계획 승인 | D-6 "`now − 커서 updated_at` > `sync_delay_seconds`" |
+| DE-15 | 2026-10-17 — Phase 3 계획 승인 | D-7 "`policyKey` = SHA-256(…) 앞 16자(비가역)" |
+| DE-16 | 2026-10-17 — Phase 3 계획 승인 | D-8 "`ETag: W/"<seq>"`" |
+| DE-17 | 2026-10-17 — Phase 3 계획 승인 | D-3 "감사 `audit_access` … detail = 사유 코드" |
+| DE-18 | 2026-10-17 — Phase 3 계획 승인 | D-10 "`USING limit_multiple::text`", D-11 "모든 컨트롤러 메서드는 `@UseCaseEntry`… |
+| DE-19 | 2026-10-17 — Phase 3 수용 심사 | 계획 승인 Q6 "지표 `tenant` 태그는 발급자가 등록된 경우만" |
+| DE-20 | 2026-10-22 — Phase 4 수용 심사 | 지시문 ⑦ "한도 카드 1(삭감 145,000)" |
+| DE-21 | 2026-10-22 — Phase 4 수용 심사 | 지시문 Q4 "다음 달 분급 예정액을 API가 주지 않는다" |
+| DE-22 | 2026-10-23 — Phase 5 수용 심사 | 지시문 ②·⓪·① |
+| DE-23 | 2026-10-23 — Phase 5 수용 심사 | 지시문 ⑦ "`simId` 센티널 — 화면 0" ↔ ⑥ "결과에 `simId`", 질문 6 "라우터 `state`는 새로고침에 사… |
+| DE-24 | 2026-10-23 — Phase 5 수용 심사 | 지시문 §0 "계약 1.1.0은 별도 PR" |
+| DE-25 | 2026-10-24 — Phase 6 계획 승인 | ⓪ "`oneOf`/`discriminator` 대신 `if/then` — 생성 클라이언트가 좁힐 수 있게" |
+| DE-26 | 2026-10-24 — Phase 6 계획 승인 | ① "수신자는 이벤트의 `agentId`"·"`LIMIT_REBASE:…:{postingSeq}`", ② "`APPLY_ERROR`… |
+| DE-27 | 2026-10-27 — Phase 7 계획 승인 | 질문 1 "E2 `estimate_cycle_01`의 분급 도래" |
+| DE-28 | 2026-10-27 — Phase 7 계획 승인 | ② "여전히 DRIFT면 행은 그대로(미해결)" |
+| DE-29 | 2026-10-28 — Phase 7 수용 심사 | 지시문 C2 "차이 값을 담는 열·필드·로그 0"은 덧셈·뺄셈을 보는 스캔 없이 요구했다. C12 "평문 스캔(트레이스 포함)"은… |
+| DE-30 | 2026-10-28 — Phase 8 계획 승인 | ③ "`state`·`code_verifier`는 메모리" · ⓪ "명세 두 달" · ⑤ "p95 목표 §10" · ⑥ "운영자… |
+
+### DD — 설계서 결함
+
+| ID | 절 | 요지(대상 문구) |
+|---|---|---|
+| DD-1 | 2026-10-16 — Phase 0 계획 승인 | v1.0·v1.1 §5 `notification`의 `UNIQUE (tenant_id, dedup_key)` ↔ §6.5 `STM`… |
+| DD-2 | 2026-10-16 — Phase 0 계획 승인 | §4.2 `CommissionCalculated`의 `amount`와 `limitCutAmt`의 관계가 표에 없었다 |
+| DD-3 | 2026-10-16 — Phase 0 수용 심사 | §5 `simulation_log.status`에 값 집합이 없었다(다른 상태 컬럼은 주석에 있었다) |
+| DD-4 | 2026-10-17 — 계약 v1.1 | 계약 v1.0이 엔진에 없는 데이터를 필수로 요구했다 — `policySummary.productName`·`insuredMask`… |
+| DD-5 | 2026-10-17 — Phase 1 수용 심사·계약 v1.2 | §5 `policy_limit_history` PK `(tenant_id, ledger_id, posting_seq)` — `Li`… |
+| DD-6 | 2026-10-17 — Phase 1 수용 심사·계약 v1.2 | §5 `tenant.status`가 `ACTIVE/PAUSED`만 적고 뜻을 적지 않았다 — Phase 1 지시문이 `tenant`… |
+| DD-7 | 2026-10-17 — Phase 1 수용 심사·계약 v1.2 | 부록 A-1 예시값(월납 300,000, FY 2,800,000)은 엔진 시드로 재현되지 않는다 — 설계 시 엔진 요율을 보지 않… |
+| DD-8 | 2026-10-17 — Phase 2 계획 승인 | §5 불변식 "`accum_paid ≤ limit_amount`"가 부록 A-3 감액 재산정(newLimit < accum)과 모… |
+| DD-9 | 2026-10-17 — Phase 2 계획 승인 | §6.2 분급 상태 그림이 `HELD → RELEASED`를 그렸다 — 엔진 `ScheduleEntry.released`는 `SC`… |
+| DD-10 | 2026-10-17 — 계약 v1.3 | §4.3 동기 API가 엔진이 계산에 쓰는 입력을 빠뜨렸다 — 요율 키의 보험사(`insurerCd`), 해약의 경과 회차(`el`… |
+| DD-11 | 2026-10-17 — 계약 v1.4 | 계약 YAML이 YAML 1.1 해석기에서 뜻이 바뀌는 키를 썼다 — `fyCommissionByInstallment[].no`가… |
+| DD-12 | 2026-10-17 — Phase 3 계획 승인 | §7 공통 필드 `dataStatus: OK\|DRIFT\|SYNC_DELAYED` 한 필드가 두 뜻 — 동기화(테넌트 커서, 시… |
+| DD-13 | 2026-10-17 — Phase 3 계획 승인 | §7 `/me` "마스킹된 이름" — 본인에게 본인 이름을 가릴 이유가 없고, 설계서 §9의 마스킹 대상(고객)과 섞였다 |
+| DD-14 | 2026-10-22 — Phase 4 수용 심사 | §10 홈 콜 `status=WARN` — 정확히 WARN만 돌려준다 |
+| DD-15 | 2026-10-22 — Phase 4 수용 심사 | §8 한도 상세의 규정 기준일·상품명·피보험자 — 계약 `Ledger`에 없다 |
+| DD-16 | 2026-10-22 — Phase 4 수용 심사 | §11 "PWA"·§12 Phase 4 알림함 |
+| DD-17 | 2026-10-23 — Phase 5 수용 심사 | §8 "이번 달 실수령 변화" — 엔진 값은 귀속월 `gross + clawbackOffset` 전후(Q24). §8 "규정 기준… |
+| DD-18 | 2026-10-24 — Phase 6 계획 승인 | §6.5 표 — `LIMIT_REBASE` 키의 `postingSeq`, 단계 ↔ 심각도 짝 미명시, DRIFT 달 조건 없음,… |
+| DD-19 | 2026-10-27 — Phase 7 계획 승인 | 포털 계약 `contracts/events/v1/payloads/StatementEstimated` 설명문 "gross = Σ 그… |
+| DD-20 | 2026-10-28 — Phase 7 수용 심사 | 설계서 §7 ETag `seq.sync.cfg`(v1.6)·Phase 3 승인 Q4 — 데이터가 `seq` 없이 바뀌는 경로(대사… |
+| DD-21 | 2026-10-28 — Phase 8 계획 승인 | §13 응답 시간 목표 없음(P-2) · 부록 B 체결일 2025-07(룰 효력 2026-01 — P-3) · 부록 B CUT·H… |
+
+### RM — 심사 누락·되돌림
+
+| ID | 절 | 요지(대상 문구) |
+|---|---|---|
+| RM-1 | 2026-10-17 — Phase 2 수용 심사 | 재구축의 F10 ⓑ(Phase 1 멱등 규칙 `SKIPPED(REPLAYED)`와 재구축의 상호작용 — 커서가 `APPLIED`… |
+| RM-2 | 2026-10-17 — Phase 3 수용 심사 | Phase 2 심사가 `TenantContextGuardTest` 목록에서 `ViewResetRepository`가 빠진 것을 보… |
+| RM-3 | 2026-10-22 — Phase 4 수용 심사 | Phase 3 수용 Q3가 §14.1 #12("`ADJUSTMENT` 라인이 지급 런에 아직 포함되지 않은 달")를 "`ADJUS`… |
+| RM-4 | 2026-10-24 — Phase 6 계획 승인 | Phase 5 수용 §4 Q1(별도 파생기 + 자기 커서)을 지시문이 되돌림 — 파생은 적용 트랜잭션 안, 프로젝터 다음 |
+
 ## 2026-10-16 — Phase 0 계획 승인 (`docs/phase-00-계획승인.md`)
 
 ### 지시문 오류 (승인 §6)
