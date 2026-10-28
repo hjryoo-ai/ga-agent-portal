@@ -1,5 +1,7 @@
 // 화면 코드 린트(포털 Phase 4 계획 ④-b): any 0, 금액 연산 0, 수기 네트워크 0, 브라우저 저장소 0, 서비스 워커 0, 콘솔 0, 한글 리터럴은 messages.ko.json만.
-// 네트워크는 생성 클라이언트(openapi-fetch)뿐이고 그것을 만드는 곳은 src/api/client.ts 하나다(no-restricted-imports). 예외는 두지 않는다.
+// 네트워크는 생성 클라이언트(openapi-fetch)뿐이고 그것을 만드는 곳은 src/api/client.ts 하나다(no-restricted-imports). 예외는 닫힌 두 파일뿐이다(마지막 두 블록):
+// src/api/client.ts(openapi-fetch) · src/auth/oidc.ts(포털 Phase 8 — 발급자 출처로의 디스커버리·토큰·갱신·종료 fetch, 계획 P-11·돌이킬 수 없는 결정 7).
+// 저장소 금지는 두 파일에서도 그대로다. lintRules.test.ts가 "예외는 정확히 두 파일"과 "다른 파일의 fetch는 여전히 실패"를 본다.
 import js from '@eslint/js';
 import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
@@ -22,6 +24,8 @@ const restrictedProperties = [
   { object: 'document', property: 'cookie', message: STORAGE },
 ];
 const clientOnly = { name: 'openapi-fetch', message: 'The API client is created only in src/api/client.ts (Phase 4 C1).' };
+/** 네트워크 예외 파일(닫힌 목록 — lintRules.test.ts). */
+export const NETWORK_EXCEPTIONS = ['src/api/client.ts', 'src/auth/oidc.ts'];
 
 export default tseslint.config(
   { ignores: ['build/**', 'node_modules/**', 'src/gen/**', '.gradle/**', 'test-results/**', 'playwright-report/**'] },
@@ -35,13 +39,13 @@ export default tseslint.config(
     },
   },
   {
-    files: ['eslint.config.js', 'eslint/**/*.js', 'scripts/**/*.mjs', 'e2e/**/*.mjs'],
+    files: ['eslint.config.js', 'eslint/**/*.js', 'scripts/**/*.mjs', 'e2e/**/*.mjs', 'e2e-compose/**/*.mjs'],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: { globals: globals.node },
   },
   {
     // E2E(Node 쪽 Playwright 시험): 브라우저 금지 규칙 밖 — 하네스 제어·토큰 파일은 Node에서 읽는다. 금액 규칙은 화면 코드(src)의 것이다.
-    files: ['e2e/**/*.ts', 'playwright.config.ts'],
+    files: ['e2e/**/*.ts', 'e2e-compose/**/*.ts', 'playwright.config.ts', 'playwright.compose.config.ts'],
     languageOptions: { globals: globals.node },
   },
   {
@@ -66,8 +70,16 @@ export default tseslint.config(
     },
   },
   {
-    // 생성 클라이언트를 만드는 한 파일만 openapi-fetch를 가져온다(마지막 블록 — 위 금지를 이 파일에서만 덮는다).
-    files: ['src/api/client.ts'],
+    // 생성 클라이언트를 만드는 한 파일만 openapi-fetch를 가져온다(위 금지를 이 파일에서만 덮는다).
+    files: [NETWORK_EXCEPTIONS[0]],
     rules: { 'no-restricted-imports': ['error', { patterns: [{ group: ['node:*'], message: 'Browser code.' }] }] },
+  },
+  {
+    // PKCE(포털 Phase 8): 발급자 출처로의 fetch만 이 파일에서 연다 — 저장소·XMLHttpRequest·WebSocket·EventSource·sendBeacon 금지는 그대로.
+    files: [NETWORK_EXCEPTIONS[1]],
+    rules: {
+      'no-restricted-globals': ['error', ...restrictedGlobals.filter((g) => g.name !== 'fetch')],
+      'no-restricted-properties': ['error', ...restrictedProperties.filter((p) => p.property !== 'fetch')],
+    },
   },
 );

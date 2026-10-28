@@ -37,14 +37,22 @@ class RebuilderTest {
     private final List<String> steps = new ArrayList<>();
     private final Rebuilder.Audit audit = (step, target) -> steps.add(step + " " + target);
 
-    /** 지운 횟수와, 불변식이 돌려줄 위반 키. */
+    /** 지운 횟수, 표식 복원 횟수(재생 뒤·불변식 앞), 불변식이 돌려줄 위반 키. */
     private final class Views implements ViewReset {
         int deletes;
+        int restores;
         List<String> broken = List.of();
 
         @Override
         public void deleteViews() {
             deletes++;
+        }
+
+        @Override
+        public int restoreDriftMarks() {
+            assertThat(recorder.applied(T)).as("restored after the replay").isNotEmpty();
+            restores++;
+            return 0;
         }
 
         @Override
@@ -73,6 +81,7 @@ class RebuilderTest {
 
         assertThat(r).isEqualTo(new Rebuilder.Result.Rebuilt(17, 17));
         assertThat(views.deletes).isEqualTo(1);
+        assertThat(views.restores).as("F11 — the drift marks are restored once, at the end of txB").isEqualTo(1);
         assertThat(recorder.applied(T)).hasSize(34);   // 적용 17 + 재생 17
         assertThat(db.cursorOf(T)).hasValueSatisfying(c -> {
             assertThat(c.state()).isEqualTo(IngestState.RUNNING);

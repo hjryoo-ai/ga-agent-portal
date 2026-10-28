@@ -20,6 +20,11 @@ public final class JdbcViewReset implements ViewReset {
     }
 
     @Override
+    public int restoreDriftMarks() {
+        return repository.restoreDriftMarks();
+    }
+
+    @Override
     public List<String> verifyAll() {
         return repository.violations();
     }

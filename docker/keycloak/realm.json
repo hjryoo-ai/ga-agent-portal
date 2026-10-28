@@ -1,0 +1,625 @@
+{
+  "accessTokenLifespan": 300,
+  "bruteForceProtected": true,
+  "clients": [
+    {
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:8080/"
+      },
+      "clientId": "portal-web",
+      "directAccessGrantsEnabled": false,
+      "enabled": true,
+      "frontchannelLogout": false,
+      "implicitFlowEnabled": false,
+      "name": "GA portal screens",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "included.custom.audience": "portal-demo",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          },
+          "consentRequired": false,
+          "name": "portal-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper"
+        }
+      ],
+      "publicClient": true,
+      "redirectUris": [
+        "http://localhost:8080/auth/callback"
+      ],
+      "serviceAccountsEnabled": false,
+      "standardFlowEnabled": true,
+      "webOrigins": [
+        "http://localhost:8080"
+      ]
+    },
+    {
+      "clientId": "k6",
+      "directAccessGrantsEnabled": true,
+      "enabled": true,
+      "implicitFlowEnabled": false,
+      "name": "load test (demo realm only)",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "included.custom.audience": "portal-demo",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          },
+          "consentRequired": false,
+          "name": "portal-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper"
+        }
+      ],
+      "publicClient": true,
+      "redirectUris": [],
+      "serviceAccountsEnabled": false,
+      "standardFlowEnabled": false,
+      "webOrigins": []
+    }
+  ],
+  "displayName": "GA portal demo (fictional)",
+  "enabled": true,
+  "loginWithEmailAllowed": false,
+  "realm": "demo",
+  "refreshTokenMaxReuse": 0,
+  "registrationAllowed": false,
+  "rememberMe": false,
+  "resetPasswordAllowed": false,
+  "revokeRefreshToken": true,
+  "sslRequired": "none",
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 28800,
+  "users": [
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"q9Y1wazLzcGjgApA+bJi93Ow4vqWMPuefCXNMCt+u/0=\",\"salt\":\"vqKKVwIOuSdztdY/SxYKEQ==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2001@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002001",
+      "lastName": "Agent 2001",
+      "requiredActions": [],
+      "username": "a-2001"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"u57lCvuljA8O4QAbSdQf4k+VY5hxA2DrPcUmI9j0RNA=\",\"salt\":\"7PaJsWEG0X425b25wCdScw==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2002@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002002",
+      "lastName": "Agent 2002",
+      "requiredActions": [],
+      "username": "a-2002"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"GFl+V9E3cLVqca67muqGtUt+A1VqGEHnI7f8tcy5GgY=\",\"salt\":\"6phgj1OTgASESwCJypP+oA==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2003@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002003",
+      "lastName": "Agent 2003",
+      "requiredActions": [],
+      "username": "a-2003"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"b4CPaXJidL84j2uNcoDkr/PaqH+fzesO63xvmJfGsjU=\",\"salt\":\"P0EBBAqcGM+HhAyykgYuJQ==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2004@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002004",
+      "lastName": "Agent 2004",
+      "requiredActions": [],
+      "username": "a-2004"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"lLSXC2zSf7Dk2x0rEVfVMvCWQ+rYgZnARkPuNiQ3T28=\",\"salt\":\"93i1YlLbCRQ8D3V2z7ZBOg==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2005@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002005",
+      "lastName": "Agent 2005",
+      "requiredActions": [],
+      "username": "a-2005"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"+MUjudWTIXI4KfHUssG7Dh6/uz5AalFy7AjNi2ZYqX4=\",\"salt\":\"odrhvOKwbtTlK7p8b+l9tg==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2006@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002006",
+      "lastName": "Agent 2006",
+      "requiredActions": [],
+      "username": "a-2006"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"pD4L2P0FiWQmkHt1Qx3UPeJSy8SR665R1aeBFi4hbmg=\",\"salt\":\"i8YEtjQBd5m2pK4RZvQwCQ==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2007@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002007",
+      "lastName": "Agent 2007",
+      "requiredActions": [],
+      "username": "a-2007"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"tXTOugvf8qN77GQqOaetua3fK84FxZyZOPfr7FcmN9w=\",\"salt\":\"95rIDCO5OvtjgAWTHU+tDQ==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2008@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002008",
+      "lastName": "Agent 2008",
+      "requiredActions": [],
+      "username": "a-2008"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"aB2TSgpe6BaQhQfzvRNUUg++oku9vtD/qJ5oa+tdg0c=\",\"salt\":\"NCC6OpnJXmPGBmxUq9E04g==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2009@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002009",
+      "lastName": "Agent 2009",
+      "requiredActions": [],
+      "username": "a-2009"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"7tY+hOFst2sKml5CnVEBkvH/pgw67U9+SCf11BnlazQ=\",\"salt\":\"PFZBy3f067kaslaKg1dx4w==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2010@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002010",
+      "lastName": "Agent 2010",
+      "requiredActions": [],
+      "username": "a-2010"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"NI+ylG2dwGzmP9Vsww2+Xs4iuLQVS5Q9ZQHDK0MIg8w=\",\"salt\":\"bwJxDZnrU3xtPigmvY4evw==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2011@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002011",
+      "lastName": "Agent 2011",
+      "requiredActions": [],
+      "username": "a-2011"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"jvJSlSvFRSdqHfa384iWKWYqZsWz93eVsjYTSOoimtc=\",\"salt\":\"sJ8FIvU3x54VSCt6FuyEOA==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2012@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002012",
+      "lastName": "Agent 2012",
+      "requiredActions": [],
+      "username": "a-2012"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"IkFXvF5JtGOL0SpJVwoJZ1T3KtjFxxD8maB+CQjF+bs=\",\"salt\":\"iU540pVCYphmwf2pF7FBYA==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2013@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002013",
+      "lastName": "Agent 2013",
+      "requiredActions": [],
+      "username": "a-2013"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"CmfA/gra7zKh/sod5YbkdBUUCt2//Kn5khYO6ii8YRw=\",\"salt\":\"AqBwTtVj4CtxgEETcs2g5A==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2014@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002014",
+      "lastName": "Agent 2014",
+      "requiredActions": [],
+      "username": "a-2014"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"lR1Sb/GXwxEcJADZnmxxd0JOeVVfh47ZaA541x08jH8=\",\"salt\":\"3ypu4INr1mKL8wFHh26VaQ==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2015@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002015",
+      "lastName": "Agent 2015",
+      "requiredActions": [],
+      "username": "a-2015"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"Ngt8Y9jisi/BqhjB8ie+f91WC9GMfR6bnnENRec2DPw=\",\"salt\":\"ZD2dM11gST18CAv4OU+Maw==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2016@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002016",
+      "lastName": "Agent 2016",
+      "requiredActions": [],
+      "username": "a-2016"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"nXmW+vpseg6SNU58H7iv345m9KZkcHRumDGzqTET3E4=\",\"salt\":\"KwvlGjigTvuxXBkY28hW2g==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2017@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002017",
+      "lastName": "Agent 2017",
+      "requiredActions": [],
+      "username": "a-2017"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"ygivw6mpYzx9Qam45oiCDNAUpK4IGOAGY9U0G4hkSgU=\",\"salt\":\"7pmf35GieRJcVFhhigOzdQ==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2018@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002018",
+      "lastName": "Agent 2018",
+      "requiredActions": [],
+      "username": "a-2018"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"vaRge+j9NQ8vhzKiG7ZsUp4TFbQWJJofvMg7dhRkxgc=\",\"salt\":\"Ejjb+/wxKCBaOM5M7gFHTg==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2019@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002019",
+      "lastName": "Agent 2019",
+      "requiredActions": [],
+      "username": "a-2019"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"KA/jRvD4ZRVjeVnpOOb/6Ub5SCKd8HYv2MgLQ0riCeM=\",\"salt\":\"5B7KLpnxhF6g1IUBRjMnjQ==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2020@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002020",
+      "lastName": "Agent 2020",
+      "requiredActions": [],
+      "username": "a-2020"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"+AFAwJi1RrQOZusnnAMLcroiAi9mxTy3BjGWaZTS7QY=\",\"salt\":\"hvVD9LJIMEot+NelxtcjqQ==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2021@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002021",
+      "lastName": "Agent 2021",
+      "requiredActions": [],
+      "username": "a-2021"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"RW0yDOAJx5p5WSNb4NZZlmcHnv05H1iKOd4MMKHitC4=\",\"salt\":\"GieS3Vj902rgpPYpIGmTGw==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2022@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002022",
+      "lastName": "Agent 2022",
+      "requiredActions": [],
+      "username": "a-2022"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"Ktd/NsLfyaacGkZXnJL8aZVQO/WgymMrsT8N0ItIZUk=\",\"salt\":\"8HtlByUHzag6kyBPQkMkVw==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2023@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002023",
+      "lastName": "Agent 2023",
+      "requiredActions": [],
+      "username": "a-2023"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"KX7F1TKdmYOFv2zk5x7bAXyyJH++FdisonlJmTV9RPM=\",\"salt\":\"qum2mPNmCmn2ic8ZnRvvuw==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2024@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002024",
+      "lastName": "Agent 2024",
+      "requiredActions": [],
+      "username": "a-2024"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"QQ1oxEKHyMtOJBllYHuBm8L8ujEuUlyEMhfQCOpNx74=\",\"salt\":\"yKLNQxp1h9Els6zz2YP9Kg==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2025@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002025",
+      "lastName": "Agent 2025",
+      "requiredActions": [],
+      "username": "a-2025"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"Ghuha2KDgHX8vvKzEs0ropb6dc/rFzmLzxTbD0d7Oxw=\",\"salt\":\"zg9EJMk1wzQSlbZ4r3t23A==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2026@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002026",
+      "lastName": "Agent 2026",
+      "requiredActions": [],
+      "username": "a-2026"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"jmF1cCaOWmyMFgEde7+jiYfqnp6n28B+B/Y+yUKlK5A=\",\"salt\":\"l/rTibA2L+DNOWGlhJAnSg==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2027@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002027",
+      "lastName": "Agent 2027",
+      "requiredActions": [],
+      "username": "a-2027"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"l8/YAOpV060+8Beh4aPF7DsFfuq+cO3eqBG4rZNDfnc=\",\"salt\":\"a+lo8c3ymOOsojGtfTBO0A==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2028@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002028",
+      "lastName": "Agent 2028",
+      "requiredActions": [],
+      "username": "a-2028"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"dYP7NC4/IcwMhSw80r4/F3QX1JCWWm9qR/19wMsq/K8=\",\"salt\":\"LDTjHVGTjJLmoNKaQkjIVg==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2029@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002029",
+      "lastName": "Agent 2029",
+      "requiredActions": [],
+      "username": "a-2029"
+    },
+    {
+      "credentials": [
+        {
+          "credentialData": "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}",
+          "secretData": "{\"value\":\"gtfgMWS8s5Y2TXd98r+DkzsP07yRKX3y46ge/iOL6YY=\",\"salt\":\"N/i+ZmmL6/uo2TUaIIvL0g==\",\"additionalParameters\":{}}",
+          "type": "password",
+          "userLabel": "demo"
+        }
+      ],
+      "email": "a-2030@demo.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "id": "00000000-0000-4000-8000-000000002030",
+      "lastName": "Agent 2030",
+      "requiredActions": [],
+      "username": "a-2030"
+    }
+  ]
+}

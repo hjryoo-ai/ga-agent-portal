@@ -38,7 +38,11 @@ class TenantPredicateScanTest {
             new AllowedStatement("portal-infra/src/main/java/com/ga/portal/infra/directory/IssuerDirectoryReader.java",
                     "select tenant_id, oidc_issuer, oidc_audience from tenant where oidc_issuer = :issuer",
                     "발급자 → 테넌트(Phase 3 계획 승인 Q1): 테넌트를 바인딩하기 전의 조회. 전용 롤 portal_issuer가 tenant의 세 열만 읽는다 — "
-                            + "ArchitectureRulesTest.PORTAL_DB_ALLOWLIST의 항목, IssuerDirectoryIT"));
+                            + "ArchitectureRulesTest.PORTAL_DB_ALLOWLIST의 항목, IssuerDirectoryIT"),
+            new AllowedStatement("portal-infra/src/main/java/com/ga/portal/infra/directory/IssuerDirectoryReader.java",
+                    "select oidc_issuer, oidc_client_id from tenant where web_origin = :origin",
+                    "요청 출처 → 로그인 설정(Phase 8 계획 Q2·P-13, 조건 A): 인증 없는 GET /auth/config와 화면 CSP. 같은 클래스·같은 롤 — "
+                            + "V10이 web_origin·oidc_client_id 두 열 SELECT만 더했다(IssuerDirectoryIT)"));
 
     private static boolean allowed(SqlTenantScanner.Violation v) {
         return ALLOWLIST.stream().anyMatch(a -> a.source().equals(v.source()) && a.statement().equals(v.statement()));
@@ -94,7 +98,7 @@ class TenantPredicateScanTest {
 
     @Test
     void scanCoversMigrationsAndRepositories() {
-        assertThat(sqlFiles).extracting(p -> p.getFileName().toString()).containsExactly("V1__init.sql", "V2__rls.sql", "V3__ingest_payload_hash.sql", "V4__projection.sql",
+        assertThat(sqlFiles).extracting(p -> p.getFileName().toString()).containsExactly("V10__web_login.sql", "V1__init.sql", "V2__rls.sql", "V3__ingest_payload_hash.sql", "V4__projection.sql",
                 "V5__query_api.sql", "V6__simulation_log.sql", "V7__inbox.sql", "V8__recon_run.sql", "V9__recon_run_outcome.sql");
         assertThat(knownTables).hasSize(18).contains("tenant", "earnings_line", "ingest_cursor", "audit_access", "recon_run");
         long javaSqlCount = javaFiles.stream().mapToLong(p -> SqlTenantScanner.sqlLiteralsInJava(read(p)).size()).sum();
@@ -103,8 +107,9 @@ class TenantPredicateScanTest {
                 + "DeferralItem 3, ClawbackItem 2, PolicyFlag 2, ReconResult 1, ViewReset 8 DELETE + 3 invariant queries; Phase 3: IngestCursor +2 caught_up_at, IssuerDirectoryReader 1, IdentityLink 1, "
                 + "AuditAccess +1 denial, AgentQuery 16, SyncStatus 1; Phase 5: AgentQuery +3 monthDetail·deferralPolicies·policies, "
                 + "SimulationLog 4, SimulationLock 1; Phase 6: Notification 4, Inquiry 7, InquiryOperator 4; Phase 7: EarningsMonth +2 findByMonths·markDataStatus, "
-                + "ReconResult +1 driftAndRepaired, InquiryOperator +1 openSummary, ReconLock 1, ReconRun 7, SyncStatus +1 lastRecon)")
-                .isEqualTo(11 + 20 + 11 + 2 + 3 + 17 + 3 + 4 + 1 + 4 + 7 + 4 + 13);
+                + "ReconResult +1 driftAndRepaired, InquiryOperator +1 openSummary, ReconLock 1, ReconRun 7, SyncStatus +1 lastRecon; "
+                + "Phase 8: ViewReset +1 restoreDriftMarks, IssuerDirectoryReader +1 byWebOrigin)")
+                .isEqualTo(11 + 20 + 11 + 2 + 3 + 17 + 3 + 4 + 1 + 4 + 7 + 4 + 13 + 1 + 1);
     }
 
     @Test
@@ -123,8 +128,9 @@ class TenantPredicateScanTest {
             assertThat(flagged).as("쓰이지 않는 허용 목록 항목(제거할 것): %s", a.statement())
                     .anyMatch(v -> v.source().equals(a.source()) && v.statement().equals(a.statement()));
         });
-        assertThat(ALLOWLIST).extracting(AllowedStatement::source).as("Phase 3: the issuer directory reader only")
-                .containsExactly("portal-infra/src/main/java/com/ga/portal/infra/directory/IssuerDirectoryReader.java");
+        assertThat(ALLOWLIST).extracting(AllowedStatement::source).as("Phase 3: the issuer directory reader only (Phase 8: its second statement)")
+                .containsExactly("portal-infra/src/main/java/com/ga/portal/infra/directory/IssuerDirectoryReader.java",
+                        "portal-infra/src/main/java/com/ga/portal/infra/directory/IssuerDirectoryReader.java");
     }
 
     // ------------------------------------------------------------------ 두 번째 술어(포털 Phase 3 지시문 D-4)

@@ -28,9 +28,10 @@ class GoldenStreamsTest {
             "engine-e2-estimate/estimate_cycle_02_채권_상계.jsonl,cd188a12c2dc4eb5e82863977a3623e9b7699bb552dba509cfd1ce207768d810",
             "engine-e2-estimate/estimate_cycle_03_정정_포함.jsonl,4f1d5e19928009b511976b732a15e8a2048e98f3784b78fe078cb0ad52ad72b6",
             "engine-e2-estimate/estimate_cycle_04_음수_순액_채권화.jsonl,9067d8bbac247453914ccfd3f20ca65fc28b2f3c70b7aa48c8e308f63267519f",
-            "engine-e2-estimate/estimate_cycle_05_분급_도래.jsonl,049e480a3f6cd91fab67ecccebe12f673b88e0fd4bbcd231424d961e8680a9cb"})
+            "engine-e2-estimate/estimate_cycle_05_분급_도래.jsonl,049e480a3f6cd91fab67ecccebe12f673b88e0fd4bbcd231424d961e8680a9cb",
+            "demo,d3c896cfb0f82e2b1f886dfafeda05c997d3e42bd62982b675712a3b00575c9c"})
     void engineCopiesAreByteForByte(String name, String sha256) throws IOException, NoSuchAlgorithmException {
-        Path file = name.equals("contract") ? Envelopes.a1() : Envelopes.stream(name);
+        Path file = name.equals("contract") ? Envelopes.a1() : name.equals("demo") ? Envelopes.demo() : Envelopes.stream(name);
         assertThat(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)))).isEqualTo(sha256);
     }
 

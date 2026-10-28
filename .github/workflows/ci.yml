@@ -119,6 +119,70 @@ jobs:
             web/build/e2e/axe/**
             web/build/e2e/logs/**
 
+  compose-e2e:
+    # 포털 Phase 8 지시문 ⑥·C5·C6·C9(계획 ⑤): docker/compose.yaml(프로파일 demo)을 그대로 띄워 — 이미지는 자격 증명 없이 공개 소스에서 빌드한다 —
+    # README 계정 PKCE 로그인 → 다섯 화면·알림함·문의 → recon run·status·운영자 재구축 → Jaeger 스팬 키 → 로그아웃(Playwright 데스크톱 Chromium 하나).
+    # 그 뒤 스택이 떠 있는 채로 비밀 스캔(docker/ci/scan-secrets.sh — compose 설정·로그·inspect·이미지·산출물, 파일 0600, 관리 포트 비공개)을 하고 내린다.
+    # Docker가 없으면 실패한다(스킵 없음 — no-docker 잡의 규약과 같다). GHP 비밀은 Gradle 설정(화면 작업)에만 쓰이고 이미지 빌드에는 넘기지 않는다.
+    runs-on: ubuntu-latest
+    env:
+      CI: 'true'
+      GHP_USER: ${{ secrets.GHP_USER }}
+      GHP_READ_TOKEN: ${{ secrets.GHP_READ_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Docker available
+        run: docker info --format '{{.ServerVersion}}' && docker compose version
+
+      - name: Build the images (public sources only — no credentials)
+        shell: bash
+        run: |
+          start=$(date +%s)
+          env -u GHP_USER -u GHP_READ_TOKEN docker compose -f docker/compose.yaml --profile demo build --progress=plain
+          echo "image build: $(( $(date +%s) - start )) s" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Compose E2E (start-up timings, Playwright, artifact scan)
+        run: ./gradlew :web:composeE2e --console=plain
+
+      - name: Secrets absent everywhere, files 0600, management port unpublished
+        if: always()
+        run: bash docker/ci/scan-secrets.sh
+
+      - name: Down (volumes too)
+        if: always()
+        run: docker compose -f docker/compose.yaml --profile demo down -v --remove-orphans
+
+      - name: Token absent from the compose E2E artifact
+        id: token-check
+        if: always()
+        shell: bash
+        run: |
+          test -n "$GHP_READ_TOKEN" || { echo 'GHP_READ_TOKEN is empty'; exit 1; }
+          hits=$( { find web/build/compose-e2e -type f -print0 2>/dev/null | xargs -0 -r grep -l -F -- "$GHP_READ_TOKEN" || true; } | wc -l)
+          echo "files containing the token: $hits"
+          test "$hits" -eq 0
+
+      - name: Compose E2E reports
+        if: always() && steps.token-check.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: compose-e2e-reports
+          path: |
+            web/build/compose-e2e/junit.xml
+            web/build/compose-e2e/summary.json
+            web/build/compose-e2e/screens.json
+            web/build/compose-e2e/operations.json
+            web/build/compose-e2e/jaeger.json
+            web/build/compose-e2e/services.json
+            web/build/compose-e2e/compose-config.yaml
+            web/build/compose-e2e/logs/**
+
   no-docker:
     # CLAUDE.md: Docker가 없으면 통합 테스트는 스킵이 아니라 실패해야 한다. 이 잡은 "실패해야 성공"이다(지시문 v1.2 §7·C8).
     # 컨테이너 잡(container:)은 쓰지 않는다 — GitHub Actions는 컨테이너 잡에 호스트의 /var/run/docker.sock을 마운트하므로 Docker가 사라지지 않는다

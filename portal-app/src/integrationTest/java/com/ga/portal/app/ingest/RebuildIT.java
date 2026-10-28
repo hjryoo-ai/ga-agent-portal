@@ -1,8 +1,13 @@
 package com.ga.portal.app.ingest;
 
 import com.ga.platform.core.tenant.TenantId;
+import com.ga.portal.domain.DataStatus;
 import com.ga.portal.domain.IngestState;
+import com.ga.portal.domain.ReconSource;
+import com.ga.portal.domain.view.ReconRow;
 import com.ga.portal.infra.persistence.AuditAccessRepository;
+import com.ga.portal.infra.persistence.EarningsMonthRepository;
+import com.ga.portal.infra.persistence.ReconResultRepository;
 import com.ga.portal.infra.persistence.ViewResetRepository;
 import com.ga.portal.infra.testing.SeedData;
 import com.ga.portal.ingest.apply.IngestMetrics;
@@ -15,9 +20,11 @@ import com.ga.portal.projection.testing.GoldenViews;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -319,6 +326,65 @@ class RebuildIT {
         assertThat(ViewRig.views(t)).isEqualTo(before);
         assertThat(ViewRig.views(t).get("earnings_month")).filteredOn(r -> r.contains("\"close_ym\":\"202608\"")).singleElement().asString()
                 .contains("\"data_status\":\"DRIFT\"");
+    }
+
+    /** 대사가 남긴 행 하나(BATCH — 출처 seq 0, 금액은 시험값). */
+    private static ReconRow batch(String status, String ym, String at) {
+        return batch(status, ym, at, 0);
+    }
+
+    /** 기본 키가 (시각, 출처, 순번)이라 같은 시각의 BATCH 두 행은 순번으로만 갈린다(상태는 키가 아니다). */
+    private static ReconRow batch(String status, String ym, String at, long seq) {
+        return new ReconRow("A-1001", ym, Instant.parse(at), 1_800_000, 0, 0, Optional.of(1_700_000L), Optional.of(0L), Optional.of(0L),
+                Optional.empty(), status, ReconSource.BATCH, seq);
+    }
+
+    private void reconcile(TenantId t, ReconRow... rows) {
+        ReconResultRepository recon = new ReconResultRepository(rig.gateway);
+        EarningsMonthRepository months = new EarningsMonthRepository(rig.gateway);
+        rig.transactions.inTransaction(t, () -> {
+            for (ReconRow r : rows) {
+                recon.insertIfAbsent(r);
+                months.markDataStatus(r.agentId(), r.closeYm(), r.status().equals("DRIFT") ? DataStatus.DRIFT : DataStatus.OK);
+            }
+            return null;
+        });
+    }
+
+    private static String dataStatus(TenantId t, String ym) {
+        return ViewRig.views(t).get("earnings_month").stream().filter(r -> r.contains("\"close_ym\":\"" + ym + "\"")).findFirst().orElseThrow()
+                .replaceAll(".*\"data_status\":\"([A-Z]+)\".*", "$1");
+    }
+
+    /**
+     * F11(포털 Phase 8 ①, 설계서 §6.7 v1.11): 투영은 이벤트 출처 DRIFT만 다시 쓴다 — 대사(BATCH)가 남긴 미해결 표식은 재구축 txB 끝에서 대사 표를
+     * 읽어 되살린다. 운영자 재구축 뒤 그 달은 여전히 "확인 중"이고, 다른 달은 그대로 OK다. 주입 S1(복원 호출 제거)·S2(가장 오래된 행).
+     */
+    @Test
+    void anOperatorRebuildKeepsAnUnresolvedBatchDriftMarked() {
+        TenantId t = ingested("RB_F11", a1());
+        reconcile(t, batch("DRIFT", "202608", "2026-10-18T19:00:00Z"));
+        assertThat(dataStatus(t, "202608")).isEqualTo("DRIFT");
+
+        assertThat(commands(t, ViewRig.feed(t, a1())).rebuild(t, ACTOR).exitCode()).isZero();
+
+        assertThat(dataStatus(t, "202608")).as("the batch drift survives the operator rebuild").isEqualTo("DRIFT");
+        assertThat(dataStatus(t, "202702")).isEqualTo("OK");
+        assertThat(ViewRig.views(t).get("recon_result")).as("read only").hasSize(1);
+    }
+
+    /** F11의 짝: 해결된 달(DRIFT 뒤 REPAIRED — 같은 시각 포함, {@code Episodes}와 같은 규칙)은 재구축 뒤에도 OK다. */
+    @Test
+    void aRepairedMonthStaysOkAfterARebuild() {
+        TenantId t = ingested("RB_F11R", a1());
+        reconcile(t, batch("DRIFT", "202608", "2026-10-18T19:00:00Z"), batch("REPAIRED", "202608", "2026-10-19T19:00:00Z"),
+                batch("DRIFT", "202702", "2026-10-18T19:00:00Z"), batch("REPAIRED", "202702", "2026-10-18T19:00:00Z", 1));
+        assertThat(ViewRig.views(t).get("recon_result")).as("all four rows stored (CI run 40686776209: seq 0 twice was skipped)").hasSize(4);
+
+        assertThat(commands(t, ViewRig.feed(t, a1())).rebuild(t, ACTOR).exitCode()).isZero();
+
+        assertThat(dataStatus(t, "202608")).isEqualTo("OK");
+        assertThat(dataStatus(t, "202702")).as("REPAIRED at the same instant resolves").isEqualTo("OK");
     }
 
     /** 전수 불변식 문장(설계서 §6.7): 월 합계·원장 누적·전기 연쇄가 어긋난 행의 키를 돌려주고, 다른 테넌트의 행은 보지 않는다. */

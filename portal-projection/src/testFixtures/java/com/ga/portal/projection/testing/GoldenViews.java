@@ -136,6 +136,63 @@ public final class GoldenViews {
         }
     }
 
+    /**
+     * 요약 대조(포털 Phase 8 계획 Q12 — 데모 스트림처럼 전 행 파일이 사람이 검토할 수 없을 만큼 클 때): {@code summary.jsonl}에 표마다 행 수와
+     * 정규형 줄 전부의 SHA-256, {@code agents/<표>.jsonl}에 손 검산 설계사들의 행 전부({@code agent_id}가 있는 표는 그 열로,
+     * {@code policy_limit_history}는 그 설계사들 원장의 {@code ledger_id}로). {@code -Pgolden.update=true}이면 대신 쓴다.
+     */
+    public static void assertSummary(String stream, Map<String, List<String>> actual, java.util.Set<String> agents) {
+        assertThat(actual.keySet()).containsExactlyElementsOf(TABLES);
+        List<String> summary = new ArrayList<>();
+        for (String table : TABLES) {
+            List<String> rows = actual.get(table);
+            summary.add(canonical(obj("table", table, "rows", rows.size(), "sha256", sha256(String.join("\n", rows)))));
+        }
+        java.util.Set<String> ledgers = new java.util.TreeSet<>();
+        for (String row : actual.get("policy_limit")) {
+            JsonNode n = Envelopes.JSON.readTree(row);
+            if (agents.contains(n.path("agent_id").asString())) {
+                ledgers.add(n.path("ledger_id").asString());
+            }
+        }
+        Map<String, List<String>> picked = new LinkedHashMap<>();
+        for (String table : TABLES) {
+            picked.put(table, actual.get(table).stream().filter(row -> {
+                JsonNode n = Envelopes.JSON.readTree(row);
+                return n.has("agent_id") ? agents.contains(n.path("agent_id").asString()) : ledgers.contains(n.path("ledger_id").asString());
+            }).toList());
+        }
+        Path dir = dir(stream);
+        boolean update = Boolean.parseBoolean(System.getProperty("golden.update", "false"));
+        try {
+            if (update) {
+                Files.createDirectories(dir.resolve("agents"));
+                Files.write(dir.resolve("summary.jsonl"), summary, StandardCharsets.UTF_8);
+                for (String table : TABLES) {
+                    Files.write(dir.resolve("agents").resolve(table + ".jsonl"), picked.get(table), StandardCharsets.UTF_8);
+                }
+                return;
+            }
+            assertThat(Files.readAllLines(dir.resolve("summary.jsonl"), StandardCharsets.UTF_8)).as("%s/summary", stream)
+                    .containsExactlyElementsOf(summary);
+            for (String table : TABLES) {
+                List<String> expected = Files.readAllLines(dir.resolve("agents").resolve(table + ".jsonl"), StandardCharsets.UTF_8).stream()
+                        .filter(l -> !l.isBlank()).map(l -> canonical(Envelopes.JSON.readTree(l))).sorted().toList();
+                assertThat(picked.get(table)).as("%s/agents/%s", stream, table).containsExactlyElementsOf(expected);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static String sha256(String text) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     /** 이벤트 seq 열({@code source_seq}·{@code last_seq}·{@code estimate_basis_seq})을 뺀 투영 — 순서 변형 대조(C3). 원장 순번은 순서와 무관해 남긴다. */
     public static Map<String, List<String>> withoutSeqs(Map<String, List<String>> tables) {
         Map<String, List<String>> out = new LinkedHashMap<>();

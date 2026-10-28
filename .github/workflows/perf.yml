@@ -1,0 +1,62 @@
+name: perf
+
+# 성능 측정(포털 Phase 8 지시문 ⑤, 계획 Q13·P-2) — 수동 실행만(workflow_dispatch, 게이트 아님). GitHub 러너(공유 2 vCPU)에서 compose 데모를 띄우고
+# k6(perf/k6/home.js — 설계사 30명이 홈 다섯 콜 묶음을 동시에)를 돌려 요약 JSON을 아티팩트로 올린다. 보고서는 이 run ID를 1차 증거로 인용한다.
+# 판정은 설계서 §13의 예시값(콜 p95 ≤ 300 ms, 묶음 p95 ≤ 800 ms) — 넘으면 이 실행이 실패로 남는다(기록이지 병합 조건이 아니다).
+
+# workflow_dispatch는 기본 가지에 있는 워크플로만 부를 수 있다 — 병합 전(수용 심사 전)에는 `perf/**` 가지를 밀어 돌린다(그 가지는 측정 뒤 지운다).
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: k6 duration (constant 30 VUs)
+        default: 3m
+        required: true
+  push:
+    branches: ['perf/**']
+
+permissions:
+  contents: read
+
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Docker available
+        run: docker info --format '{{.ServerVersion}}' && docker compose version && nproc
+
+      - name: Build the images (public sources only — no credentials)
+        shell: bash
+        run: |
+          start=$(date +%s)
+          docker compose -f docker/compose.yaml --profile demo build --progress=plain
+          echo "image build: $(( $(date +%s) - start )) s" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Start and wait for the first sync (timed)
+        shell: bash
+        run: |
+          start=$(date +%s)
+          docker compose -f docker/compose.yaml --profile demo up -d
+          bash docker/ci/wait-demo.sh "$start" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: k6 — home bundle, 30 agents
+        shell: bash
+        run: |
+          mkdir -p perf/out && chmod 777 perf/out
+          docker run --rm --network host -v "$PWD:/repo:ro" -v "$PWD/perf/out:/out" \
+            grafana/k6@sha256:2dd4756ec6e14e62778916e1eb850108e4b499304c02df56760fa0bdb0fba0b8 \
+            run -e DURATION='${{ inputs.duration || '3m' }}' /repo/perf/k6/home.js
+
+      - name: Down
+        if: always()
+        run: docker compose -f docker/compose.yaml --profile demo down -v --remove-orphans
+
+      - name: k6 summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: k6-summary
+          path: |
+            perf/out/summary.json

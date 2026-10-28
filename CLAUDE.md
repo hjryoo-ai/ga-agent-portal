@@ -92,6 +92,14 @@
 - 의존성: pnpm `--frozen-lockfile`, 정확한 판(`saveExact`), 공개 1일 미만 판 금지(`minimumReleaseAge`), 라이선스 표 `web/THIRD-PARTY.md`(`webLicenses`가 대조), `pnpm audit` 결과는 CI 아티팩트로 기록.
 - E2E 센티널(허구 증권번호·식별자)은 `pii-sentinels.properties`의 `e2e` 키, 문의 본문 센티널은 `inquiry` 키(Phase 6 — 작성·상세 화면 DOM과 상세 응답에서만 허용) — 평문 스캔은 웹 산출물·Vitest 결과·E2E 결과도 본다.
 
+## 데모·배포 규약 (포털 Phase 8 — 설계서 §3.2·§9·§11, `docs/운영.md` §9)
+- **데모 코드 경로 0.** 제품 코드에 데모 분기·데모 시계·데모 계정·미리 채운 입력이 없다. 데모는 운영 이미지에 compose 값(서버 인자·configtree·`seed-demo.sql`)만 다르다. 엔진 대역은 `portal-demo`(엔진 데모 묶음 바이트를 계약 경로로 — 제품 모듈이 의존하지 않는다).
+- **비밀은 compose가 처음 뜰 때 볼륨 파일로 만든다**(`docker/secrets/generate.sh` — 0600, 소비자 uid 소유). 저장소·`.env`·이미지·환경 변수·로그·`docker compose config` 출력에 값 0 — CI `compose-e2e`의 `scan-secrets.sh`가 본다. 데모 렐름의 사용자 비밀번호(허구값 하나)만 README에 쓰고 렐름 파일은 해시만.
+- **서비스는 전부 프로파일 `demo`**, 호스트 공개는 `127.0.0.1`의 8080·8180·16686뿐(관리 포트·DB·엔진 대역 0). 이미지는 digest 고정(태그는 주석). 서버만의 설정은 서버 인자로 — 환경 변수는 `exec`로 부르는 CLI에도 실린다.
+- **내보내기는 끝점 속성이 있을 때만**(OTLP — compose만, 시험·CI 0). 관리 포트는 전용 보안 체인(헬스·`/actuator/prometheus`만), 앱 포트의 같은 경로는 같은 404. 프레임워크 스팬은 HTTP 서버 하나, 높은 기수 키는 뺀다(`docs/지표.md` §4.1 닫힌 키 목록).
+- **브라우저 로그인은 Authorization Code + PKCE(S256)** — 토큰·`code_verifier`·`state`는 메모리에만, 콜백은 `code`·`state`를 그리지 않고 주소를 바로 지운다, 본 창은 같은 `state`의 `BroadcastChannel` 메시지 한 번만 받는다. 발급자·클라이언트는 `/auth/config`(요청 출처 = `web_origin` 정확 일치, 아니면 같은 404). CSP `connect-src`는 그 출처의 발급자 출처 하나만 더한다.
+- **compose E2E와 k6는 CI에서만 띄운다**(로컬 Docker 없음 전제). 산출물(compose 설정·로그·Playwright 결과)에 잡은 비밀·증권번호 0.
+
 ## 작업 방식
 - Phase 단위: 계획 → 승인 → 단계 커밋(테스트와 같은 커밋) → 보고서 → 태그 → PR. 지시문의 완료 기준(C-n)을 전부 테스트로 증명해야 다음 Phase로 간다.
 - 테스트 없는 기능 코드 커밋 금지. 통합 테스트는 Testcontainers(PostgreSQL, digest 고정). Docker가 없으면 통합 테스트는 **실패**해야 한다(스킵 금지).

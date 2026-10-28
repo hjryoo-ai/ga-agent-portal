@@ -2,6 +2,7 @@
 import { createBrowserRouter, type RouteObject } from 'react-router';
 import { ROUTE_PATHS, type RoutePath } from '../routes';
 import { HomeScreen } from '../screens/HomeScreen';
+import { CallbackScreen } from '../ui/States';
 import { Layout } from './Layout';
 
 type Child = Omit<RouteObject, 'path' | 'index' | 'children'>;
@@ -19,6 +20,8 @@ const screens: Record<RoutePath, Child> = {
   '/inquiries': { lazy: () => import('../screens/InquiriesScreen').then((s) => ({ Component: s.InquiriesScreen })) },
   '/inquiries/new': { lazy: () => import('../screens/InquiryNewScreen').then((s) => ({ Component: s.InquiryNewScreen })) },
   '/inquiries/:id': { lazy: () => import('../screens/InquiryScreen').then((s) => ({ Component: s.InquiryScreen })) },
+  // main.tsx가 React 전에 처리한다 — 여기 닿으면(콜백 처리가 없는 창) 같은 안내만
+  '/auth/callback': { element: <CallbackScreen /> },
 };
 
 export function createRouter() {

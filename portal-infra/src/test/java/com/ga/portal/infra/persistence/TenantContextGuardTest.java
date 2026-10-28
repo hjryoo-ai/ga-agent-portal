@@ -100,7 +100,7 @@ class TenantContextGuardTest {
         assertThat(publicMethods(ClawbackItemRepository.class)).containsExactly("find", "save");
         assertThat(publicMethods(PolicyFlagRepository.class)).containsExactly("find", "save");
         assertThat(publicMethods(ReconResultRepository.class)).containsExactly("driftAndRepaired", "insertIfAbsent");
-        assertThat(publicMethods(ViewResetRepository.class)).containsExactly("deleteViews", "violations");
+        assertThat(publicMethods(ViewResetRepository.class)).containsExactly("deleteViews", "restoreDriftMarks", "violations");
         assertThat(publicMethods(ViewRepository.class)).isEmpty();
         assertThat(publicMethods(IdentityLinkRepository.class)).containsExactly("find");
         assertThat(publicMethods(AgentQueryRepository.class)).containsExactly("byType", "deferralPolicies", "deferrals", "deferralsOfLine", "dueMonths", "history",
@@ -164,6 +164,7 @@ class TenantContextGuardTest {
         assertThatThrownBy(() -> links.find("sub")).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(viewReset::deleteViews).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(viewReset::violations).isInstanceOf(TenantNotBoundException.class);
+        assertThatThrownBy(viewReset::restoreDriftMarks).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> query.profile("A-1001")).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> query.months("A-1001", "202601", "202612")).isInstanceOf(TenantNotBoundException.class);
         assertThatThrownBy(() -> query.month("A-1001", "202608")).isInstanceOf(TenantNotBoundException.class);

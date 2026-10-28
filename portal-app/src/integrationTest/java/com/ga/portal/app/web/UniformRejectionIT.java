@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 불일치·경로 변수 형식 — 도 같은 바이트·같은 헤더. {@code MANAGER}와 남의 자원은 조회 진입점이 생기는 4단계에서 더한다. 쿼리 파라미터 형식 오류만 400 한 가지.
  * 포털 Phase 6(C6): 쿠키만 싣고 {@code Authorization}이 없는 {@code GET}·{@code PATCH}·{@code POST}는 같은 401 바이트 — 인증은 Bearer 머리뿐이라 쿠키로는
  * 아무것도 열리지 않는다(CSRF 토큰·{@code Origin} 검사를 두지 않는 근거, 설계서 §9 v1.9). 새 경로의 메서드 불일치도 같은 404. 문의 429 바이트는 여기 고정한다.
+ * 포털 Phase 8(계획 Q2 조건 A): 인증 없는 {@code /auth/config}의 미등록 출처는 {@code /api} 밖 없는 경로의 404와 같은 바이트·같은 머리 — 인증 머리가 있어도.
  */
 class UniformRejectionIT extends ApiIntegrationTest {
 
@@ -143,6 +144,21 @@ class UniformRejectionIT extends ApiIntegrationTest {
         assertThat(post.statusCode()).as("method mismatch").isEqualTo(404);
         assertThat(post.body()).isEqualTo(NOT_FOUND);
         assertThat(headers(post)).as("method mismatch headers").isEqualTo(first);
+    }
+
+    @Test
+    void anUnregisteredOriginOnTheAuthConfigIsTheUnroutedNotFound() {
+        java.net.URI config = java.net.URI.create("http://127.0.0.1:" + port + AuthConfigHandler.PATH);
+        HttpResponse<byte[]> unrouted = get("/no-such-screen", b -> b);
+        for (HttpRequest.Builder b : List.of(
+                HttpRequest.newBuilder(config).header("Origin", WEB_STRANGER).GET(),
+                HttpRequest.newBuilder(config).header("Origin", WEB_STRANGER).header("Authorization", "Bearer " + ISSUER_1.token(SUB_A, AUD_1)).GET(),
+                HttpRequest.newBuilder(config).GET())) {
+            HttpResponse<byte[]> r = send(b);
+            assertThat(r.statusCode()).isEqualTo(404);
+            assertThat(r.body()).isEqualTo(NOT_FOUND);
+            assertThat(headers(r)).isEqualTo(headers(unrouted));
+        }
     }
 
     @Test

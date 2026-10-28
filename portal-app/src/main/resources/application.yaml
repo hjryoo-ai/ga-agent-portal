@@ -28,9 +28,15 @@ management:
     web:
       exposure:
         include: health
+  # 포털 Phase 8(OTLP 내보내기 — docs/지표.md §4): 프레임워크 관측 중 Spring Security 필터 체인·예약 작업(1초 인제스트 틱)은 끈다 — 스팬 표 밖의
+  # 키를 싣고 틱마다 스팬을 만든다. HTTP 서버 관측(http.server.requests)은 둔다(높은 기수 키는 TracingConfiguration이 스팬에서 뺀다).
+  observations:
+    enable:
+      "[spring.security]": false
+      "[tasks.scheduled]": false
   health:
     # 트랜잭션 밖 DB 접근 금지(불변 규약 2) — DB 헬스 지표는 테넌트 없이 커넥션을 쓰므로 끈다.
-    # 포털 Phase 8에서 전용 롤(portal_health)로 복원한다(설계서 §9 롤 표).
+    # 전용 롤(portal_health)과 함께 켤 일은 v2다(포털 Phase 8 계획 Q5 — 설계서 §9 롤 표).
     db:
       enabled: false
 

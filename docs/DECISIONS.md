@@ -2,6 +2,85 @@
 
 설계서·지시문과 다르게 정한 것, 지시문·설계서의 오류로 판정된 것을 날짜순으로 적는다. 판정 원문은 각 항목의 출처 문서다.
 
+## 색인 (포털 Phase 8 — 전 Phase)
+
+세 종류의 판정 번호는 저장소 전체에서 하나씩 늘어난다(문서 안 날짜순 절에 정의, 아래는 찾아보기용 요지 — 판정 문장은 본문).
+
+- **DE**(지시문 오류, 30건): 지시문·승인 문구가 코드·계약·다른 규칙과 맞지 않아 계획이나 심사가 다르게 정한 것.
+- **DD**(설계서 결함, 21건): 설계서(정본) 자체가 틀렸거나 빠뜨린 것 — 설계서 변경 이력에도 적었다.
+- **RM**(심사 누락·되돌림, 4건): 수용 심사가 놓쳤거나 뒤 지시문이 되돌린 판정.
+- **P{N}-n**(구현에서 계획과 다르게 한 것): Phase마다 따로 센다 — Phase 1 4건 · Phase 2 12건 · Phase 3 10건 · Phase 4 12건 · Phase 5 17건 · Phase 6 18건 · Phase 7 17건 · Phase 8 17건 (합 107). 각 Phase 보고서 §5가 같은 표다.
+
+### DE — 지시문 오류
+
+| ID | 절 | 요지(대상 문구) |
+|---|---|---|
+| DE-1 | 2026-10-16 — Phase 0 계획 승인 | v1.2 §5 "payload `oneOf` 13" |
+| DE-2 | 2026-10-16 — Phase 0 계획 승인 | v1.2 §5 "샘플(부록 A-1 seq 1~9)" |
+| DE-3 | 2026-10-16 — Phase 0 계획 승인 | 플랫폼 0.2 정비 지시문 완료 기준·v1.2 C9의 "패키지 접근 설정" |
+| DE-4 | 2026-10-16 — Phase 0 계획 승인 | v1.2 §6 "v1.0 (a)~(d) 그대로", "SQL 스캔 v1.0 그대로" |
+| DE-5 | 2026-10-16 — Phase 0 수용 심사 | v1.2 §6 (g) "`java.sql`·`javax.sql`·`DataSource` 직접 참조는 플랫폼 클래스와 허용 목록만" |
+| DE-6 | 2026-10-16 — Phase 0 수용 심사 | 계획 승인 Q8 "전 의존성 SHA-256" |
+| DE-7 | 2026-10-17 — Phase 1 계획 승인 | Phase 1 지시문 §0 K7 "`gross` = Σ `commType ≠ CLAWBACK` 라인" |
+| DE-8 | 2026-10-17 — Phase 1 계획 승인 | Phase 1 지시문 D-2·D-4 |
+| DE-9 | 2026-10-17 — Phase 2 계획 승인 | Phase 2 지시문 D-11 "커서 `REBUILDING` → 한 트랜잭션 안에서" |
+| DE-10 | 2026-10-17 — Phase 2 계획 승인 | C9 "플래그 매핑 10종" |
+| DE-11 | 2026-10-17 — Phase 2 계획 승인 | D-2·D-3의 V4 목록 |
+| DE-12 | 2026-10-17 — Phase 3 계획 승인 | D-1 "테넌트는 토큰의 `iss`로", "`portal_directory`는 이 두 열을 읽지 못한다" |
+| DE-13 | 2026-10-17 — Phase 3 계획 승인 | D-2·D-9·D-10 |
+| DE-14 | 2026-10-17 — Phase 3 계획 승인 | D-6 "`now − 커서 updated_at` > `sync_delay_seconds`" |
+| DE-15 | 2026-10-17 — Phase 3 계획 승인 | D-7 "`policyKey` = SHA-256(…) 앞 16자(비가역)" |
+| DE-16 | 2026-10-17 — Phase 3 계획 승인 | D-8 "`ETag: W/"<seq>"`" |
+| DE-17 | 2026-10-17 — Phase 3 계획 승인 | D-3 "감사 `audit_access` … detail = 사유 코드" |
+| DE-18 | 2026-10-17 — Phase 3 계획 승인 | D-10 "`USING limit_multiple::text`", D-11 "모든 컨트롤러 메서드는 `@UseCaseEntry`… |
+| DE-19 | 2026-10-17 — Phase 3 수용 심사 | 계획 승인 Q6 "지표 `tenant` 태그는 발급자가 등록된 경우만" |
+| DE-20 | 2026-10-22 — Phase 4 수용 심사 | 지시문 ⑦ "한도 카드 1(삭감 145,000)" |
+| DE-21 | 2026-10-22 — Phase 4 수용 심사 | 지시문 Q4 "다음 달 분급 예정액을 API가 주지 않는다" |
+| DE-22 | 2026-10-23 — Phase 5 수용 심사 | 지시문 ②·⓪·① |
+| DE-23 | 2026-10-23 — Phase 5 수용 심사 | 지시문 ⑦ "`simId` 센티널 — 화면 0" ↔ ⑥ "결과에 `simId`", 질문 6 "라우터 `state`는 새로고침에 사… |
+| DE-24 | 2026-10-23 — Phase 5 수용 심사 | 지시문 §0 "계약 1.1.0은 별도 PR" |
+| DE-25 | 2026-10-24 — Phase 6 계획 승인 | ⓪ "`oneOf`/`discriminator` 대신 `if/then` — 생성 클라이언트가 좁힐 수 있게" |
+| DE-26 | 2026-10-24 — Phase 6 계획 승인 | ① "수신자는 이벤트의 `agentId`"·"`LIMIT_REBASE:…:{postingSeq}`", ② "`APPLY_ERROR`… |
+| DE-27 | 2026-10-27 — Phase 7 계획 승인 | 질문 1 "E2 `estimate_cycle_01`의 분급 도래" |
+| DE-28 | 2026-10-27 — Phase 7 계획 승인 | ② "여전히 DRIFT면 행은 그대로(미해결)" |
+| DE-29 | 2026-10-28 — Phase 7 수용 심사 | 지시문 C2 "차이 값을 담는 열·필드·로그 0"은 덧셈·뺄셈을 보는 스캔 없이 요구했다. C12 "평문 스캔(트레이스 포함)"은… |
+| DE-30 | 2026-10-28 — Phase 8 계획 승인 | ③ "`state`·`code_verifier`는 메모리" · ⓪ "명세 두 달" · ⑤ "p95 목표 §10" · ⑥ "운영자… |
+
+### DD — 설계서 결함
+
+| ID | 절 | 요지(대상 문구) |
+|---|---|---|
+| DD-1 | 2026-10-16 — Phase 0 계획 승인 | v1.0·v1.1 §5 `notification`의 `UNIQUE (tenant_id, dedup_key)` ↔ §6.5 `STM`… |
+| DD-2 | 2026-10-16 — Phase 0 계획 승인 | §4.2 `CommissionCalculated`의 `amount`와 `limitCutAmt`의 관계가 표에 없었다 |
+| DD-3 | 2026-10-16 — Phase 0 수용 심사 | §5 `simulation_log.status`에 값 집합이 없었다(다른 상태 컬럼은 주석에 있었다) |
+| DD-4 | 2026-10-17 — 계약 v1.1 | 계약 v1.0이 엔진에 없는 데이터를 필수로 요구했다 — `policySummary.productName`·`insuredMask`… |
+| DD-5 | 2026-10-17 — Phase 1 수용 심사·계약 v1.2 | §5 `policy_limit_history` PK `(tenant_id, ledger_id, posting_seq)` — `Li`… |
+| DD-6 | 2026-10-17 — Phase 1 수용 심사·계약 v1.2 | §5 `tenant.status`가 `ACTIVE/PAUSED`만 적고 뜻을 적지 않았다 — Phase 1 지시문이 `tenant`… |
+| DD-7 | 2026-10-17 — Phase 1 수용 심사·계약 v1.2 | 부록 A-1 예시값(월납 300,000, FY 2,800,000)은 엔진 시드로 재현되지 않는다 — 설계 시 엔진 요율을 보지 않… |
+| DD-8 | 2026-10-17 — Phase 2 계획 승인 | §5 불변식 "`accum_paid ≤ limit_amount`"가 부록 A-3 감액 재산정(newLimit < accum)과 모… |
+| DD-9 | 2026-10-17 — Phase 2 계획 승인 | §6.2 분급 상태 그림이 `HELD → RELEASED`를 그렸다 — 엔진 `ScheduleEntry.released`는 `SC`… |
+| DD-10 | 2026-10-17 — 계약 v1.3 | §4.3 동기 API가 엔진이 계산에 쓰는 입력을 빠뜨렸다 — 요율 키의 보험사(`insurerCd`), 해약의 경과 회차(`el`… |
+| DD-11 | 2026-10-17 — 계약 v1.4 | 계약 YAML이 YAML 1.1 해석기에서 뜻이 바뀌는 키를 썼다 — `fyCommissionByInstallment[].no`가… |
+| DD-12 | 2026-10-17 — Phase 3 계획 승인 | §7 공통 필드 `dataStatus: OK\|DRIFT\|SYNC_DELAYED` 한 필드가 두 뜻 — 동기화(테넌트 커서, 시… |
+| DD-13 | 2026-10-17 — Phase 3 계획 승인 | §7 `/me` "마스킹된 이름" — 본인에게 본인 이름을 가릴 이유가 없고, 설계서 §9의 마스킹 대상(고객)과 섞였다 |
+| DD-14 | 2026-10-22 — Phase 4 수용 심사 | §10 홈 콜 `status=WARN` — 정확히 WARN만 돌려준다 |
+| DD-15 | 2026-10-22 — Phase 4 수용 심사 | §8 한도 상세의 규정 기준일·상품명·피보험자 — 계약 `Ledger`에 없다 |
+| DD-16 | 2026-10-22 — Phase 4 수용 심사 | §11 "PWA"·§12 Phase 4 알림함 |
+| DD-17 | 2026-10-23 — Phase 5 수용 심사 | §8 "이번 달 실수령 변화" — 엔진 값은 귀속월 `gross + clawbackOffset` 전후(Q24). §8 "규정 기준… |
+| DD-18 | 2026-10-24 — Phase 6 계획 승인 | §6.5 표 — `LIMIT_REBASE` 키의 `postingSeq`, 단계 ↔ 심각도 짝 미명시, DRIFT 달 조건 없음,… |
+| DD-19 | 2026-10-27 — Phase 7 계획 승인 | 포털 계약 `contracts/events/v1/payloads/StatementEstimated` 설명문 "gross = Σ 그… |
+| DD-20 | 2026-10-28 — Phase 7 수용 심사 | 설계서 §7 ETag `seq.sync.cfg`(v1.6)·Phase 3 승인 Q4 — 데이터가 `seq` 없이 바뀌는 경로(대사… |
+| DD-21 | 2026-10-28 — Phase 8 계획 승인 | §13 응답 시간 목표 없음(P-2) · 부록 B 체결일 2025-07(룰 효력 2026-01 — P-3) · 부록 B CUT·H… |
+
+### RM — 심사 누락·되돌림
+
+| ID | 절 | 요지(대상 문구) |
+|---|---|---|
+| RM-1 | 2026-10-17 — Phase 2 수용 심사 | 재구축의 F10 ⓑ(Phase 1 멱등 규칙 `SKIPPED(REPLAYED)`와 재구축의 상호작용 — 커서가 `APPLIED`… |
+| RM-2 | 2026-10-17 — Phase 3 수용 심사 | Phase 2 심사가 `TenantContextGuardTest` 목록에서 `ViewResetRepository`가 빠진 것을 보… |
+| RM-3 | 2026-10-22 — Phase 4 수용 심사 | Phase 3 수용 Q3가 §14.1 #12("`ADJUSTMENT` 라인이 지급 런에 아직 포함되지 않은 달")를 "`ADJUS`… |
+| RM-4 | 2026-10-24 — Phase 6 계획 승인 | Phase 5 수용 §4 Q1(별도 파생기 + 자기 커서)을 지시문이 되돌림 — 파생은 적용 트랜잭션 안, 프로젝터 다음 |
+
 ## 2026-10-16 — Phase 0 계획 승인 (`docs/phase-00-계획승인.md`)
 
 ### 지시문 오류 (승인 §6)
@@ -453,7 +532,60 @@ DE-24 문구 정정(Q30): "앞으로 포털 계약 개정은 작업 브랜치 �
 - DD-19(`StatementEstimated` 설명문)는 고치지 않았다(승인 그대로 — 다음 이벤트 계약 개정 때).
 - 영문 번역(`docs/en/`)은 v1.6 그대로.
 
+## 2026-10-28 — Phase 7 수용 심사 (`docs/phase-07-수용심사.md`)
+
+판정: **수용, 조건 없음** — PR #28 병합(merge commit `2ccfc44`), `phase-7` = `56181af` 유지. **P7-15 승인**(ETag 재료 = `seq`·동기화·설정 + 커서 `updated_at` + 마지막 `recon_run` — 설계서 §7 v1.10 문장 그대로, 콜마다 +1 문장 수용). P7-1~17·F1~F12 전부 수용. 사용자 직접 계획 승인 네 번째 Phase — 사후 확인, 뒤집은 것 없음.
+
+| # | 무엇 | 처리 |
+|---|---|---|
+| DD-20 | 설계서 §7 ETag `seq.sync.cfg`(v1.6)·Phase 3 승인 Q4 — 데이터가 `seq` 없이 바뀌는 경로(대사·재구축)를 보지 못했다 | v1.10 §7(P7-15, F5) — 승인 |
+| DE-29 | 지시문 C2 "차이 값을 담는 열·필드·로그 0"은 덧셈·뺄셈을 보는 스캔 없이 요구했다. C12 "평문 스캔(트레이스 포함)"은 메모리 내보내기에서 성립하지 않았다 | `ReconArithmeticScanTest`(P7-16, F4), 스팬 덤프(P7-17, F6) |
+
+- F11(운영자 `ingest rebuild`가 BATCH DRIFT 표식을 지운다)은 **Phase 8 1단계**: `Rebuilder` txB 끝의 불변식 하나 — "미해결 DRIFT 행(`recon_result` 마지막 행이 DRIFT)이 있는 (설계사, 달)은 `data_status = DRIFT`". 재구축은 대사 표를 읽기만 한다(파생 아님 — ArchUnit 규칙 그대로). §6.7 "지우지 않는 것"의 짝으로 "되살리는 것". 그때까지는 `docs/운영.md` §8 절차.
+- E2E ⓑ에서 iOS만 통과한 이유는 그대로 둔다 — Phase 8 데모 E2E에서 WebKit `no-cache` 처리 차이인지 한 줄로 확인.
+- Phase 8 재료(심사 §3): Q1 compose의 대사는 앱 안 스케줄러 그대로(cron 컨테이너 없음), 데모 스크립트는 `recon run --ym`을 한 번 불러 판정을 보인다. Q2 OTLP 넣는다 — compose에 Jaeger(또는 Tempo) + `opentelemetry-exporter-otlp`(Boot BOM), 내보내기는 속성으로만 켜고 시험 프로파일은 꺼진 채, 새 의존성은 검증 메타데이터 승인 대상, compose E2E가 수집기 API에서 스팬 하나를 읽어 속성 키 ⊆ 표 확인. Q3 위 F11. Q4 DD-19는 **Phase 8 0단계** — 이벤트 계약 `StatementEstimated` 설명문 표기 1.4.1("도래 예정 미리보기 포함, basisSeq는 하한") + 엔진 사본 갱신 PR(선승인 패턴). Q5 ETag 문장 그대로 — k6(§13) 홈 콜 p95가 문제면 그때. Q6 `run.sh`를 compose 안에서(판정 ⑤ 포함), §14.1 #14 닫기(Keycloak PKCE), README 포트폴리오 관점, 데모 생성기 부록 B.
+- 실 엔진 E2E는 병합 뒤 `main`에서 사용자가 실행 → `RESULT.md`(판정 다섯 — Phase 3·5·6·7 몫).
+
+## 2026-10-28 — Phase 8 계획 승인 (`docs/phase-08-계획승인.md`)
+
+승인: 계획 Q1~Q14 권장안 전부, P-1~P-24 그대로. 돌이킬 수 없는 결정 일곱 전부 예 — 엔진 데모 PR(약 9 MB, 두 저장소 — 엔진 CI 뒤 직접 병합), 이벤트 계약 표기 1.4.1(포털 `main` 표기 PR → 엔진 사본 PR), 새 의존성 둘(`opentelemetry-exporter-otlp`·`micrometer-registry-prometheus` — 검증 메타데이터 추가만·제거 0·전이 목록 표), 요청별 CSP(`connect-src`만), V10(`tenant.web_origin`·`oidc_client_id`), 인증 없는 `GET /auth/config`, 웹 린트 닫힌 예외 `src/auth/oidc.ts`. 작은 조건 A(`/auth/config` — 출처 정확 일치, 두 필드, 열거 불가 시험, `/auth/callback`은 `PublicPathsTest` 밖)·B(콜백은 `code`·`state`를 그리지 않고 즉시 주소에서 지움, 본 창은 일치하는 `state` 메시지 하나만 받고 채널을 닫음 — Vitest 둘 + 주입 S16). Q5 관리 포트 호스트 공개 0을 compose E2E가 본다. Q11 명세 샘플은 `index.json` 하나로 묶는다. 이번 승인이 돌이킬 수 없는 결정의 "예"를 적었다(사용자 확인 대신).
+
+### 지시문 오류
+
+| # | 지시문 문구 | 무엇이 틀렸나 | 정한 것 |
+|---|---|---|---|
+| DE-30 | ③ "`state`·`code_verifier`는 메모리" · ⓪ "명세 두 달" · ⑤ "p95 목표 §10" · ⑥ "운영자 재구축 뒤 표식 유지로 대체" | 전체 페이지 리다이렉트에서는 메모리가 사라진다(P-9). 두 달만이면 야간 스케줄러가 매일 `INCONCLUSIVE`(Q11). §10의 p95는 투영 지연이다(P-2). compose 안에는 미해결 DRIFT가 없어 보일 것이 없다(Q4) | 팝업 + `BroadcastChannel`, 전 달 명세 샘플, §13 예시값, F11 증거는 `RebuildIT`·하네스 E2E ⓔ′ |
+
+### 설계서 결함
+
+| # | 무엇 | 처리 |
+|---|---|---|
+| DD-21 | §13 응답 시간 목표 없음(P-2) · 부록 B 체결일 2025-07(룰 효력 2026-01 — P-3) · 부록 B CUT·HELD가 엔진 표준 룰로 불가(P-4) · §6.7·§14.1 #11 설정 키 이름 `portal.ingest.rebuild.max-events`(실제 `rebuild-max-events` — P-18) · 부록 B "포털 생성기"(지시문 §0이 뒤집음 — 엔진이 만든다) | v1.11에서 고친다: §13 예시값(콜 p95 ≤ 300 ms, 홈 다섯 묶음 ≤ 800 ms, 30명), 부록 B 체결일 2026-01~2027-06·엔진 데모 시험 픽스처, 키 이름 |
+
 ## 2026-10-28 — 포털 계약 v1.4.1 (표기만 — DD-19 닫음)
 
 포털 Phase 8 계획 승인(돌이킬 수 없는 결정 2)의 ⓐ: `contracts/events/v1/payloads/StatementEstimated.v1.schema.json`의 `gross` 설명문에서 "포털 earnings_month.gross와 같은 정의"를 지우고 "잠정 명세는 그 달 도래 예정 분급의 미리보기를 더할 수 있다 — 같다는 보장이 없다, basisSeq는 하한"을 적었다. 제약 무변경 — `EventSchemaTest.descriptionOnlyChangesSince140`(스키마 15개에서 문자열 `description`을 뺀 키 정렬 트리의 SHA-256이 1.4.0 = `2ccfc44`의 값 `f26fd753…c1926`과 같다), `v141EstimatedGrossDocumentsThePreview`. `contracts/CHECKSUMS` 갱신. `main` 기반 PR — `CLAUDE.md`의 공유 계약 표기 변경 예외로 자체 CI 뒤 병합하고, 엔진 사본 PR(ⓑ)의 `UPSTREAM`이 그 병합 커밋을 가리킨다. 설계서 v1.10.1.
 
+## 2026-10-28 — Phase 8 구현에서 계획과 다르게 한 것 (보고서 §5)
+
+단계마다 더한다(보고서 §5가 이 표를 옮긴다).
+
+| # | 계획 | 구현 | 이유 |
+|---|---|---|---|
+| P8-1 | P-3·DD-21 "체결일 2026-01~2027-06", P-4 HELD 케이스 | 엔진 데모 창 **2026-03~2028-02**(마감 202603~202801, 잠정 202802), 기본 계약 체결일 2026-03~2027-06. HELD는 커브 계약 `DEMO-S05`(2027-01-15)의 202801 이후 미유지 판정 주입 | `DEFER_AFTER_FY`는 분급 일정을 만들지 않고(엔진 계약 설명), 커브 분급은 12개월 뒤에 도래한다 — 2026-01 시작으로는 창 안에서 HELD가 생기지 않았다(엔진 `9963809`, 설계서 부록 B v1.11) |
+| P8-2 | ④ S4 "`DemoServerTest.outOfSampleIs500`" | `DemoServerTest.statementsAnswerOnlyTheSampleRequests`·`simulationsAnswerOnlyTheSampleRequestsWhateverTheKeyOrder`(S4는 둘째가 잡았다 — 로컬 주입) | 명세·시뮬레이션 두 경로를 한 시험에 섞지 않았다 — 이름만 다르다 |
+| P8-3 | Q2 "허용 목록 항목은 그대로 하나" | 직접 DB 접근 허용 목록(닫힌 FQN — `ArchitectureRulesTest.PORTAL_DB_ALLOWLIST`)은 그대로 `IssuerDirectoryReader` 하나. **문장 허용 목록**(`TenantPredicateScanTest.ALLOWLIST` — (파일, 문장) 쌍)은 같은 파일의 둘째 문장 `byWebOrigin` +1(사유 기재), 자바 SQL 문장 수 +1 | `web_origin` 조회도 테넌트 바인딩 전의 `tenant` 조회라 `tenant_id` 술어가 없다 — 문장 단위 목록은 문장마다 항목이다. 계획 문장의 "항목"은 클래스 목록이었다 |
+| P8-4 | 지시문 ③ "ID/액세스/refresh 전부 메모리" | 액세스·refresh만 메모리, **ID 토큰은 받아도 보관하지 않는다** | 화면이 ID 토큰을 쓰는 곳이 없다(로그아웃은 refresh 토큰으로 종료 끝점에 POST). 보관하지 않는 것이 더 좁다 — PKCE 저장 위치 표에 "없음" |
+| P8-5 | (계획에 없음) | `PortalApiCompatibilityTest`에 1.2.0 사본(`main` `80880b8`의 바이트 — SHA-256 고정, `contracts/CHECKSUMS`의 그 판 줄과 같다)을 더해 1.0.0~1.2.0 → 1.3.0 추가뿐을 대조. `PortalApiContractTest`에 인증 없는 연산 닫힌 표(`GET /auth/config` — `security: []`, 200·404만, `no-cache`) | 1.2.0 → 1.3.0이 추가뿐이라는 것을 직전 판과도 대조해야 한다. 경로 대조 시험(`pathsAreTheAuthorizationMatrix…`)은 공개 연산을 건너뛰고 새 시험이 그 연산을 본다 |
+| P8-6 | ① F11 시험 `DriftMarkAgreementIT`(격자 259)·`RebuildIT.aRepairedMonthStaysOkAfterARebuild` | 격자 행마다 `source_seq` = 행 순번, 같은 시각의 BATCH 짝은 순번 0·1. `RebuildIT`는 넣은 행 수(4)를 먼저 단언 | `recon_result` 기본 키는 (시각, 출처, `source_seq`) — 상태가 키가 아니라 같은 시각·같은 출처·순번 0의 두 행이 충돌(격자 — 23505)하거나 `insertIfAbsent`가 둘째를 조용히 건너뛰었다(`RebuildIT` — DRIFT만 남음). CI run 40686776209가 잡았다(시험 자료의 결함 — 복원 문장은 그대로) |
+| P8-7 | 돌이킬 수 없는 결정 3 "새 의존성 둘 — 검증 메타데이터 추가만" | 그 둘의 전이(잠금 +18, `<component>` +24 — 빈 `GRADLE_USER_HOME` 재생성, 둘째 빈 홈에서 `build` 통과)에 더해 **Node 배포본 `node-24.22.0-linux-arm64.tar.gz` 한 줄**(nodejs.org `SHASUMS256.txt` 값 = 받은 파일) | 이미지 빌드(Q14)가 Apple 실리콘 호스트에서는 linux-arm64로 돈다 — 메타데이터에는 darwin-arm64·linux-x64뿐이라 "누구나 `docker compose up`"이 검증에서 실패한다. 제거 0 |
+| P8-8 | Q5 "노출은 관리 포트에서만" | 관리 포트 전용 보안 체인 `ManagementPortSecurityConfiguration`(`management.server.port`가 있을 때만, 요청의 로컬 포트 = 실제 관리 포트일 때만 걸린다 — 헬스 셋 + `/actuator/prometheus` GET, 나머지 같은 404). `PUBLIC_PATHS`(앱 포트)는 그대로 | 관리 포트 요청도 같은 보안 필터를 지난다 — 나머지 체인의 `denyAll`이 `/actuator/prometheus`를 404로 막는다. 앱 포트 목록에 넣으면 앱 포트에서 그 경로가 `permitAll` → MVC 404(다른 바이트)가 된다. `ManagementPortIT`(관리 포트 200·앱 포트 같은 404) |
+| P8-9 | (계획에 없음 — 지시문 ② "다섯 화면에 데이터") | compose 서버 인자 `--portal.ingest.limit=1000`, 등록 SQL의 `params.poll_interval_seconds = 5` | 폴링은 한 회에 한 쪽이다 — 기본(200건·10초)이면 17,856건에 약 15분. 계약 상한 1,000건·주기 하한 5초로 약 90초. 제품 코드·기본값은 그대로(운영 설정 값만) |
+| P8-10 | P-21 "앱 키 ⊆ 스팬 표, 나머지 ⊆ 수집 경로 목록" | 프레임워크 관측: Spring Security 필터 체인·예약 작업은 끈다(`management.observations.enable`), HTTP 서버 관측(`http.server.requests`)은 두되 높은 기수 키를 스팬에서 뺀다(`TracingConfiguration` — `ObservationFilter`). `docs/지표.md` §4.1에 프레임워크 스팬 키(닫힌 다섯)·수집 경로 키 두 목록 | `TracingLeakIT`는 앱 조립이 아니라 인제스트 장치 위라 프레임워크 스팬을 본 적이 없다. OTLP를 켜면 MVC 스팬의 `http.url`(문의 id·`calcId`·월이 실린 경로 원문)과 1초 틱마다의 예약 작업 스팬이 나간다. 포털 자신의 스팬은 추적기 직접이라 거르개와 무관, 지표는 낮은 기수 키만 쓴다 |
+| P8-11 | 지시문 ② "compose `demo` 프로파일"·C5 `docker compose --profile demo up` | 서비스 여덟 전부 `profiles: [demo]` — 명령은 `docker compose -f docker/compose.yaml --profile demo up --build`(파일이 `docker/`에 있어 `-f`) | 프로파일 없이 `up`하면 아무것도 뜨지 않는다(`engine` 프로파일은 v2 — Q6). `DemoComposeFilesTest`가 전원 `demo`를 단언 |
+| P8-12 | 조건 B 주입 S16 "콜백이 `code`를 그리면 compose E2E 누출 검사가 잡는다" | compose E2E에 콜백 문서를 **직접 연** 시험 하나(카나리 `code`·`state` → 주소 정리·DOM에 0). 팝업 흐름의 code·state·토큰은 잡아서 비밀 목록에 넣고 본 창 DOM·주소·응답·콘솔·산출물을 훑는다 | 팝업은 넘기자마자 닫혀 그 DOM을 결정적으로 읽을 수 없다. 스크립트가 열지 않은 창은 `window.close()`가 무시되므로 직접 연 콜백은 남아 검사할 수 있다 |
+| P8-13 | Q13 "수동 워크플로 `perf.yml`(`workflow_dispatch`)" | `workflow_dispatch` + `push: branches: ['perf/**']` — 병합 전 측정은 `perf/phase-8` 가지(작업 가지와 같은 커밋)를 밀어 돌리고 측정 뒤 지운다 | GitHub은 기본 가지에 있는 워크플로만 수동으로 부른다 — `main` 병합은 수용 심사 뒤라 그 전에는 `perf.yml`을 부를 수 없다. 게이트가 아닌 것은 그대로(PR·`main`에 걸리지 않는다) |
+| P8-14 | 계획 P-21 "Jaeger·OTel SDK가 더하는 키(`otel.scope.name`·`span.kind`·`otel.status_code`…)는 닫힌 목록으로" | 그 목록(`collector-span-keys`)을 **지웠다**. 스팬 속성은 앱 표·프레임워크 키뿐이고, 자원 키 목록(`collector-process-keys`)은 넷. 두 목록의 키는 전부 실제로 나타나야 한다(남으면 실패) | Jaeger 2.22에는 내부 API `/api/traces`가 없다(404 — CI 40694514233). 질의 API v3(OTLP JSON)에서는 범위·종류·상태가 속성이 아니라 필드다 — 관측(CI 40696153752, 스팬 5,924): 속성 키 13개 전부 표 안, 자원 키 넷. 쓰이지 않는 허용 항목은 폐기 항목이다 |
+| P8-15 | 계획 ⑤ "운영자 재구축 전후 다섯 화면 응답 동일" | 본문이 같되 `asOf.at` **하나만** 비교에서 뺀다(재구축 뒤 값 ≥ 전 값을 따로 본다). `asOf.seq`·데이터는 바이트 그대로 | `asOf.at`은 커서가 그 seq에 닿은 시각이다 — 재구축이 커서를 새로 쓰므로 바뀌는 것이 맞다(CI 40696153752: 바뀐 것은 그 필드뿐) |
+| P8-16 | 계획 ⑤ compose E2E 화면 이동 | 로그인 뒤 이동은 문서를 다시 읽지 않는다(`history.pushState` + `popstate` — 라우터 이동). 타임라인은 24개월을 고른다 | PKCE 토큰은 메모리에만 있다 — `page.goto`(새로 읽기)는 세션을 버린다(설계대로, CI 40693176741). 데모 스트림의 첫 분급 도래는 2028-01이라 이번 달부터 12개월(기본)에는 없다(README 데모 절) |
+| P8-17 | 계획 C7 증거 "compose E2E(저장소 5종·주소·회전 — 짧은 수명 렐름으로 갱신 한 번)" | compose E2E는 회전을 돌리지 않는다 — 데모 렐름의 액세스 수명은 300초 그대로, 시험 1은 약 7초. 회전의 증거는 Vitest `rotationReplacesTheRefreshToken`(주입 S7)과 Keycloak 렐름 설정(`revokeRefreshToken`, 재사용 0 — `DemoComposeFilesTest`) | 갱신을 보려고 렐름 수명을 줄이면 데모 렐름이 시험용 값이 된다(데모 코드 경로 0). 렐름을 시험마다 따로 두면 compose가 둘이 된다. 저장소 5종·주소·콜백은 compose E2E가 그대로 본다 |

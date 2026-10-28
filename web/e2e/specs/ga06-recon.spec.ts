@@ -2,8 +2,10 @@
 // GA06 — A-1 둘째 판만(이웃 없음, 명세 스텁 a1, 자동 재구축 끔으로 시작): ⓐ 정상 → ⓑ 라인 누락 → DRIFT "확인 중" → 자동 켬 → 재구축·재대사 REPAIRED → 정상,
 // 알림 추가 0 → ⓒ 뒤처짐(머리 11 + 피드 503) → DRIFT 0 → ⓓ 엔진 다운 → DRIFT 0. 한 프로젝트 안에서 순서대로.
 // GA04 — 포털 손 스트림의 EVENT DRIFT(스트림 자체의 불일치): ⓔ 자동 끔 → "확인 중" 그대로·재구축 0, 켬 → 재구축 1·여전히 "확인 중", 한 번 더 → 재구축 0(시도함 — Q14).
+// 포털 Phase 8 ①(F11): ⓔ′ GA06 — 자동 끔, 라인 누락 → 대사 DRIFT → 운영자 `ingest rebuild` → 라인은 돌아왔지만 BATCH DRIFT 표식은 재구축 끝 불변식이 되살려
+// 여전히 "확인 중" → 재대사 MATCH → 그 자리에서 REPAIRED(P7-2) → 정상. 운영자 재구축은 recon: 행위자가 아니다(재구축 수 그대로).
 import type { Page } from '@playwright/test';
-import { advance, autoRebuild, corruptLine, failFeed, me, openHead, recon, reconRebuilds, statementEngine, streamLength, tenantOf } from '../support/env';
+import { advance, autoRebuild, corruptLine, failFeed, me, openHead, rebuild, recon, reconRebuilds, statementEngine, streamLength, tenantOf } from '../support/env';
 import { expect, test, type Portal } from '../support/fixtures';
 import type { NotificationPage } from '../support/inbox';
 
@@ -112,4 +114,20 @@ test('ⓔ 스트림 자체의 DRIFT(GA04): 끔 → 그대로, 켬 → 재구축 
   expect(await recon(t, ['202608']), 'recon run again').toBe(0);
   expect(await reconRebuilds(t), 'tried — not rebuilt again (Q14)').toBe(1);
   await drift('ga04 e tried');
+});
+
+test('ⓔ′ 운영자 재구축 뒤에도 미해결 DRIFT는 "확인 중"(F11) → 재대사 MATCH → 정상', async ({ page, portal }, info) => {
+  const t = tenantOf(info.project.name, 'GA06');
+  await autoRebuild(t, false);
+  await corruptLine(t, '1');
+  expect(await recon(t, MONTHS), 'recon run (auto rebuild off)').toBe(0);
+  await august(page, portal, t, 'ga06 e2 drift', '855,000', true);
+
+  expect(await rebuild(t), 'operator ingest rebuild').toBe(0);
+  await august(page, portal, t, 'ga06 e2 rebuilt', '1,800,000', true);
+  expect(await reconRebuilds(t), 'the operator is not recon:').toBe(1);
+
+  expect(await recon(t, MONTHS), 'recon run after the rebuild').toBe(0);
+  await august(page, portal, t, 'ga06 e2 repaired', '1,800,000', false);
+  expect(await reconRebuilds(t)).toBe(1);
 });

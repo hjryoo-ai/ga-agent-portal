@@ -1,0 +1,9 @@
+{"rows":0,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","table":"agent_profile"}
+{"rows":6951,"sha256":"c3b308f18346885dc122465acb2d704ed2f63c55fffa3c3cd86ec8ea5a96ce8d","table":"earnings_line"}
+{"rows":716,"sha256":"9b3c6d14381ba0f5594147d3d179f89ff88653657bb6e9a7c95fc0dc145e3eec","table":"earnings_month"}
+{"rows":327,"sha256":"5feb26775aa588e63d01496913b631d919f9d5d97e52e22747eb1fbed7a3817a","table":"policy_limit"}
+{"rows":3710,"sha256":"5b6d801ae11d0c73e9aa925b684ecd51b6c7f3ee058f211bc56a50f0317c5d58","table":"policy_limit_history"}
+{"rows":5136,"sha256":"f4daafc85826106417538e0f671c5978dcbf99bfaa75abe1514d2988e7a3fd8c","table":"deferral_item"}
+{"rows":21,"sha256":"fda6acdb6826b9a9942a518f8c2b76fa71e80da405777be16fa1ba9afb38930a","table":"clawback_item"}
+{"rows":40,"sha256":"76cb31a5590d8ffa5e9bfadd290fb53815f9437d49f4e12a3789323ba5a95668","table":"policy_flag"}
+{"rows":0,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","table":"recon_result"}

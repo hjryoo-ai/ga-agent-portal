@@ -61,6 +61,10 @@ spring-boot-micrometer-tracing-opentelemetry = { module = "org.springframework.b
 micrometer-tracing-bridge-otel = { module = "io.micrometer:micrometer-tracing-bridge-otel" }
 # 시험 전용: 메모리 스팬 수집기(TracingLeakIT — 스팬 이름·속성에 값이 없음을 본다)
 opentelemetry-sdk-testing = { module = "io.opentelemetry:opentelemetry-sdk-testing" }
+# 포털 Phase 8(계획 Q5·④, 승인 돌이킬 수 없는 결정 3 — 판은 Spring Boot BOM): OTLP 스팬 내보내기(끝점 속성이 있을 때만 켜진다 — compose만)와
+# Prometheus 긁기 끝점(관리 포트 전용 — compose 안 네트워크, 호스트 공개 0)
+opentelemetry-exporter-otlp = { module = "io.opentelemetry:opentelemetry-exporter-otlp" }
+micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

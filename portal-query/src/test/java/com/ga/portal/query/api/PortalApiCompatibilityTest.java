@@ -24,6 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 아래에 고정, {@code contracts/CHECKSUMS}의 그 판 줄과 같다)이고, 두 문서를 구조로 대조한다. 1.1.1(포털 Phase 5 수용 심사 B1)은 1.1.0({@code phase-5}
  * {@code 0fccc05}의 바이트 — 같은 방식으로 고정)에 대해서도 같은 대조를 통과하고, 그 위에 <b>설명문만</b> 바뀌었다(설명·요약·{@code info.version}을 뺀
  * 두 문서가 같다). 1.2.0(포털 Phase 6 — 알림·문의)은 1.0.0·1.1.0·1.1.1({@code main} {@code 3a24ce6}의 바이트 — 같은 방식으로 고정) 모두에 대해 추가뿐이다.
+ * 1.3.0(포털 Phase 8 — 인증 없는 {@code /auth/config})은 1.0.0~1.2.0({@code main} {@code 80880b8}의 바이트 — 같은 방식으로 고정, {@code contracts/CHECKSUMS}의
+ * 그 판 줄과 같다) 모두에 대해 추가뿐이다.
  * <ul>
  *   <li>이전 판의 모든 경로·메서드·응답 코드·컴포넌트가 새 판에 있다.</li>
  *   <li>객체의 {@code required}는 같다(새 속성은 선택), 기존 속성의 정의는 같다 — 설명문만 바뀔 수 있고 {@code enum}은 늘기만 한다.</li>
@@ -37,12 +39,14 @@ class PortalApiCompatibilityTest {
     static final String V1_0_0_SHA256 = "0d14a1827aab03f61505dd3a24451728e1a73a59f6645cbbc8d7563b4fbf9188";
     static final String V1_1_0_SHA256 = "8bf4e71cee7f924bf32cc6c31d0dcd20bd2e879a6a7a7622f278586687c64065";
     static final String V1_1_1_SHA256 = "2f529ade506bd43869b54fa37f59ebae10efa4de5698275150161aeaf6114742";
+    static final String V1_2_0_SHA256 = "be7f09c3a915a081b5cb9e651e6d838454b73d959ef7004f33791a4c1e62baee";
     /** 새 키가 들어와도 되는 맵(그 맵의 직속 키만 — 그 아래는 다시 규칙대로). */
     static final Set<String> ADDITIVE_MAPS = Set.of("properties", "paths", "responses", "schemas", "parameters", "headers");
 
     static JsonNode oldApi;
     static JsonNode v110Api;
     static JsonNode v111Api;
+    static JsonNode v120Api;
     static JsonNode newApi;
 
     @BeforeAll
@@ -51,6 +55,7 @@ class PortalApiCompatibilityTest {
         oldApi = yaml.readTree(baseline("1.0.0", V1_0_0_SHA256));
         v110Api = yaml.readTree(baseline("1.1.0", V1_1_0_SHA256));
         v111Api = yaml.readTree(baseline("1.1.1", V1_1_1_SHA256));
+        v120Api = yaml.readTree(baseline("1.2.0", V1_2_0_SHA256));
         newApi = yaml.readTree(Files.readString(Path.of(System.getProperty("ga.repoRoot"), "contracts", "api", "v1", "portal-api.openapi.yaml")));
     }
 
@@ -195,11 +200,22 @@ class PortalApiCompatibilityTest {
 
     @Test
     void version120IsAdditiveOver100And110And111() {
-        assertThat(newApi.path("info").path("version").asString()).isEqualTo("1.2.0");
-        assertThat(compare(oldApi, newApi)).as("1.0.0 → 1.2.0").isEmpty();
-        assertThat(compare(v110Api, newApi)).as("1.1.0 → 1.2.0").isEmpty();
-        assertThat(compare(v111Api, newApi)).as("1.1.1 → 1.2.0").isEmpty();
+        assertThat(v120Api.path("info").path("version").asString()).isEqualTo("1.2.0");
+        assertThat(compare(oldApi, v120Api)).as("1.0.0 → 1.2.0").isEmpty();
+        assertThat(compare(v110Api, v120Api)).as("1.1.0 → 1.2.0").isEmpty();
+        assertThat(compare(v111Api, v120Api)).as("1.1.1 → 1.2.0").isEmpty();
         assertThat(compare(oldApi, v111Api)).as("1.0.0 → 1.1.1").isEmpty();
+    }
+
+    @Test
+    void version130IsAdditiveOver100To120() {
+        assertThat(newApi.path("info").path("version").asString()).isEqualTo("1.3.0");
+        assertThat(compare(oldApi, newApi)).as("1.0.0 → 1.3.0").isEmpty();
+        assertThat(compare(v110Api, newApi)).as("1.1.0 → 1.3.0").isEmpty();
+        assertThat(compare(v111Api, newApi)).as("1.1.1 → 1.3.0").isEmpty();
+        assertThat(compare(v120Api, newApi)).as("1.2.0 → 1.3.0").isEmpty();
+        assertThat(newApi.path("paths").propertyNames()).as("1.3.0 adds exactly one path").hasSize(v120Api.path("paths").propertyNames().size() + 1)
+                .contains("/auth/config");
     }
 
     @Test
