@@ -21,7 +21,7 @@ final class AuthConfigHandler {
     private static final MediaType PROBLEM = MediaType.parseMediaType(ProblemResponses.CONTENT_TYPE);
 
     /** 응답 본문 — 두 필드뿐(계약 {@code portal-api} 1.3.0 {@code AuthConfig}, 추가 속성 금지). */
-    record AuthConfig(String issuer, String clientId) {
+    record AuthConfig(String issuer, String clientId, String audience) {
     }
 
     private AuthConfigHandler() {
@@ -37,6 +37,6 @@ final class AuthConfigHandler {
             return ServerResponse.status(404).contentType(PROBLEM).body(ProblemResponses.NOT_FOUND);
         }
         return ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).cacheControl(CacheControl.noCache())
-                .body(new AuthConfig(login.get().issuer(), login.get().clientId()));
+                .body(new AuthConfig(login.get().issuer(), login.get().clientId(), "portal"));
     }
 }
