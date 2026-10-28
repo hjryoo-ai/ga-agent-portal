@@ -173,7 +173,19 @@ test('운영: recon run(MATCH — OK)·status·운영자 재구축 전후 다섯
   const rebuild = cli('ingest', 'rebuild', `--tenant=${TENANT}`);
   expect(rebuild.code, rebuild.out).toBe(0);
   const after = await Promise.all(paths.map((p) => api(p, token)));
-  for (const [i, r] of after.entries()) expect(r.body, paths[i]).toBe(before[i]?.body);
+  // 같은 seq의 같은 뷰여야 한다. 다른 것은 `asOf.at` 하나뿐이어야 한다 — 커서가 그 seq에 닿은 시각이라 재구축이 새로 쓴다(뒤로 가지 않는다).
+  const split = (body: string) => {
+    const v = JSON.parse(body) as { asOf?: { at?: string } };
+    const at = v.asOf?.at;
+    if (v.asOf !== undefined) delete v.asOf.at;
+    return { at, rest: JSON.stringify(v) };
+  };
+  for (const [i, r] of after.entries()) {
+    const a = split(r.body);
+    const b = split(before[i]?.body ?? '');
+    expect(a.rest, paths[i]).toBe(b.rest);
+    if (b.at !== undefined) expect(Date.parse(a.at ?? ''), `${paths[i] ?? ''} asOf.at`).toBeGreaterThanOrEqual(Date.parse(b.at));
+  }
   expect([...before, ...after].flatMap((r) => leaks(r.body))).toEqual([]);
   mkdirSync(out, { recursive: true });
   writeFileSync(
@@ -217,7 +229,7 @@ async function jaegerSpans(): Promise<ResourceSpans[]> {
     });
 }
 
-/** docs/지표.md §4 — 앱 스팬 표, 프레임워크 스팬 표, 수집 경로가 더하는 키(닫힌 두 목록). */
+/** docs/지표.md §4 — 앱 스팬 표, 프레임워크 스팬 키, 자원(프로세스) 키(닫힌 두 목록). */
 function catalog() {
   const doc = readFileSync(resolve(repo, 'docs/지표.md'), 'utf8');
   const app = new Map<string, Set<string>>();
@@ -229,11 +241,11 @@ function catalog() {
     if (b?.[1] === undefined) throw new Error(`no ${name} block in docs/지표.md`);
     return new Set(b[1].split('\n').map((l) => l.trim()).filter((l) => l !== ''));
   };
-  return { app, http: block('framework-span-keys'), span: block('collector-span-keys'), process: block('collector-process-keys') };
+  return { app, http: block('framework-span-keys'), process: block('collector-process-keys') };
 }
 
 test('Jaeger: 스팬 이름·키가 닫힌 표 안, 값에 누출 0(P-21)', async () => {
-  const { app, http, span, process } = catalog();
+  const { app, http, process } = catalog();
   expect(app.size).toBeGreaterThanOrEqual(11);
   let traces: ResourceSpans[] = [];
   const spansOf = (rs: ResourceSpans) => (rs.scopeSpans ?? []).flatMap((ss) => ss.spans ?? []);
@@ -252,7 +264,7 @@ test('Jaeger: 스팬 이름·키가 닫힌 표 안, 값에 누출 0(P-21)', asyn
       if (own === null) problems.push(`span outside the table: ${s.name}`);
       for (const a of s.attributes ?? []) {
         seen.keys.add(a.key);
-        if (!(own?.has(a.key) ?? false) && !span.has(a.key)) problems.push(`${s.name}: key ${a.key}`);
+        if (!(own?.has(a.key) ?? false)) problems.push(`${s.name}: key ${a.key}`);
         const v = JSON.stringify(a.value);
         if (leaks(v).length > 0 || /A-20[0-9]{2}/.test(v)) problems.push(`${s.name}: value of ${a.key} leaks`);
       }
@@ -268,5 +280,8 @@ test('Jaeger: 스팬 이름·키가 닫힌 표 안, 값에 누출 0(P-21)', asyn
     JSON.stringify({ resourceSpans: traces.length, spans: seen.spans, names: [...seen.names].sort(), keys: [...seen.keys].sort(), processKeys: [...seen.processKeys].sort() }, null, 2),
   );
   expect([...new Set(problems)]).toEqual([]);
+  // 두 닫힌 목록은 정확해야 한다 — 나타나지 않는 키가 목록에 남아 있으면 실패(폐기 항목 금지)
+  expect([...http].filter((k) => !seen.keys.has(k)), 'framework-span-keys never seen').toEqual([]);
+  expect([...process].filter((k) => !seen.processKeys.has(k)), 'collector-process-keys never seen').toEqual([]);
   expect(policyNumbers()).toHaveLength(432);
 });
